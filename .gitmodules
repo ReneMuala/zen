@@ -1,0 +1,6 @@
+[submodule "libs/ilc"]
+	path = libs/ilc
+	url = https://github.com/reneMuala/ilc
+[submodule "libs/supernova"]
+	path = libs/supernova
+	url = https://github.com/renemuala/supernova.git
