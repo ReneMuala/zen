@@ -78,8 +78,10 @@ namespace zen
         hlt,
         // modify stack
         most,
+        go,
+        go_if,
         jump,
-        jump_if,
+        jump_if
     };
     class vm
     {

@@ -76,9 +76,9 @@ void test_vm()
         add_i64, vm::ref(acc), vm::ref(acc), vm::ref(i),
         lt_i64, vm::ref(is_i_lt_end), vm::ref(i), vm::ref(end),
         inc_i64, vm::ref(i),
-        jump, +2,
+        go, +2,
         hlt,
-        jump_if, vm::ref(is_i_lt_end), -14,
+        go_if, vm::ref(is_i_lt_end), -14,
         hlt,
     };
     vm1.load(code);
