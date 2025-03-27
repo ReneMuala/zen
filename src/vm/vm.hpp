@@ -81,7 +81,9 @@ namespace zen
         go,
         go_if,
         jump,
-        jump_if
+        jump_if,
+        call,
+        ret,
     };
     class vm
     {

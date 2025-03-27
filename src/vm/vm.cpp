@@ -271,16 +271,24 @@ void zen::vm::run(stack & stack, const i64 & entry_point)
             else
                 i+=2;
             break;
+        case call:
+            stack -= sizeof(i64); // NOLINT
+            *static_cast<i64*>(stack-sizeof(i64)) = i+2;
+            i = *address<i64>(this->code[i + 1], stack) - 1;
+            break;
+        case ret:
+            i = *static_cast<i64*>(stack-sizeof(i64)) - 1;
+            stack += sizeof(i64);  // NOLINT
+            break;
         default:
             fmt::println(stderr, "fatal error: unsupported operation {} (zen vm halted at {})", this->code[i], i);
         case hlt:
-            return;
+            goto __end;
         }
     }
+    __end:
     if (not stack.empty())
-    {
         fmt::println(stderr, "fatal error: stack not cleared, {} items remaining", stack.size());
-    }
 }
 
 

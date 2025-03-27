@@ -20,8 +20,11 @@ void test_vm()
     vm::f64 f = 1.0;
     vm::boolean boolean_e, boolean_f;
     vm::i64 g = 1, h = 2, i = 3, j, k, l;
-    vm::i64 sum2, begin = 1, end = 5, acc;
+    vm::i64 sum2, begin = 1, end = 5, acc, acc2;
     vm::boolean is_i_lt_end;
+    vm::i64 v_2 = 2, v_minus_14 = -14;
+    vm::i64 m = 10, n = 15, o;
+    vm::i64 callAddress;
     std::vector<vm::i64> code = {
         inc_i64, vm::ref(a),
         dec_i64, vm::ref(a),
@@ -79,10 +82,41 @@ void test_vm()
         go, +2,
         hlt,
         go_if, vm::ref(is_i_lt_end), -14,
+        bit_xor, vm::ref(acc2), vm::ref(acc2), vm::ref(acc2),
+        i64_to_i64, vm::ref(i), vm::ref(begin),
+        add_i64, vm::ref(acc2), vm::ref(acc2), vm::ref(i),
+        lt_i64, vm::ref(is_i_lt_end), vm::ref(i), vm::ref(end),
+        inc_i64, vm::ref(i),
+        jump, vm::ref(v_2),
+        hlt,
+        jump_if, vm::ref(is_i_lt_end), vm::ref(v_minus_14),
+        // call, 2,
+        bit_xor, vm::ref(o), vm::ref(o), vm::ref(o),
+        call, vm::ref(callAddress),
+        call, vm::ref(callAddress),
+        call, vm::ref(callAddress),
+        hlt,
+        most, -8,
+        i64_to_i64, -8, vm::ref(o),
+        add_i64, vm::ref(o), vm::ref(m), vm::ref(n),
+        add_i64, vm::ref(o), vm::ref(o), -8,
+        most, +8,
+        ret,
         hlt,
     };
+    callAddress = static_cast<vm::i64>(code.size()) - 17;
+    // code[code.size() - 9] = static_cast<vm::i64>(code.size()) - 6;
     vm1.load(code);
     vm1.run();
+    fmt::println(R"(   .-') _   ('-.       .-') _
+  (  OO) )_(  OO)     ( OO ) )
+,(_)----.(,------.,--./ ,--,'
+|       | |  .---'|   \ |  |\
+'--.   /  |  |    |    \|  | )
+(_/   /  (|  '--. |  .     |/
+ /   /___ |  .--' |  |\    |
+|        ||  `---.|  | \   |
+`--------'`------'`--'  `--'  )");
     fmt::println(">> arith i64");
     fmt::println("{} + {} = {}", a, b, sum);
     fmt::println("{} - {} = {}", a, b, sub);
@@ -121,8 +155,11 @@ void test_vm()
     fmt::println("2 = {}", k);
     fmt::println("3 = {}", l);
     fmt::println("{} = {}", sum2, sum);
-    fmt::println(">> jmp");
+    fmt::println(">> go");
     fmt::println("1 + 2 + 3 + 4 + 5 = {}", acc, i);
+    fmt::println(">> jump");
+    fmt::println("1 + 2 + 3 + 4 + 5 = {}", acc2, i);
+    fmt::println("o = {}", o);
 }
 
 void test_stack()
