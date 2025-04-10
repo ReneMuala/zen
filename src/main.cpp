@@ -24,7 +24,7 @@ void test_vm()
     vm::boolean is_i_lt_end;
     vm::i64 v_2 = 2, v_minus_14 = -14;
     vm::i64 m = 10, n = 15, o;
-    vm::i64 callAddress;
+    vm::i64 callSumAccAddress, callSumParamAddress, callSumParamResult;
     std::vector<vm::i64> code = {
         inc_i64, vm::ref(a),
         dec_i64, vm::ref(a),
@@ -90,11 +90,16 @@ void test_vm()
         jump, vm::ref(v_2),
         hlt,
         jump_if, vm::ref(is_i_lt_end), vm::ref(v_minus_14),
-        // call, 2,
         bit_xor, vm::ref(o), vm::ref(o), vm::ref(o),
-        call, vm::ref(callAddress),
-        call, vm::ref(callAddress),
-        call, vm::ref(callAddress),
+        call, vm::ref(callSumAccAddress),
+        call, vm::ref(callSumAccAddress),
+        call, vm::ref(callSumAccAddress),
+        most, -8,
+        push, vm::ref(a),
+        push, vm::ref(b),
+        call, vm::ref(callSumParamAddress),
+        i64_to_i64, vm::ref(callSumParamResult), -24,
+        most, +8+16,
         hlt,
         most, -8,
         i64_to_i64, -8, vm::ref(o),
@@ -102,21 +107,18 @@ void test_vm()
         add_i64, vm::ref(o), vm::ref(o), -8,
         most, +8,
         ret,
+        add_i64, -32, -24, -16,
+        ret,
         hlt,
     };
-    callAddress = static_cast<vm::i64>(code.size()) - 17;
-    // code[code.size() - 9] = static_cast<vm::i64>(code.size()) - 6;
+    callSumAccAddress = 226;
+    callSumParamAddress = 242;
+    // fmt::println("placeholder: {}", std::find(code.begin(), code.end(), placeholder) - code.begin());
+    // fmt::println("code {}", code[callSumAccAddress]);
+    // return;
     vm1.load(code);
     vm1.run();
-    fmt::println(R"(   .-') _   ('-.       .-') _
-  (  OO) )_(  OO)     ( OO ) )
-,(_)----.(,------.,--./ ,--,'
-|       | |  .---'|   \ |  |\
-'--.   /  |  |    |    \|  | )
-(_/   /  (|  '--. |  .     |/
- /   /___ |  .--' |  |\    |
-|        ||  `---.|  | \   |
-`--------'`------'`--'  `--'  )");
+    fmt::println(zen::ascii_art);
     fmt::println(">> arith i64");
     fmt::println("{} + {} = {}", a, b, sum);
     fmt::println("{} - {} = {}", a, b, sub);
@@ -159,7 +161,8 @@ void test_vm()
     fmt::println("1 + 2 + 3 + 4 + 5 = {}", acc, i);
     fmt::println(">> jump");
     fmt::println("1 + 2 + 3 + 4 + 5 = {}", acc2, i);
-    fmt::println("o = {}", o);
+    fmt::println("sumAcc();sumAcc();sumAcc(); {}", o);
+    fmt::println("sumParam({},{}) = {}", a,b, callSumParamResult);
 }
 
 void test_stack()
@@ -176,6 +179,24 @@ void test_stack()
     std::cout << stack.negative_stack_size << std::endl;
 }
 
+void test_constants()
+{
+    using namespace zen::utils;
+    raii c(2);
+    std::cout << c.as<int>() << std::endl;
+
+    constant_pool pool;
+    auto & name = pool.get("name");
+
+    for (auto & [k,v] : pool.data)
+    {
+        std::cout << k << std::endl;
+    }
+
+    std::cout << ( name.type_hash == typeid(char const*).hash_code() )<< std::endl;
+    // std::cout << (char*)(name_addr) << std::endl;
+}
+
 int main(int argc, char** argv) try
 {
     // for (int i = 0; i < 10000; ++i)
@@ -183,7 +204,8 @@ int main(int argc, char** argv) try
     //     test_stack();
     // }
     // return 0;
-    test_vm();
+    // test_vm();
+    test_constants();
     return 0;
     zen::lexer lexer("main.zen");
     while (auto token = lexer.next())

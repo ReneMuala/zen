@@ -1,9 +1,9 @@
 add_rules("mode.debug", "mode.release")
-add_requires("fmt", "asmjit")
+add_requires("fmt", "asmjit", "libffi")
 target("zen")
     set_languages("c++23")
     set_kind("binary")
-    add_packages("fmt", "asmjit")
+    add_packages("fmt", "asmjit", "libffi")
     add_includedirs("src/", "libs/")
     add_files(
             "src/*.cpp",

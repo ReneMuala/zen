@@ -5,16 +5,33 @@
 #pragma once
 #include <vector>
 #include <cstdint>
+#include <memory>
+#include <optional>
 #include <stack>
-#include <stdlib.h>
+#include <string>
+#include <unordered_map>
 #include <fmt/base.h>
 
 namespace zen
 {
+    constexpr static auto ascii_art = R"(   .-') _   ('-.       .-') _
+  (  OO) )_(  OO)     ( OO ) )
+,(_)----.(,------.,--./ ,--,'
+|       | |  .---'|   \ |  |\
+'--.   /  |  |    |    \|  | )
+(_/   /  (|  '--. |  .     |/
+ /   /___ |  .--' |  |\    |
+|        ||  `---.|  | \   |
+`--------'`------'`--'  `--'  )";
     enum instruction
     {
         push,
         pop,
+        add_i8,
+        sub_i8,
+        mul_i8,
+        div_i8,
+        mod_i8,
 
         // arith for i64
         add_i64,
@@ -52,12 +69,23 @@ namespace zen
         // conversions & copies
         i64_to_f64,
         i64_to_i64,
+        i64_to_boolean,
+        i64_to_i8,
+
         f64_to_i64,
         f64_to_f64,
-        boolean_to_i64,
-        i64_to_boolean,
-        boolean_to_f64,
         f64_to_boolean,
+        f64_to_i8,
+
+        boolean_to_i8,
+        boolean_to_i64,
+        boolean_to_f64,
+        boolean_to_boolean,
+
+        i8_to_i8,
+        i8_to_i64,
+        i8_to_f64,
+        i8_to_boolean,
 
         // unary for i64
         inc_i64,
@@ -84,11 +112,22 @@ namespace zen
         jump_if,
         call,
         ret,
+        // fetch_i8,
+        // fetch_i64,
+        // fetch_f64,
+        // fetch_boolean,
+        // send_i8,
+        // send_i64,
+        // send_f64,
+        // send_boolean,
+        // memory_of,
+        placeholder,
     };
     class vm
     {
     public:
         using boolean = bool;
+        using i8 = int8_t;
         using i64 = int64_t;
         using f64 = double;
 
@@ -141,4 +180,79 @@ namespace zen
         void run(const i64 & entry_point = 0);
         void run(stack & stack, const i64 & entry_point = 0);
     };
+
+
+    namespace utils
+    {
+        template<typename type = void>
+        class raii
+        {
+            type* data = nullptr;
+            public:
+            size_t type_hash = typeid(void).hash_code();
+            explicit raii(auto value): type_hash(typeid(decltype(value)).hash_code())
+            {
+                this->data = malloc(sizeof(decltype(value)));
+                if (!this->data)
+                    throw std::bad_alloc();
+                *reinterpret_cast<decltype(value)*>(this->data) = value;
+            }
+
+            raii(raii const& other) = delete;
+            raii(raii && other) noexcept
+            {
+                this->data = other.data;
+                this->type_hash = other.type_hash;
+                other.data = nullptr;
+            };
+
+            type* get() const
+            {
+                return this->data;
+            }
+
+            template<typename other>
+            [[nodiscard]] constexpr bool is() const
+            {
+                return type_hash == typeid(other).hash_code();
+            }
+
+            template<typename other>
+            other as() const
+            {
+                if (not is<other>())
+                    throw std::bad_cast();
+                return *reinterpret_cast<other*>(this->data);
+            }
+            template<typename other>
+            [[nodiscard]] raii clone() const
+            {
+                return std::move(raii{
+                    *static_cast<other*>(this->data)
+                });
+            }
+
+            ~raii()
+            {
+                free(this->data);
+            }
+        };
+
+        struct constant_pool
+        {
+            std::unordered_map<std::string, raii<>> data;
+            template<typename type>
+            const raii<> & get(type value)
+            {
+                std::string key = typeid(type).name();
+                if constexpr (std::is_same_v<type, std::string> or std::is_same_v<type, char> or std::is_same_v<type, char *> or std::is_same_v<type, const char *>)
+                    key += value;
+                else
+                    key += std::to_string(value);
+                if (!data.contains(key))
+                    data.emplace(key, std::move(raii<>(value)));
+                return data.find(key)->second;
+            }
+        };
+    }
 }

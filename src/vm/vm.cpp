@@ -9,7 +9,6 @@
 #include <stack>
 #include <fmt/core.h>
 
-
 void* zen::vm::stack::operator-(const i64& size)
 {
     if (size > -this->negative_stack_size)
@@ -53,7 +52,7 @@ bool zen::vm::stack::empty() const
 
 zen::vm::i64 zen::vm::stack::size() const
 {
-    return abs(negative_stack_size);
+    return negative_stack_size < 0 ? -negative_stack_size : negative_stack_size;
 }
 
 void zen::vm::load(std::vector<i64>& code)
@@ -82,6 +81,26 @@ void zen::vm::run(stack & stack, const i64 & entry_point)
             *address<i64>(this->code[i + 1], stack) = *static_cast<i64*>(stack-sizeof(i64));
             stack += sizeof(i64);  // NOLINT
             i+=1;
+            break;
+        case add_i8:
+            *address<i8>(this->code[i + 1], stack) = *address<i8>(this->code[i + 2], stack) + *address<i8>(this->code[i + 3], stack);
+            i+=3;
+            break;
+        case sub_i8:
+            *address<i8>(this->code[i + 1], stack) = *address<i8>(this->code[i + 2], stack) - *address<i8>(this->code[i + 3], stack);
+            i+=3;
+            break;
+        case mul_i8:
+            *address<i8>(this->code[i + 1], stack) = *address<i8>(this->code[i + 2], stack) * *address<i8>(this->code[i + 3], stack);
+            i+=3;
+            break;
+        case div_i8:
+            *address<i8>(this->code[i + 1], stack) = *address<i8>(this->code[i + 2], stack) / *address<i8>(this->code[i + 3], stack);
+            i+=3;
+            break;
+        case mod_i8:
+            *address<i8>(this->code[i + 1], stack) = *address<i8>(this->code[i + 2], stack) % *address<i8>(this->code[i + 3], stack);
+            i+=3;
             break;
         case add_i64:
             *address<i64>(this->code[i + 1], stack) = *address<i64>(this->code[i + 2], stack) + *address<i64>(this->code[i + 3], stack);
@@ -183,24 +202,57 @@ void zen::vm::run(stack & stack, const i64 & entry_point)
             *address<i64>(this->code[i + 1], stack) =  *address<i64>(this->code[i + 2], stack);
             i+=2;
             break;
+        case i64_to_i8:
+            *address<i8>(this->code[i + 1], stack) =   static_cast<i8>(*address<i64>(this->code[i + 2], stack));
+            i+=2;
+            break;
         case f64_to_i64:
             *address<i64>(this->code[i + 1], stack) = static_cast<i64>(*address<f64>(this->code[i + 2], stack));
+            i+=2;
+            break;
+        case f64_to_i8:
+            *address<i8>(this->code[i + 1], stack) = static_cast<i8>(*address<f64>(this->code[i + 2], stack));
             i+=2;
             break;
         case f64_to_f64:
             *address<f64>(this->code[i + 1], stack) = *address<f64>(this->code[i + 2], stack);
             i+=2;
             break;
+        case boolean_to_i8:
+            *address<i8>(this->code[i + 1], stack) = *address<boolean>(this->code[i + 2], stack);
+            i+=2;
+            break;
         case boolean_to_i64:
             *address<i64>(this->code[i + 1], stack) = *address<boolean>(this->code[i + 2], stack);
             i+=2;
             break;
-        case i64_to_boolean:
-            *address<boolean>(this->code[i + 1], stack) = static_cast<boolean>(*address<i64>(this->code[i + 2], stack));
-            i+=2;
-            break;
         case boolean_to_f64:
             *address<f64>(this->code[i + 1], stack) = *address<boolean>(this->code[i + 2], stack);
+            i+=2;
+            break;
+        case boolean_to_boolean:
+            *address<boolean>(this->code[i + 1], stack) = *address<boolean>(this->code[i + 2], stack);
+            i+=2;
+            break;
+
+        case i8_to_i8:
+            *address<i8>(this->code[i + 1], stack) = *address<i8>(this->code[i + 2], stack);
+            i+=2;
+            break;
+        case i8_to_i64:
+            *address<i64>(this->code[i + 1], stack) = *address<i8>(this->code[i + 2], stack);
+            i+=2;
+            break;
+        case i8_to_f64:
+            *address<f64>(this->code[i + 1], stack) = *address<i8>(this->code[i + 2], stack);
+            i+=2;
+            break;
+        case i8_to_boolean:
+            *address<boolean>(this->code[i + 1], stack) = *address<i8>(this->code[i + 2], stack);
+            i+=2;
+            break;
+        case i64_to_boolean:
+            *address<boolean>(this->code[i + 1], stack) = static_cast<boolean>(*address<i64>(this->code[i + 2], stack));
             i+=2;
             break;
         case f64_to_boolean:
@@ -223,28 +275,22 @@ void zen::vm::run(stack & stack, const i64 & entry_point)
             (*address<f64>(this->code[i + 1], stack))--;
             i+=1;
             break;
-
         case bit_and:
             *address<i64>(this->code[i + 1], stack) = *address<i64>(this->code[i + 2], stack) & *address<i64>(this->code[i + 3], stack);
             i+=3;
             break;
-
         case bit_or:
             *address<i64>(this->code[i + 1], stack) = *address<i64>(this->code[i + 2], stack) | *address<i64>(this->code[i + 3], stack);
             i+=3;
             break;
-
         case bit_xor:
             *address<i64>(this->code[i + 1], stack) = *address<i64>(this->code[i + 2], stack) xor *address<i64>(this->code[i + 3], stack);
             i+=3;
             break;
-
         case bit_not:
             *address<i64>(this->code[i + 1], stack) = ~*address<i64>(this->code[i + 1], stack);
             i+=1;
             break;
-
-
         case boolean_not:
             *address<boolean>(this->code[i + 1], stack) = not *address<boolean>(this->code[i + 2], stack);
             i+=2;
