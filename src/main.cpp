@@ -196,6 +196,49 @@ void test_constants()
     std::cout << ( name.type_hash == typeid(char const*).hash_code() )<< std::endl;
     // std::cout << (char*)(name_addr) << std::endl;
 }
+#include <iostream>
+#include <ffi.h>
+extern "C" {
+        int sum(int a, int b)
+        {
+            std::cout << "a : " << a << std::endl;
+            std::cout << "b : " << b << std::endl;
+            return a + b;
+        }
+    }
+
+void test_ffi()
+{
+    ffi_cif cif;
+    ffi_type * args[2];
+    void * values[2];
+    int a = 100, b = 101;
+    args[0] = &ffi_type_sint;
+    args[1] = &ffi_type_sint;
+    values[0] = &a;
+    values[1] = &b;
+    int r;
+    if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, 2, &ffi_type_sint, args) == FFI_OK)
+    {
+        ffi_call(&cif, (void(*)())sum, &r, values);
+        std::cout << r << std::endl;
+    }
+}
+
+void test_vm_ffi()
+{
+    using namespace zen;
+    vm vm1;
+    vm::i64 a, b;
+    if (vm1.register_callable(vm::ref(sum),
+        std::vector {
+        vm::ref(ffi_type_sint),
+        vm::ref(ffi_type_sint),
+        }, vm::ref(ffi_type_sint)))
+    {
+        std::cout << "vm1.register_callable(vm::ref(sum) done";
+    }
+}
 
 int main(int argc, char** argv) try
 {
@@ -205,7 +248,9 @@ int main(int argc, char** argv) try
     // }
     // return 0;
     // test_vm();
-    test_constants();
+    // test_constants();
+    // test_ffi();
+    test_vm_ffi();
     return 0;
     zen::lexer lexer("main.zen");
     while (auto token = lexer.next())
