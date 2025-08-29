@@ -77,6 +77,8 @@ namespace enums
     NID,
     /// id || id<type> | string | number | undefined | null
     NTYPE,
+    // <TYPE>
+    NGENERIC,
     /// signature (...) for function declaration
     NSUFFIX_ID_SIGNATURE,
     /// index or name property

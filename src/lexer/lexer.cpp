@@ -118,10 +118,10 @@ zen::token zen::lexer::next_single(const enums::token_type&& type)
     return token(type, std::move(value), line, col);
 }
 
-zen::token zen::lexer::next_not_equal()
+zen::token zen::lexer::next_not_or_not_equal()
 {
     std::string value = {it};
-    auto type = enums::TERROR;
+    auto type = enums::TNOT;
     getchar();
     if(it == '=')
     {
@@ -396,7 +396,7 @@ std::optional<zen::token> zen::lexer::next()
         return next_or();
     if (it == '!')
     {
-        auto && token = next_not_equal();
+        auto && token = next_not_or_not_equal();
         if (token.type == enums::TCOMMENT)
             goto begin;
         return token;

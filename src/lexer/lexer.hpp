@@ -26,7 +26,7 @@ namespace zen {
         zen::token next_or();
         inline token next_equ_or_equal();
         inline token next_single(const enums::token_type && type);
-        inline token next_not_equal();
+        inline token next_not_or_not_equal();
         inline token next_greater_or_greater_equal();
         inline token next_lower_or_lower_equal();
         inline token next_plus_or_plus_plus_or_plus_equal();
