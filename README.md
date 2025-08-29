@@ -1,77 +1,60 @@
 # zen
 
 ```c++
+//// ⚡⚡⚡ 
+/// zen (https://github.com/renemuala/zen)
+//// ⚡⚡⚡
 
-random = int {
 
-}
-
-sum(i: int, b: int) = int (a + b)
-
-greater(a: int, b: int) = int {
-    if(a > b) { 
-        a 
-    } else  { 
-        b 
-    }
-}
-
-using io.*
-
-print_struct(b: B) = {
-    print(b.a)
-    print(b.b)
-}
-
-display_window() = {
-    window : Window = Window()
-    window.show()
-}
-
-count(start: int, end: int) = {
-    for(i: int = start; i < end; i = i + 1) {
-        print(i)
-    }
-}
-
-read_file(file: string) = string(str) {
+readFile(filename: string) = string(str) {
     str : string = ""
     f : file = open(file, "r")
-    line : string = f.readline()
-    while(line != "") {
-        str = str + line
-        print(line)
-        line = f.readline()
-    }
-    f.close()
-}
-
-main() = int(0) { 
-    a : int = 10
-    b : int = 20
-
-    print(sum(a, b))
-    print(greater(a, b))
-}
-
-
-read_and_return_greater() = int(max) {
-    max : int = 0
-    number : int = 0
-
-    while(number != -1) {
-        number = read_int()
-        max = greater(max, number)
+    while(!f.eof) {
+        str = str + f.readLine()
     }
 }
 
-add(a: int, b: int) = int {
-    a + b
+divide(x : double, y: double) = maybe<double> {
+    if (y != 0){
+        x / y
+    }
 }
 
-sum(a: int, b: int) = int(
-    add(a, b)
-)
+factorial(x: int) = task<int>(result) {
+    result : int = 1
+    for(i : int = 2, x) {
+        result *= i
+    }
+}
+
+main() = {
+    begin = 1.0
+    end = 10.0
+    for(x = begin, end;
+        y = end, begin, -1){
+        if(r: double = divide(x, y)){
+            print(r)
+        }
+    }
+    
+    tsk = factorial(20)
+    if(m : int = factorial(10)){
+        print("result 2: " + m)
+    }
+    
+    for(i : int = 1, 20){
+      thread.sleep<seconds>(1) 
+      if(tsk.done){
+        if(result : int = tsk.value){
+          print("result 1: " + result)  
+        } else {
+          print("error: " + tsk.error)
+        }
+    }
+    tsk.stop()
+    }
+}
+
 ```
 
 # v2 
