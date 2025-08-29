@@ -322,6 +322,11 @@ void zen::vm::run(stack & stack, const i64 & entry_point)
             *static_cast<i64*>(stack-sizeof(i64)) = i+2;
             i = *address<i64>(this->code[i + 1], stack) - 1;
             break;
+        case ffi_call:
+            stack -= sizeof(i64); // NOLINT
+            *static_cast<i64*>(stack-sizeof(i64)) = i+2;
+            i = *address<i64>(this->code[i + 1], stack) - 1;
+            break;
         case ret:
             i = *static_cast<i64*>(stack-sizeof(i64)) - 1;
             stack += sizeof(i64);  // NOLINT

@@ -1,3 +1,4 @@
+
 #include <iostream>
 #include "lexer/lexer.hpp"
 #include "parser/parser.hpp"
@@ -229,15 +230,25 @@ void test_vm_ffi()
 {
     using namespace zen;
     vm vm1;
-    vm::i64 a, b;
-    if (vm1.register_callable(vm::ref(sum),
+    vm::i64 a = 10, b = 20;
+    if (vm1.register_ffi_callable(vm::ref(sum),
         std::vector {
-        vm::ref(ffi_type_sint),
-        vm::ref(ffi_type_sint),
+            vm::ref(ffi_type_sint),
+            vm::ref(ffi_type_sint),
         }, vm::ref(ffi_type_sint)))
     {
         std::cout << "vm1.register_callable(vm::ref(sum) done";
     }
+
+    std::vector<vm::i64> code = {
+        push, vm::ref(a),
+        push, vm::ref(a),
+        push, vm::ref(b),
+        zen::ffi_call, vm::ref(sum)
+    };
+
+    vm1.load(code);
+
 }
 
 int main(int argc, char** argv) try
@@ -250,8 +261,8 @@ int main(int argc, char** argv) try
     // test_vm();
     // test_constants();
     // test_ffi();
-    test_vm_ffi();
-    return 0;
+    // test_vm_ffi();
+    // return 0;
     zen::lexer lexer("main.zen");
     while (auto token = lexer.next())
     {
