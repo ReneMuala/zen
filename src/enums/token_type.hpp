@@ -85,6 +85,8 @@ namespace enums
     NSUFFIX_PROPERTY,
     /// function call
     NSUFFIX_FUNCTION_CALL,
+    // (...) = TYPE? {...}
+    NSUFFIX_FUNCTION_DEFINITION,
     NSUFFIX_VAL_NTERNARY,
     /// integer number
     TINT_NUM,
@@ -197,6 +199,10 @@ namespace enums
     TKEYWORD_RETURN,
     // switch
     TKEYWORD_SWITCH,
+    // class
+    TKEYWORD_CLASS,
+    // static
+    TKEYWORD_STATIC,
     // case
     TKEYWORD_CASE,
     // int

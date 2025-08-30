@@ -298,10 +298,6 @@ zen::token zen::lexer::next_id_or_keyword()
             type = enums::TKEYWORD_IF;
         else if (value == "else")
             type = enums::TKEYWORD_ELSE;
-        else if (value == "typeof")
-            type = enums::TKEYWORD_TYPEOF;
-        else if (value == "this")
-            type = enums::TKEYWORD_THIS;
         else if (value == "true")
             type = enums::TKEYWORD_TRUE;
         else if (value == "false")
@@ -310,20 +306,16 @@ zen::token zen::lexer::next_id_or_keyword()
             type = enums::TKEYWORD_BREAK;
         else if (value == "continue")
             type = enums::TKEYWORD_CONTINUE;
-        else if (value == "return")
-            type = enums::TKEYWORD_RETURN;
         else if (value == "string")
             type = enums::TKEYWORD_STRING;
         else if (value == "int")
             type = enums::TKEYWORD_INT;
         else if (value == "float")
             type = enums::TKEYWORD_FLOAT;
-        else if (value == "null")
-            type = enums::TKEYWORD_NULL;
-        else if (value == "switch")
-            type = enums::TKEYWORD_SWITCH;
-        else if (value == "case")
-            type = enums::TKEYWORD_CASE;
+        else if (value == "class")
+            type = enums::TKEYWORD_CLASS;
+        else if (value == "static")
+            type = enums::TKEYWORD_STATIC;
         }
     return token(type, std::move(value), line, col);
 }

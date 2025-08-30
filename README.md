@@ -5,7 +5,6 @@
 /// zen (https://github.com/renemuala/zen)
 //// ⚡⚡⚡
 
-
 readFile(filename: string) = string(str) {
     str : string = ""
     f : file = open(file, "r")
