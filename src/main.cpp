@@ -4,29 +4,31 @@
 #include "parser/parser.hpp"
 
 #include <vm/vm.hpp>
+
+#include "utils/utils.hpp"
 std::vector<zen::token> tokens;
 
 void test_vm()
 {
     using namespace zen;
     vm vm1;
-    vm::i64 a = 10, b = 20, sum = 0, sub, mul, div, mod;
-    vm::f64 c = 3.14, d = 5.67, sum_f, sub_f, mul_f, div_f;
-    vm::boolean a_gt_b, a_lt_b, a_gte_b, a_lte_b, a_eq_b, a_neq_b;
-    vm::boolean c_gt_d, c_lt_d, c_gte_d, c_lte_d, c_eq_d, c_neq_d;
-    vm::boolean a_gt_b_and_a_lt_b, a_gt_b_or_a_lt_b, not_a_gt_b_or_a_lt_b;
-    vm::i64 a_gt_b_i64;
-    vm::f64 a_lt_b_f64;
-    vm::i64 e = 0;
-    vm::f64 f = 1.0;
-    vm::boolean boolean_e, boolean_f;
-    vm::i64 g = 1, h = 2, i = 3, j, k, l;
-    vm::i64 sum2, begin = 1, end = 5, acc, acc2;
-    vm::boolean is_i_lt_end;
-    vm::i64 v_2 = 2, v_minus_14 = -14;
-    vm::i64 m = 10, n = 15, o;
-    vm::i64 callSumAccAddress, callSumParamAddress, callSumParamResult;
-    std::vector<vm::i64> code = {
+    i64 a = 10, b = 20, sum = 0, sub, mul, div, mod;
+    f64 c = 3.14, d = 5.67, sum_f, sub_f, mul_f, div_f;
+    boolean a_gt_b, a_lt_b, a_gte_b, a_lte_b, a_eq_b, a_neq_b;
+    boolean c_gt_d, c_lt_d, c_gte_d, c_lte_d, c_eq_d, c_neq_d;
+    boolean a_gt_b_and_a_lt_b, a_gt_b_or_a_lt_b, not_a_gt_b_or_a_lt_b;
+    i64 a_gt_b_i64;
+    f64 a_lt_b_f64;
+    i64 e = 0;
+    f64 f = 1.0;
+    boolean boolean_e, boolean_f;
+    i64 g = 1, h = 2, i = 3, j, k, l;
+    i64 sum2, begin = 1, end = 5, acc, acc2;
+    boolean is_i_lt_end;
+    i64 v_2 = 2, v_minus_14 = -14;
+    i64 m = 10, n = 15, o;
+    i64 callSumAccAddress, callSumParamAddress, callSumParamResult;
+    std::vector<i64> code = {
         inc_i64, vm::ref(a),
         dec_i64, vm::ref(a),
         add_i64, vm::ref(sum), vm::ref(a), vm::ref(b),
@@ -230,7 +232,7 @@ void test_vm_ffi()
 {
     using namespace zen;
     vm vm1;
-    vm::i64 a = 10, b = 20;
+    i64 a = 10, b = 20;
     if (vm1.register_ffi_callable(vm::ref(sum),
         std::vector {
             vm::ref(ffi_type_sint),
@@ -240,7 +242,7 @@ void test_vm_ffi()
         std::cout << "vm1.register_callable(vm::ref(sum) done";
     }
 
-    std::vector<vm::i64> code = {
+    std::vector<i64> code = {
         push, vm::ref(a),
         push, vm::ref(a),
         push, vm::ref(b),
@@ -263,7 +265,7 @@ int main(int argc, char** argv) try
     // test_ffi();
     // test_vm_ffi();
     // return 0;
-    zen::lexer lexer("main.zen");
+    zen::lexer lexer("test.zen");
     while (auto token = lexer.next())
     {
         // fmt::println(">> {}: '{}'", static_cast<int>(token->type), token->value);
@@ -274,6 +276,7 @@ int main(int argc, char** argv) try
     if (parse())
     {
         std::cout << "Success" << std::endl;
+        get_composer().bake();
     }
     else
     {

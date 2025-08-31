@@ -4,9 +4,16 @@
 #pragma once
 #include "enums/token_type.hpp"
 #include <vector>
+
+#include "composer/composer.hpp"
+#include "composer/vm/composer.hpp"
 using namespace enums;
 extern std::vector<zen::token> tokens;
-
+zen::composer::composer& get_composer()
+{
+    static zen::composer::vm::composer composer;
+    return reinterpret_cast<zen::composer::composer&>(composer);
+}
 // namespace parser
 // {
 typedef enums::token_type SYMBOL;
@@ -126,41 +133,90 @@ BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
+    static zen::composer::composer& composer = get_composer();
+    static bool begin_function_invoked;
+    static std::list<std::tuple<std::string, zen::composer::type>> parameters = {};
     // provides parser::id
     // REQUIRE_NON_TERMINAL(NID)
-    if (TRY_REQUIRE_NON_TERMINAL(NGENERIC)){}
+    if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
+    {
+    }
     if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
     {
+        composer.begin_function(parser::id);
+        begin_function_invoked = true;
         do
         {
             if (TRY_REQUIRE_NON_TERMINAL(NID))
             {
+                const std::string name = parser::id;
                 REQUIRE_TERMINAL_CALLBACK(TCOLON, EXPECTED(":"))
                 parser::type.clear();
                 REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
+                const zen::composer::type & type = composer.get_type(parser::type);
+                parameters.emplace_back(name, type);
             }
         }
         while (TRY_REQUIRE_TERMINAL(TCOMMA));
         REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
+    } else
+    {
+        begin_function_invoked = false;
     }
     REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
+    if (not begin_function_invoked)
+    {
+        composer.begin_function(parser::id);
+    }
     parser::type.clear();
     if (TRY_REQUIRE_NON_TERMINAL(NTYPE))
-    {}
-    if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
     {
-        REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
-        REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
+        composer.set_function_return(composer.get_type(parser::type));
+        for (auto parameter : parameters)
+        {
+            composer.set_function_parameter(std::get<0>(parameter), std::get<1>(parameter));
+        }
+        parameters.clear();
+        int offset_before = -1;
+        if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
+        {
+            REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
+            if (ILC::offset - offset_before == 1 and ILC::chain[ILC::offset - 1] == TID)
+            {
+                composer.set_function_return_name(parser::id);
+            }
+            REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
+        }
+    } else
+    {
+        composer.set_function_return(composer.get_type("unit"));
+        for (auto parameter : parameters)
+        {
+            composer.set_function_parameter(std::get<0>(parameter), std::get<1>(parameter));
+        }
+        parameters.clear();
     }
     if (TRY_REQUIRE_TERMINAL(TBRACES_OPEN))
     {
-        while (TRY_REQUIRE_NON_TERMINAL(NSTAT) or TRY_REQUIRE_NON_TERMINAL(NVAL)){}
-        if (TRY_REQUIRE_NON_TERMINAL(NRETURN))
+        while (true)
         {
-            REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
+            if (TRY_REQUIRE_NON_TERMINAL(NSTAT))
+            {
+
+            }
+            else if (TRY_REQUIRE_NON_TERMINAL(NVAL))
+            {
+                composer.set_function_return_value(composer.top());
+                composer.pop();
+            } else break;
         }
         REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
+    } else
+    {
+        composer.set_function_return_value(composer.top());
+        composer.pop();
     }
+    composer.end_function();
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NFOR)
@@ -265,6 +321,7 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_OR_VALUE)
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_NUM)
+    static zen::composer::composer& composer = get_composer();
     bool negative = false;
     if (TRY_REQUIRE_TERMINAL(TMINUS))
         negative = true;
@@ -274,13 +331,27 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_NUM)
     if (not TRY_REQUIRE_TERMINAL(TINT_NUM))
     {
         REQUIRE_TERMINAL(TDOUBLE_NUM)
+        double data = strtod(tokens[ILC::offset - 1].value.c_str(), nullptr);
+        if (negative)
+        {
+            data = -data;
+        }
+        composer.push<double>(std::move(data), composer.get_type("double"));
     } else
     {
+        long data = strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10);
+        if (negative)
+        {
+            data = -data;
+        }
+        composer.push<long>(std::move(data), composer.get_type("long"));
     }
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_CHAR_ARRAY)
+    static zen::composer::composer& composer = get_composer();
     REQUIRE_TERMINAL(TCHAR_ARRAY)
+    composer.push<std::string>(std::move(tokens[ILC::offset-1].value), composer.get_type("long"));
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_NOT_VAL)
@@ -311,18 +382,27 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_LIST)
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_ID)
+    static zen::composer::composer& composer = get_composer();
     bool negative = false;
     if (TRY_REQUIRE_TERMINAL(TMINUS))
         negative = true;
     if (TRY_REQUIRE_TERMINAL(TPLUS))
         negative = false;
     REQUIRE_NON_TERMINAL(NID)
+    const auto & v = composer.get_function_local(parser::id);
+    composer.push<zen::composer::value>(zen::composer::value(v.type, v.address), v.type);
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_BOOLEAN)
+    static zen::composer::composer& composer = get_composer();
     if (not TRY_REQUIRE_TERMINAL(TKEYWORD_TRUE))
+    {
         REQUIRE_TERMINAL(TKEYWORD_FALSE)
-    using namespace ILC;
+        composer.push<bool>(false, composer.get_type("bool"));
+    } else
+    {
+        composer.push<bool>(true, composer.get_type("bool"));
+    }
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NGENERIC)
@@ -335,10 +415,7 @@ BEGIN_PRODUCTION(PRODUCTION_NGENERIC)
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NTYPE)
-    if (not(TRY_REQUIRE_NON_TERMINAL(NID) or
-        TRY_REQUIRE_TERMINAL(TKEYWORD_FLOAT) or
-        TRY_REQUIRE_TERMINAL(TKEYWORD_INT) or
-        TRY_REQUIRE_TERMINAL(TKEYWORD_STRING)))
+    if (not TRY_REQUIRE_NON_TERMINAL(NID))
     {
         ROLLBACK_PRODUCTION()
     }
@@ -348,11 +425,14 @@ BEGIN_PRODUCTION(PRODUCTION_NTYPE)
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVARIABLE_DEFINITION)
+    static zen::composer::composer & composer = get_composer();
     // provides parser::id
     REQUIRE_NON_TERMINAL(NID)
+    const auto name = parser::id;
     REQUIRE_TERMINAL(TCOLON)
     parser::type.clear();
     REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
+    composer.set_function_local(name, composer.get_type(parser::type));
     if (TRY_REQUIRE_TERMINAL(TEQU))
     {
         REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))

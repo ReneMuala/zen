@@ -16,7 +16,7 @@ void* zen::vm::stack::operator-(const i64& size)
         fmt::println(stderr, "zen::vm::stack address out of range: {}", size);
         return nullptr;
     }
-    return reinterpret_cast<void*>(reinterpret_cast<vm::i64>(data) + abs(this->negative_stack_size) - size);
+    return reinterpret_cast<void*>(reinterpret_cast<i64>(data) + abs(this->negative_stack_size) - size);
 }
 
 bool zen::vm::stack::operator-=(const i64& size)
@@ -50,7 +50,7 @@ bool zen::vm::stack::empty() const
     return negative_stack_size == 0;
 }
 
-zen::vm::i64 zen::vm::stack::size() const
+zen::i64 zen::vm::stack::size() const
 {
     return negative_stack_size < 0 ? -negative_stack_size : negative_stack_size;
 }

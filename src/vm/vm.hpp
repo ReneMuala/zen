@@ -16,6 +16,10 @@
 
 namespace zen
 {
+    using boolean = bool;
+    using i8 = int8_t;
+    using i64 = int64_t;
+    using f64 = double;
     constexpr static auto ascii_art = R"(   .-') _   ('-.       .-') _
   (  OO) )_(  OO)     ( OO ) )
 ,(_)----.(,------.,--./ ,--,'
@@ -129,10 +133,7 @@ namespace zen
     class vm
     {
     public:
-        using boolean = bool;
-        using i8 = int8_t;
-        using i64 = int64_t;
-        using f64 = double;
+
 
         struct stack
         {
@@ -183,85 +184,10 @@ namespace zen
         }
         static constexpr i64 ref(auto & some)
         {
-           return reinterpret_cast<vm::i64>(&some);
+           return reinterpret_cast<i64>(&some);
         }
         void load(std::vector<i64>& code);
         void run(const i64 & entry_point = 0);
         void run(stack & stack, const i64 & entry_point = 0);
     };
-
-
-    namespace utils
-    {
-        template<typename type = void>
-        class raii
-        {
-            type* data = nullptr;
-            public:
-            size_t type_hash = typeid(void).hash_code();
-            explicit raii(auto value): type_hash(typeid(decltype(value)).hash_code())
-            {
-                this->data = malloc(sizeof(decltype(value)));
-                if (!this->data)
-                    throw std::bad_alloc();
-                *reinterpret_cast<decltype(value)*>(this->data) = value;
-            }
-
-            raii(raii const& other) = delete;
-            raii(raii && other) noexcept
-            {
-                this->data = other.data;
-                this->type_hash = other.type_hash;
-                other.data = nullptr;
-            };
-
-            type* get() const
-            {
-                return this->data;
-            }
-
-            template<typename other>
-            [[nodiscard]] constexpr bool is() const
-            {
-                return type_hash == typeid(other).hash_code();
-            }
-
-            template<typename other>
-            other as() const
-            {
-                if (not is<other>())
-                    throw std::bad_cast();
-                return *reinterpret_cast<other*>(this->data);
-            }
-            template<typename other>
-            [[nodiscard]] raii clone() const
-            {
-                return std::move(raii{
-                    *static_cast<other*>(this->data)
-                });
-            }
-
-            ~raii()
-            {
-                free(this->data);
-            }
-        };
-
-        struct constant_pool
-        {
-            std::unordered_map<std::string, raii<>> data;
-            template<typename type>
-            const raii<> & get(type value)
-            {
-                std::string key = typeid(type).name();
-                if constexpr (std::is_same_v<type, std::string> or std::is_same_v<type, char> or std::is_same_v<type, char *> or std::is_same_v<type, const char *>)
-                    key += value;
-                else
-                    key += std::to_string(value);
-                if (!data.contains(key))
-                    data.emplace(key, std::move(raii<>(value)));
-                return data.find(key)->second;
-            }
-        };
-    }
 }

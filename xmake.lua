@@ -10,8 +10,8 @@ target("zen")
             "src/lexer/*.cpp",
             "src/vm/*.cpp",
             --"src/parser/*.cpp",
-            "src/exceptions/*.cpp"
-            --"src/composer/*.cpp"
+            "src/exceptions/*.cpp",
+            "src/composer/vm/*.cpp"
     )
 --
 -- If you want to known more usage about xmake, please see https://xmake.io

@@ -306,12 +306,6 @@ zen::token zen::lexer::next_id_or_keyword()
             type = enums::TKEYWORD_BREAK;
         else if (value == "continue")
             type = enums::TKEYWORD_CONTINUE;
-        else if (value == "string")
-            type = enums::TKEYWORD_STRING;
-        else if (value == "int")
-            type = enums::TKEYWORD_INT;
-        else if (value == "float")
-            type = enums::TKEYWORD_FLOAT;
         else if (value == "class")
             type = enums::TKEYWORD_CLASS;
         else if (value == "static")
