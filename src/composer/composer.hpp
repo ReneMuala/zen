@@ -27,6 +27,7 @@ class composer {
     virtual void end_function() = 0;
 
     virtual void operation_assign(const S & destination, const V & source) = 0;
+
     virtual void operation_arith_plus(const S & destination, const V & first, const V & second) = 0;
     virtual void operation_arith_minus(const S & destination, const V & first, const V & second) = 0;
     virtual void operation_arith_multi(const S & destination, const V & first, const V & second) = 0;
@@ -38,12 +39,12 @@ class composer {
     virtual void operation_logic_not(const S & destination, const V & value) = 0;
     virtual void operation_logic_extract(const S & destination, const V & value) = 0;
 
-    virtual void operation_real_g(const S & destination, const V & first, const V & second) = 0;
-    virtual void operation_real_ge(const S & destination, const V & first, const V & second) = 0;
-    virtual void operation_real_l(const S & destination, const V & first, const V & second) = 0;
-    virtual void operation_real_le(const S & destination, const V & first, const V & second) = 0;
-    virtual void operation_real_eq(const S & destination, const V & first, const V & second) = 0;
-    virtual void operation_real_neq(const S & destination, const V & first, const V & second) = 0;
+    virtual void operation_rel_g(const S & destination, const V & first, const V & second) = 0;
+    virtual void operation_rel_ge(const S & destination, const V & first, const V & second) = 0;
+    virtual void operation_rel_l(const S & destination, const V & first, const V & second) = 0;
+    virtual void operation_rel_le(const S & destination, const V & first, const V & second) = 0;
+    virtual void operation_rel_eq(const S & destination, const V & first, const V & second) = 0;
+    virtual void operation_rel_neq(const S & destination, const V & first, const V & second) = 0;
 
     virtual void begin_if_then(const V & value) = 0;
     virtual void else_if_then(const V & value) = 0;
