@@ -9,6 +9,8 @@
 #include "composer/vm/composer.hpp"
 using namespace enums;
 extern std::vector<zen::token> tokens;
+static bool pragma_ignore_missing_symbols = false;
+static std::string pragma_ignore_missing_symbols_data;
 zen::composer::composer& get_composer()
 {
     static zen::composer::vm::composer composer;
@@ -177,13 +179,20 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
             composer.set_function_parameter(std::get<0>(parameter), std::get<1>(parameter));
         }
         parameters.clear();
-        int offset_before = -1;
         if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
         {
+            pragma_ignore_missing_symbols = true;
+            pragma_ignore_missing_symbols_data.clear();
+            const int offset_before = ILC::offset;
             REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
+            pragma_ignore_missing_symbols = false;
             if (ILC::offset - offset_before == 1 and ILC::chain[ILC::offset - 1] == TID)
             {
                 composer.set_function_return_name(parser::id);
+            } else if (not pragma_ignore_missing_symbols_data.empty())
+            {
+                std::cout << ILC::offset - offset_before << std::endl;
+                throw std::out_of_range("No such local symbol(s): " + pragma_ignore_missing_symbols_data);
             }
             REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
         }
@@ -389,8 +398,18 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_ID)
     if (TRY_REQUIRE_TERMINAL(TPLUS))
         negative = false;
     REQUIRE_NON_TERMINAL(NID)
-    const auto & v = composer.get_function_local(parser::id);
-    composer.push<zen::composer::value>(zen::composer::value(v.type, v.address), v.type);
+    try
+    {
+        const auto & v = composer.get_function_local(parser::id);
+        composer.push<zen::composer::value>(zen::composer::value(v.type, v.address), v.type);
+    } catch (const std::out_of_range & e)
+    {
+        if (not pragma_ignore_missing_symbols)
+            throw;
+        if (not pragma_ignore_missing_symbols_data.empty())
+            pragma_ignore_missing_symbols_data += ", ";
+        pragma_ignore_missing_symbols_data += parser::id;
+    }
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_BOOLEAN)
@@ -427,7 +446,9 @@ END_PRODUCTION
 BEGIN_PRODUCTION(PRODUCTION_NVARIABLE_DEFINITION)
     static zen::composer::composer & composer = get_composer();
     // provides parser::id
+    pragma_ignore_missing_symbols = true;
     REQUIRE_NON_TERMINAL(NID)
+    pragma_ignore_missing_symbols = false;
     const auto name = parser::id;
     REQUIRE_TERMINAL(TCOLON)
     parser::type.clear();
