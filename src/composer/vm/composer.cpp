@@ -261,7 +261,7 @@ namespace zen
         {
             return scope.locals.at(name);
         }
-            throw std::out_of_range("No such local symbol: " + name);
+        throw std::out_of_range("No such local symbol: " + name);
     }
 
     void composer::vm::composer::operation_assign(const value& destination, const value& source)

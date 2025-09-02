@@ -8,13 +8,8 @@
 #include <optional>
 #include <exceptions/expected_token.hpp>
 
-zen::lexer::lexer(const std::string&& filename)
+zen::lexer::lexer(std::istream & stream): stream(stream)
 {
-    stream.open(filename);
-    if (not stream.is_open())
-    {
-        throw exceptions::file_not_found(filename);
-    }
     lit = it = 0;
     line = col = 1;
 }

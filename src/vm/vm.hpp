@@ -5,7 +5,7 @@
 #pragma once
 #include <vector>
 #include <cstdint>
-#include <ffi.h>
+// #include <ffi.h>
 #include <map>
 #include <memory>
 #include <optional>
@@ -149,7 +149,7 @@ namespace zen
 
     private:
         std::vector<i64> code;
-        std::map<i64, ffi_cif> callables;
+        // std::map<i64, ffi_cif> callables;
 
         template<typename type>
         static constexpr  void fetch_lhs_rhs(std::stack<type>& stack, type& lhs, type& rhs)
@@ -177,11 +177,11 @@ namespace zen
         }
 
     public:
-        bool register_ffi_callable(i64 function_pointer,std::vector<i64> args, i64 return_type)
-        {
-            ffi_cif & cif = callables[function_pointer];
-            return ffi_prep_cif(&cif, FFI_DEFAULT_ABI, args.size(), reinterpret_cast<ffi_type*>(return_type), reinterpret_cast<ffi_type**>(args.data())) == FFI_OK;
-        }
+        // bool register_ffi_callable(i64 function_pointer,std::vector<i64> args, i64 return_type)
+        // {
+        //     // ffi_cif & cif = callables[function_pointer];
+        //     // return ffi_prep_cif(&cif, FFI_DEFAULT_ABI, args.size(), reinterpret_cast<ffi_type*>(return_type), reinterpret_cast<ffi_type**>(args.data())) == FFI_OK;
+        // }
         static constexpr i64 ref(auto & some)
         {
            return reinterpret_cast<i64>(&some);

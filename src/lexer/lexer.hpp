@@ -12,12 +12,12 @@
 
 namespace zen {
     class lexer {
-        std::ifstream stream;
+        std::istream & stream;
         char lit, it;
         long line, col;
         inline void getchar();
         public:
-        explicit lexer(const std::string&& filename);
+        explicit lexer(std::istream& stream);
 
         std::optional<token> next();
         inline token next_int_or_double();

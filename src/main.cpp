@@ -4,7 +4,7 @@
 #include "parser/parser.hpp"
 
 #include <vm/vm.hpp>
-
+#include <sstream>
 #include "utils/utils.hpp"
 std::vector<zen::token> tokens;
 
@@ -199,6 +199,7 @@ void test_constants()
     std::cout << ( name.type_hash == typeid(char const*).hash_code() )<< std::endl;
     // std::cout << (char*)(name_addr) << std::endl;
 }
+/*
 #include <iostream>
 #include <ffi.h>
 extern "C" {
@@ -252,7 +253,7 @@ void test_vm_ffi()
     vm1.load(code);
 
 }
-
+*/
 int main(int argc, char** argv) try
 {
     // for (int i = 0; i < 10000; ++i)
@@ -265,7 +266,36 @@ int main(int argc, char** argv) try
     // test_ffi();
     // test_vm_ffi();
     // return 0;
-    zen::lexer lexer("test.zen");
+#ifdef NATIVE
+    std::string filename = "test.zen";
+    std::ifstream stream0(filename);
+    stream0.open(filename);
+    if (not stream0.is_open())
+    {
+        throw zen::exceptions::file_not_found(filename);
+    }
+#else
+    std::stringstream stream0;
+
+    stream0.str(R"(
+sub(x: long, y: long) = long(result) {
+    result: long = x - y
+}
+
+sum(x: long, y: long) = long(x+y)
+
+printSum(x: long, y: long) = {
+//    print(sum(x,y))
+}
+
+main() = {
+    x : double = 10
+//    print(sum(10,20))
+}
+)");
+#endif
+
+    zen::lexer lexer(stream0);
     while (auto token = lexer.next())
     {
         // fmt::println(">> {}: '{}'", static_cast<int>(token->type), token->value);

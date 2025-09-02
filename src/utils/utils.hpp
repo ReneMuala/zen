@@ -8,6 +8,8 @@
 #include <string>
 #include <typeinfo>
 #include <unordered_map>
+#include <stdlib.h>
+
 namespace zen::utils
 {
     template <typename type = void>
