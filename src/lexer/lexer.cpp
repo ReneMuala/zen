@@ -14,20 +14,50 @@ zen::lexer::lexer(std::istream & stream): stream(stream)
     line = col = 1;
 }
 
-zen::token zen::lexer::next_int_or_double()
+zen::token zen::lexer::next_number()
 {
     std::string value;
     auto type = enums::TINT_NUM;
     restart:
     do
     {
+        if (it == '_') continue;
         value += it;
         getchar();
-    } while (isdigit(it));
+    } while (isdigit(it) or it == '_');
     if (it == '.' and type == enums::TINT_NUM)
     {
         type = enums::TDOUBLE_NUM;
         goto restart;
+    }
+    if (it == 'f')
+    {
+        type = enums::TFLOAT_NUM;
+        getchar();
+    } else if (it == 'd')
+    {
+        type = enums::TDOUBLE_NUM;
+        getchar();
+    }
+    else if (it == 'b' and type == enums::TINT_NUM)
+    {
+        type = enums::TBYTE_NUM;
+        getchar();
+    }
+    else if (it == 's' and type == enums::TINT_NUM)
+    {
+        type = enums::TSHORT_NUM;
+        getchar();
+    }
+    else if (it == 'i' and type == enums::TINT_NUM)
+    {
+        type = enums::TINT_NUM;
+        getchar();
+    }
+    else if (it == 'l' and type == enums::TINT_NUM)
+    {
+        type = enums::TLONG_NUM;
+        getchar();
     }
     return token(type, std::move(value), line, col);
 }
@@ -342,7 +372,7 @@ std::optional<zen::token> zen::lexer::next()
     if (stream.eof())
         return std::nullopt;
     if (isdigit(it))
-        return next_int_or_double();
+        return next_number();
     if (isalpha(it))
         return next_id_or_keyword();
     if (it == '{')

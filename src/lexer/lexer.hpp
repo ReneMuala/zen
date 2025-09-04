@@ -20,7 +20,7 @@ namespace zen {
         explicit lexer(std::istream& stream);
 
         std::optional<token> next();
-        inline token next_int_or_double();
+        inline token next_number();
         inline token next_string();
         zen::token next_and();
         zen::token next_or();

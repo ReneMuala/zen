@@ -4,17 +4,18 @@
 #pragma once
 #include "enums/token_type.hpp"
 #include <vector>
-
+#include <iostream>
 #include "composer/composer.hpp"
 #include "composer/vm/composer.hpp"
 using namespace enums;
 extern std::vector<zen::token> tokens;
 static bool pragma_ignore_missing_symbols = false;
 static std::string pragma_ignore_missing_symbols_data;
-zen::composer::composer& get_composer()
+
+zen::composer::composer* get_composer()
 {
-    static zen::composer::vm::composer composer;
-    return reinterpret_cast<zen::composer::composer&>(composer);
+    static auto composer = std::make_unique<zen::composer::vm::composer>();
+    return (zen::composer::composer*)(composer.get());
 }
 // namespace parser
 // {
@@ -39,7 +40,7 @@ namespace parser
 
 #define EXPECTED(ITEM) []() \
         {\
-            fmt::println(stderr, "syntax error: expected {} found {} @{} at {}", ITEM, tokens[ILC::offset].value,  (int)tokens[ILC::offset].type ,tokens[ILC::offset-1].get_location_string()); \
+            std::cerr <<  "syntax error: expected " << ITEM << " found " << tokens[ILC::offset].value << " @" << (int)tokens[ILC::offset].type << " at " << tokens[ILC::offset-1].get_location_string(); \
         }
 
 BEGIN_PRODUCTION(PRODUCTION_NUSING_STAT)
@@ -122,22 +123,28 @@ BEGIN_PRODUCTION(PRODUCTION_NIF)
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
+    auto composer = get_composer();
     if (TRY_REQUIRE_NON_TERMINAL(NGENERIC)){}
     REQUIRE_TERMINAL(TPARENTHESIS_OPEN)
+    const std::string name = parser::id;
+    zen::i8 param_count = 0;
     while (TRY_REQUIRE_NON_TERMINAL(NVAL))
     {
+        param_count++;
         if (not TRY_REQUIRE_TERMINAL(TCOMMA))
         {
             break;
         }
     }
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
+    std::cout << "CALL";
+    composer->call(name, param_count);
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
-    static zen::composer::composer& composer = get_composer();
+    static auto composer = get_composer();
     static bool begin_function_invoked;
-    static std::list<std::tuple<std::string, zen::composer::type>> parameters = {};
+    static std::list<std::tuple<std::string, std::string>> parameters = {};
     // provides parser::id
     // REQUIRE_NON_TERMINAL(NID)
     if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
@@ -145,7 +152,7 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
     }
     if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
     {
-        composer.begin_function(parser::id);
+        composer->begin(parser::id);
         begin_function_invoked = true;
         do
         {
@@ -155,8 +162,7 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
                 REQUIRE_TERMINAL_CALLBACK(TCOLON, EXPECTED(":"))
                 parser::type.clear();
                 REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
-                const zen::composer::type & type = composer.get_type(parser::type);
-                parameters.emplace_back(name, type);
+                parameters.emplace_back(name, parser::type);
             }
         }
         while (TRY_REQUIRE_TERMINAL(TCOMMA));
@@ -168,15 +174,15 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
     REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
     if (not begin_function_invoked)
     {
-        composer.begin_function(parser::id);
+        composer->begin(parser::id);
     }
     parser::type.clear();
     if (TRY_REQUIRE_NON_TERMINAL(NTYPE))
     {
-        composer.set_function_return(composer.get_type(parser::type));
+        composer->set_return_type(parser::type);
         for (auto parameter : parameters)
         {
-            composer.set_function_parameter(std::get<0>(parameter), std::get<1>(parameter));
+            composer->set_parameter(std::get<0>(parameter), std::get<1>(parameter));
         }
         parameters.clear();
         if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
@@ -188,20 +194,20 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
             pragma_ignore_missing_symbols = false;
             if (ILC::offset - offset_before == 1 and ILC::chain[ILC::offset - 1] == TID)
             {
-                composer.set_function_return_name(parser::id);
+                composer->set_return_name(parser::id);
             } else if (not pragma_ignore_missing_symbols_data.empty())
             {
-                std::cout << ILC::offset - offset_before << std::endl;
+                // std::cout << ILC::offset - offset_before << std::endl;
                 throw std::out_of_range("No such local symbol(s): " + pragma_ignore_missing_symbols_data);
             }
             REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
         }
     } else
     {
-        composer.set_function_return(composer.get_type("unit"));
+        composer->set_return_type("unit");
         for (auto parameter : parameters)
         {
-            composer.set_function_parameter(std::get<0>(parameter), std::get<1>(parameter));
+            composer->set_parameter(std::get<0>(parameter), std::get<1>(parameter));
         }
         parameters.clear();
     }
@@ -215,17 +221,15 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
             }
             else if (TRY_REQUIRE_NON_TERMINAL(NVAL))
             {
-                composer.set_function_return_value(composer.top());
-                composer.pop();
+                composer->return_value();
             } else break;
         }
         REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
     } else
     {
-        composer.set_function_return_value(composer.top());
-        composer.pop();
+        composer->return_value();
     }
-    composer.end_function();
+    composer->end();
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NFOR)
@@ -269,24 +273,39 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_PREFIX_VAL)
     REQUIRE_NON_TERMINAL(NSINGLE_VAL)
 END_PRODUCTION
 
+BEGIN_PRODUCTION(PRODUCTION_NVAL_MOD_VALUE)
+    static auto composer = get_composer();
+    REQUIRE_TERMINAL(TMODULO)
+    REQUIRE_NON_TERMINAL_CALLBACK(NFIRST_PRIORITY_RHS_VAL, EXPECTED("value"))
+    composer->modulo();
+END_PRODUCTION
+
 BEGIN_PRODUCTION(PRODUCTION_NVAL_TIMES_VALUE)
+    static auto composer = get_composer();
     REQUIRE_TERMINAL(TTIMES)
     REQUIRE_NON_TERMINAL_CALLBACK(NFIRST_PRIORITY_RHS_VAL, EXPECTED("value"))
+    composer->times();
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_SLASH_VALUE)
+    static auto composer = get_composer();
     REQUIRE_TERMINAL(TSLASH)
     REQUIRE_NON_TERMINAL_CALLBACK(NFIRST_PRIORITY_RHS_VAL, EXPECTED("value"))
+    composer->slash();
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_PLUS_VAL)
+    static auto composer = get_composer();
     REQUIRE_TERMINAL(TPLUS)
     REQUIRE_NON_TERMINAL_CALLBACK(NSECOND_PRIORITY_RHS_VAL, EXPECTED("value"))
+    composer->plus();
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_MINUS_VALUE)
+    static auto composer = get_composer();
     REQUIRE_TERMINAL(TMINUS)
     REQUIRE_NON_TERMINAL_CALLBACK(NTHIRD_PRIORITY_RHS_VAL, EXPECTED("value"))
+    composer->minus();
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_GREATER_VALUE)
@@ -330,14 +349,54 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_OR_VALUE)
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_NUM)
-    static zen::composer::composer& composer = get_composer();
+    static auto composer = get_composer();
     bool negative = false;
     if (TRY_REQUIRE_TERMINAL(TMINUS))
         negative = true;
     if (TRY_REQUIRE_TERMINAL(TPLUS))
         negative = false;
     using namespace ILC;
-    if (not TRY_REQUIRE_TERMINAL(TINT_NUM))
+    if (TRY_REQUIRE_TERMINAL(TINT_NUM))
+    {
+        int data = strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10);
+        if (negative)
+        {
+            data = -data;
+        }
+        composer->push<int>(std::move(data), "int");
+    }  else if (TRY_REQUIRE_TERMINAL(TBYTE_NUM))
+    {
+        char data = static_cast<char>(strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10));
+        if (negative)
+        {
+            data = -data;
+        }
+        composer->push<char>(std::move(data), "byte");
+    } else if (TRY_REQUIRE_TERMINAL(TSHORT_NUM))
+    {
+        short data = static_cast<short>(strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10));
+        if (negative)
+        {
+            data = -data;
+        }
+        composer->push<short>(std::move(data), "short");
+    } else if (TRY_REQUIRE_TERMINAL(TLONG_NUM))
+    {
+        long data = strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10);
+        if (negative)
+        {
+            data = -data;
+        }
+        composer->push<long>(std::move(data), "long");
+    } else if (TRY_REQUIRE_TERMINAL(TFLOAT_NUM))
+    {
+        float data = strtof(tokens[ILC::offset - 1].value.c_str(), nullptr);
+        if (negative)
+        {
+            data = -data;
+        }
+        composer->push<float>(std::move(data), "float");
+    } else
     {
         REQUIRE_TERMINAL(TDOUBLE_NUM)
         double data = strtod(tokens[ILC::offset - 1].value.c_str(), nullptr);
@@ -345,22 +404,14 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_NUM)
         {
             data = -data;
         }
-        composer.push<double>(std::move(data), composer.get_type("double"));
-    } else
-    {
-        long data = strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10);
-        if (negative)
-        {
-            data = -data;
-        }
-        composer.push<long>(std::move(data), composer.get_type("long"));
+        composer->push<double>(std::move(data), "double");
     }
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_CHAR_ARRAY)
-    static zen::composer::composer& composer = get_composer();
+    static auto composer = get_composer();
     REQUIRE_TERMINAL(TCHAR_ARRAY)
-    composer.push<std::string>(std::move(tokens[ILC::offset-1].value), composer.get_type("long"));
+    composer->push<std::string>(std::move(tokens[ILC::offset-1].value),"string");
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_NOT_VAL)
@@ -391,7 +442,7 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_LIST)
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_ID)
-    static zen::composer::composer& composer = get_composer();
+    static auto composer = get_composer();
     bool negative = false;
     if (TRY_REQUIRE_TERMINAL(TMINUS))
         negative = true;
@@ -400,8 +451,7 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_ID)
     REQUIRE_NON_TERMINAL(NID)
     try
     {
-        const auto & v = composer.get_function_local(parser::id);
-        composer.push<zen::composer::value>(zen::composer::value(v.type, v.address), v.type);
+        composer->push(parser::id);
     } catch (const std::out_of_range & e)
     {
         if (not pragma_ignore_missing_symbols)
@@ -413,14 +463,14 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_ID)
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_BOOLEAN)
-    static zen::composer::composer& composer = get_composer();
+    static auto composer = get_composer();
     if (not TRY_REQUIRE_TERMINAL(TKEYWORD_TRUE))
     {
         REQUIRE_TERMINAL(TKEYWORD_FALSE)
-        composer.push<bool>(false, composer.get_type("bool"));
+        composer->push<bool>(false, "bool");
     } else
     {
-        composer.push<bool>(true, composer.get_type("bool"));
+        composer->push<bool>(true, "bool");
     }
 END_PRODUCTION
 
@@ -444,7 +494,7 @@ BEGIN_PRODUCTION(PRODUCTION_NTYPE)
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVARIABLE_DEFINITION)
-    static zen::composer::composer & composer = get_composer();
+    static auto composer = get_composer();
     // provides parser::id
     pragma_ignore_missing_symbols = true;
     REQUIRE_NON_TERMINAL(NID)
@@ -453,20 +503,22 @@ BEGIN_PRODUCTION(PRODUCTION_NVARIABLE_DEFINITION)
     REQUIRE_TERMINAL(TCOLON)
     parser::type.clear();
     REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
-    composer.set_function_local(name, composer.get_type(parser::type));
+    composer->set_local(name, parser::type);
+    composer->push(name);
     if (TRY_REQUIRE_TERMINAL(TEQU))
     {
         REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
     }
-    // fmt::println("{} : {}", parser::id, parser::type);
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NASGN_SUFFIX)
+    static auto composer = get_composer();
     if (not(TRY_REQUIRE_TERMINAL(TEQU) or TRY_REQUIRE_TERMINAL(TPLUS_EQU) or TRY_REQUIRE_TERMINAL(TMINUS_EQU) or
         TRY_REQUIRE_TERMINAL(TTIMES_EQU) or TRY_REQUIRE_TERMINAL(TSLASH_EQU) or TRY_REQUIRE_TERMINAL(TMINUS_EQU)))
     {
         ROLLBACK_PRODUCTION()
     }
+    composer->push(parser::id);
     REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
 END_PRODUCTION
 
@@ -686,12 +738,14 @@ BEGIN_SYMBOL_BINDING(NFIRST_PRIORITY_RHS_VAL)
         (PRODUCTION_NVAL_PREFIX_VAL() and (
             PRODUCTION_NVAL_TIMES_VALUE() or
             PRODUCTION_NVAL_SLASH_VALUE() or
+            PRODUCTION_NVAL_MOD_VALUE() or
             true))
       END_SYMBOL_BINDING
 
 BEGIN_SYMBOL_BINDING(NSUFIXED_VAL)
           PRODUCTION_NVAL_SLASH_VALUE() or
           PRODUCTION_NVAL_TIMES_VALUE() or
+          PRODUCTION_NVAL_MOD_VALUE() or
           PRODUCTION_NVAL_PLUS_VAL() or
           PRODUCTION_NVAL_MINUS_VALUE() or
           PRODUCTION_NVAL_GREATER_VALUE() or

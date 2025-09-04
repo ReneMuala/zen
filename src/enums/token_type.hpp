@@ -88,8 +88,16 @@ namespace enums
     // (...) = TYPE? {...}
     NSUFFIX_FUNCTION_DEFINITION,
     NSUFFIX_VAL_NTERNARY,
+    /// short number
+    TBYTE_NUM,
+    /// short number
+    TSHORT_NUM,
     /// integer number
     TINT_NUM,
+    /// long number
+    TLONG_NUM,
+    /// float number
+    TFLOAT_NUM,
     /// double number
     TDOUBLE_NUM,
     /// text

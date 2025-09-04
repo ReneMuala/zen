@@ -14,11 +14,44 @@
 #include <unordered_map>
 #include <fmt/base.h>
 
+#define DECL_KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(T) \
+add_##T, \
+sub_##T,\
+mul_##T,\
+div_##T,\
+mod_##T
+
+#define DECL_KAIZEN_ARITHMETICS_FOR_FLOAT_TYPE(T) \
+add_##T, \
+sub_##T,\
+mul_##T,\
+div_##T
+
+#define DECL_KAIZEN_RELATIONAL_FOR_TYPE(T) \
+gt_##T,\
+lt_##T,\
+gte_##T,\
+lte_##T,\
+eq_##T,\
+neq_##T
+
+#define DECL_KAIZEN_CONVERSION_FOR_TYPE(T) \
+T##_to_i64,\
+T##_to_f64,\
+T##_to_i8,\
+T##_to_i32,\
+T##_to_i16,\
+T##_to_f32,\
+T##_to_boolean
+
 namespace zen
 {
     using boolean = bool;
     using i8 = int8_t;
+    using i16 = int16_t;
+    using i32 = int32_t;
     using i64 = int64_t;
+    using f32 = float;
     using f64 = double;
     constexpr static auto ascii_art = R"(   .-') _   ('-.       .-') _
   (  OO) )_(  OO)     ( OO ) )
@@ -33,83 +66,34 @@ namespace zen
     {
         push,
         pop,
-        add_i8,
-        sub_i8,
-        mul_i8,
-        div_i8,
-        mod_i8,
+        DECL_KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i8),
+        DECL_KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i16),
+        DECL_KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i32),
+        DECL_KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i64),
+        DECL_KAIZEN_ARITHMETICS_FOR_FLOAT_TYPE(f32),
+        DECL_KAIZEN_ARITHMETICS_FOR_FLOAT_TYPE(f64),
 
-        // arith for i64
-        add_i64,
-        sub_i64,
-        mul_i64,
-        div_i64,
-        mod_i64,
+        DECL_KAIZEN_RELATIONAL_FOR_TYPE(i8),
+        DECL_KAIZEN_RELATIONAL_FOR_TYPE(i16),
+        DECL_KAIZEN_RELATIONAL_FOR_TYPE(i32),
+        DECL_KAIZEN_RELATIONAL_FOR_TYPE(i64),
+        DECL_KAIZEN_RELATIONAL_FOR_TYPE(f32),
+        DECL_KAIZEN_RELATIONAL_FOR_TYPE(f64),
 
-        // relational for i64
-        gt_i64,
-        lt_i64,
-        gte_i64,
-        lte_i64,
-        eq_i64,
-        neq_i64,
+        DECL_KAIZEN_CONVERSION_FOR_TYPE(i8),
+        DECL_KAIZEN_CONVERSION_FOR_TYPE(i16),
+        DECL_KAIZEN_CONVERSION_FOR_TYPE(i32),
+        DECL_KAIZEN_CONVERSION_FOR_TYPE(i64),
+        DECL_KAIZEN_CONVERSION_FOR_TYPE(f32),
+        DECL_KAIZEN_CONVERSION_FOR_TYPE(f64),
 
-        // arith for f64
-        add_f64,
-        sub_f64,
-        mul_f64,
-        div_f64,
-
-        // relational for f64
-        gt_f64,
-        lt_f64,
-        gte_f64,
-        lte_f64,
-        eq_f64,
-        neq_f64,
-
-        // logic for boolean
         boolean_and,
         boolean_or,
-
-        // conversions & copies
-        i64_to_f64,
-        i64_to_i64,
-        i64_to_boolean,
-        i64_to_i8,
-
-        f64_to_i64,
-        f64_to_f64,
-        f64_to_boolean,
-        f64_to_i8,
-
-        boolean_to_i8,
-        boolean_to_i64,
-        boolean_to_f64,
-        boolean_to_boolean,
-
-        i8_to_i8,
-        i8_to_i64,
-        i8_to_f64,
-        i8_to_boolean,
-
-        // unary for i64
-        inc_i64,
-        dec_i64,
-
-        // unary for f64
-        inc_f64,
-        dec_f64,
-
-        bit_and,
-        bit_or,
-        bit_xor,
-        bit_not,
-        // unary for boolean
         boolean_not,
 
         // etc
         hlt,
+        ret,
         // modify stack
         most,
         go,
@@ -117,8 +101,7 @@ namespace zen
         jump,
         jump_if,
         call,
-        ffi_call,
-        ret,
+        // ffi_call,
         // fetch_i8,
         // fetch_i64,
         // fetch_f64,

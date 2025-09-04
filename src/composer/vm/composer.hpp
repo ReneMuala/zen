@@ -14,12 +14,15 @@
 namespace zen::composer::vm {
 class composer : zen::composer::composer
 {
-    std::list<std::tuple<std::string, signature, i64>> functions;
+protected:
+    std::shared_ptr<const type>& get_type(const std::string& name) override;
+    std::unordered_map<std::string,std::tuple<signature, i64>> functions;
     std::vector<i64> code;
-    std::unordered_map<std::string, type> types;
+    std::unordered_map<std::string, std::shared_ptr<const type>> types;
     struct scope_data
     {
-        i64 local_most_size;
+        std::string function_name;
+        i64 local_most_size{};
         std::map<std::string, symbol> locals;
         std::optional<value> return_value;
         std::optional<std::string> return_name;
@@ -37,29 +40,33 @@ class composer : zen::composer::composer
             return_name = std::nullopt;
         }
     } scope;
+    void umost(const std::initializer_list<value> && values);
+    value top();
+    void push(const value&);
 public:
     composer();
-    ~composer() override;
-
-    void begin_function(std::string name) override;
-    void set_function_parameter(std::string name, const type& type) override;
-    void set_function_return(const type& type) override;
-    void set_function_return_name(std::string name) override;
-    void set_function_local(std::string name, const type& type) override;
-    void end_function() override;
-    const type& get_type(const std::string& name) override;
-    const symbol& get_function_local(const std::string& name) override;
-    void operation_assign(const value& destination, const value& source) override;
-
+    ~composer() override = default;
+    void begin(std::string name) override;
+    void set_parameter(std::string name, const std::string& type) override;
+    void set_return_type(const std::string& name) override;
+    void return_value() override;
+    void set_return_name(const std::string& name) override;
+    void set_local(std::string name, const std::string& type) override;
+    void end() override;
     void bake() override;
-    void set_function_return_value(const value& value) override;
-    void push_local_temp(const type& type) override;
+    void assign() override;
+    void push(const std::string& name) override;
     void pop() override;
-    void operation_arith_plus(const value& destination, const value& first, const value& second) override;
-    void operation_arith_minus(const value& destination, const value& first, const value& second) override;
-    void operation_arith_multi(const value& destination, const value& first, const value& second) override;
-    void operation_arith_divide(const value& destination, const value& first, const value& second) override;
-    void operation_arith_mod(const value& destination, const value& first, const value& second) override;
+    void plus() override;
+    void minus() override;
+    void times() override;
+    void slash() override;
+    void modulo() override;
+    void call(const std::string& name, const i8& args_count) override;
+
+protected:
+    void push(const std::shared_ptr<const type>& type) override;
+
 };
 
 } // zen

@@ -7,7 +7,7 @@
 #include <sstream>
 #include "utils/utils.hpp"
 std::vector<zen::token> tokens;
-
+/*
 void test_vm()
 {
     using namespace zen;
@@ -167,6 +167,7 @@ void test_vm()
     fmt::println("sumAcc();sumAcc();sumAcc(); {}", o);
     fmt::println("sumParam({},{}) = {}", a,b, callSumParamResult);
 }
+*/
 
 void test_stack()
 {
@@ -256,6 +257,69 @@ void test_vm_ffi()
 */
 int main(int argc, char** argv) try
 {
+    zen::composer::composer * composer = get_composer();
+
+    composer->begin("internal::cast_test");
+    composer->set_local("x", "double");
+    composer->push(20, "int");
+    composer->push("x");
+    composer->call("double",1);
+    composer->end();
+
+    composer->begin("internal::float_to_int");
+    composer->set_return_type("float");
+    composer->set_parameter("x", "float");
+    composer->push("x");
+    composer->push("<return>");
+    composer->call("float",1);
+    composer->end();
+
+    composer->begin("internal::sum_ints_as_doubles");
+    composer->set_return_type("double");
+    composer->set_parameter("x", "int");
+    composer->set_parameter("y", "int");
+    composer->push("x");
+    composer->push("<double>");
+    composer->call("double", -1);
+    composer->push("y");
+    composer->push("<double>");
+    composer->call("double", -1);
+    composer->plus();
+    composer->return_value();
+    composer->end();
+
+    composer->begin("internal::sum");
+    composer->set_return_type("long");
+    composer->set_parameter("x", "long");
+    composer->set_parameter("y", "long");
+    composer->push("x");
+    composer->push("y");
+    composer->plus();
+    composer->return_value();
+    composer->end();
+
+    composer->begin("internal::timesTwo");
+    composer->set_return_type("double");
+    composer->set_parameter("x", "double");
+    composer->push(2.0, "double");
+    composer->push("x");
+    composer->times();
+    composer->return_value();
+    composer->end();
+
+    composer->begin("internal::timesThree");
+    composer->set_return_type("long"); // most x
+    composer->set_return_name("result");
+    composer->set_parameter("x", "long"); // most x
+    composer->set_local("result", "long"); // most x
+    composer->push(3, "long");
+    composer->push("x");
+    composer->times();  // most x
+    composer->push("result");
+    composer->assign();
+    composer->end();
+    composer->bake();
+    return 0;
     // for (int i = 0; i < 10000; ++i)
     // {
     //     test_stack();
@@ -266,6 +330,7 @@ int main(int argc, char** argv) try
     // test_ffi();
     // test_vm_ffi();
     // return 0;
+
 #ifdef NATIVE
     std::string filename = "test.zen";
     std::ifstream stream0(filename);
@@ -284,14 +349,27 @@ sub(x: long, y: long) = long(result) {
 
 sum(x: long, y: long) = long(x+y)
 
+magic(x: long, y: long) = long(result) {
+    sum: long = x + y
+    sub: long = x - y
+    result: long = (sum * sub + sum / sub) * sum * sum / 2l + 3l * sub
+}
+
 printSum(x: long, y: long) = {
 //    print(sum(x,y))
 }
+
 
 main() = {
     x : double = 10
 //    print(sum(10,20))
 }
+
+intToDouble(x: int) = double(r) {
+    r: double = 1.0
+    r = double(100)
+}
+
 )");
 #endif
 
@@ -305,8 +383,7 @@ main() = {
     ILC::chain_size = ILC::chain.size();
     if (parse())
     {
-        std::cout << "Success" << std::endl;
-        get_composer().bake();
+        get_composer()->bake();
     }
     else
     {

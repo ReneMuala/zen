@@ -17,35 +17,58 @@ namespace zen::composer
         const std::string name;
         const i64 size;
         explicit operator const std::string&() const { return name; }
+        explicit type(std::string  name, const i64 size) : name(std::move(name)), size(size) {}
         bool operator==(const type& other) const
         {
             return name == other.name && size == other.size;
         }
     };
 
+    enum kind
+    {
+        temporary,
+        constant,
+        variable
+    };
+
     struct value
     {
-        const std::reference_wrapper<const type> type;
-        const i64 address;
-        value(const std::reference_wrapper<const composer::type> & type, const i64 & address) : type(type), address(address) {}
+        kind kind;
+        const std::shared_ptr<const type> type;
+        [[nodiscard]] bool is(const std::string & type_name) const
+        {
+            return type->name == type_name;
+        }
+        [[nodiscard]] bool has_same_type_as(const value & other) const
+        {
+            return *type == *other.type;
+        }
+        [[nodiscard]] i64 address(const i64 & relative_point) const
+        {
+            return  _address - relative_point;
+        }
+        value(const std::shared_ptr<const composer::type> & type, const i64 & address, const composer::kind & kind = variable) : type(type), kind(kind), _address(address) {}
+        const i64 _address;
     };
 
     struct symbol : value
     {
         const std::string name;
-        symbol(std::string  name, const std::reference_wrapper<const composer::type> & type, const i64 & address) : value(type, address), name(std::move(name)) {}
+        symbol(std::string  name, const std::shared_ptr<const composer::type> & type, const i64 & address) : value(type, address), name(std::move(name)) {}
     };
 
     struct signature
     {
-        std::reference_wrapper<const type> type;
-        std::list<std::reference_wrapper<const composer::type>> parameters {};
+        std::shared_ptr<const type> type;
+        std::list<std::shared_ptr<const composer::type>> parameters {};
     };
 
 class composer {
 protected:
     utils::constant_pool pool;
-    std::stack<std::tuple<value, bool>> stack;
+    std::stack<value> stack;
+    virtual std::shared_ptr<const type>& get_type(const std::string& name) = 0;
+    virtual void push(const std::shared_ptr<const type>& type) = 0;
     public:
 
     virtual ~composer() = default;
@@ -58,42 +81,43 @@ protected:
     // virtual void set_generic_context_resolution_parameter(std::string, const type & type) = 0;
     // virtual void end_generic_context_resolution() = 0;
 
-    virtual void begin_function(std::string name) = 0;
-    virtual void set_function_parameter(std::string name, const type & type) = 0;
-    virtual void set_function_return(const type & type) = 0;
-    virtual void set_function_return_value(const value & value) = 0;
-    virtual void set_function_return_name(std::string name) = 0;
-    virtual void set_function_local(std::string name, const type & type) = 0;
-    virtual const symbol & get_function_local(const std::string & name) = 0;
-    virtual void end_function() = 0;
+    virtual void begin(std::string name) = 0;
+    virtual void set_parameter(std::string name, const std::string & type) = 0;
+    virtual void set_return_type(const std::string & name) = 0;
+    virtual void return_value() = 0;
+    virtual void set_return_name(const std::string & name) = 0;
+    virtual void set_local(std::string name, const std::string & type) = 0;
+    virtual void end() = 0;
     virtual void bake() = 0;
-
-    virtual void operation_assign(const value & destination, const value & source) = 0;
-
-    virtual void push_local_temp(const type & type) = 0;
-
+    // if args count is < 0, it means no assignment is occurring
+    virtual void call(const std::string& name, const i8 & args_count) = 0;
+    // TS <- TS+1
+    virtual void assign() = 0;
+    virtual void push(const std::string & name) = 0;
     template <typename native>
-    void push(native && data, const type & t)
+    void push(native && data, const std::string & type)
     {
+        auto t = get_type(type);
         if constexpr (std::is_same_v<native, value>)
-            stack.push({value(t, data.address), false});
+            stack.push(value(t, data.address));
         else
         {
             const i64 address = (i64)(pool.get<native>(data).get());
-            stack.push({value(std::ref(t), address), false});
+            stack.emplace(t, address, constant);
         }
     }
-    value & top()
-    {
-        return std::get<0>(stack.top());
-    }
-    virtual void pop() = 0;
 
-    virtual void operation_arith_plus(const value & destination, const value & first, const value & second) = 0;
-    virtual void operation_arith_minus(const value & destination, const value & first, const value & second) = 0;
-    virtual void operation_arith_multi(const value & destination, const value & first, const value & second) = 0;
-    virtual void operation_arith_divide(const value & destination, const value & first, const value & second) = 0;
-    virtual void operation_arith_mod(const value & destination, const value & first, const value & second) = 0;
+    virtual void pop() = 0;
+    // PUSH(TS + TS+1)
+    virtual void plus() = 0;
+    // PUSH(TS - TS+1)
+    virtual void minus() = 0;
+    // PUSH(TS * TS+1)
+    virtual void times() = 0;
+    // PUSH(TS / TS+1)
+    virtual void slash() = 0;
+    // PUSH(TS % TS+1)
+    virtual void modulo() = 0;
 
     // virtual void operation_logic_and(const symbol & destination, const value & first, const value & second) = 0;
     // virtual void operation_logic_or(const symbol & destination, const value & first, const value & second) = 0;
@@ -140,7 +164,6 @@ protected:
 
     // virtual symbol & get_static_field(const std::string & classname, const std::string & name) = 0;
     // virtual symbol & get_static_method(const std::string & classname, const std::string & name) = 0;
-    virtual const type & get_type(const std::string & name) = 0;
     // virtual const symbol & get_function(const std::string & name, const signature & signature) = 0;
     // virtual const symbol & get_constructor(const type & name, const signature & signature) = 0;
 };
