@@ -31,6 +31,12 @@ namespace zen::composer
         variable
     };
 
+    enum call_result
+    {
+        result,
+        casting
+    };
+
     struct value
     {
         kind kind;
@@ -65,12 +71,13 @@ namespace zen::composer
 
 class composer {
 protected:
+    int & ilc_offset;
     utils::constant_pool pool;
     std::stack<value> stack;
     virtual std::shared_ptr<const type>& get_type(const std::string& name) = 0;
     virtual void push(const std::shared_ptr<const type>& type) = 0;
     public:
-
+    explicit composer(int & ilc_offset): ilc_offset(ilc_offset) {}
     virtual ~composer() = default;
 
     // virtual void begin_generic_context() = 0;
@@ -90,7 +97,7 @@ protected:
     virtual void end() = 0;
     virtual void bake() = 0;
     // if args count is < 0, it means no assignment is occurring
-    virtual void call(const std::string& name, const i8 & args_count) = 0;
+    virtual call_result call(const std::string& name, const i8 & args_count) = 0;
     // TS <- TS+1
     virtual void assign() = 0;
     virtual void push(const std::string & name) = 0;

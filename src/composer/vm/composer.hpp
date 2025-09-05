@@ -44,7 +44,7 @@ protected:
     value top();
     void push(const value&);
 public:
-    composer();
+    composer(int & ilc_offset);
     ~composer() override = default;
     void begin(std::string name) override;
     void set_parameter(std::string name, const std::string& type) override;
@@ -62,7 +62,7 @@ public:
     void times() override;
     void slash() override;
     void modulo() override;
-    void call(const std::string& name, const i8& args_count) override;
+    call_result call(const std::string& name, const i8& args_count) override;
 
 protected:
     void push(const std::shared_ptr<const type>& type) override;

@@ -7,6 +7,8 @@
 #include <iostream>
 #include <fmt/core.h>
 
+#include "exceptions/semantic_error.hpp"
+
 namespace zen
 {
     void composer::vm::composer::umost(const std::initializer_list<value>&& values)
@@ -38,37 +40,42 @@ namespace zen
         stack.push(v);
     }
 
-    composer::vm::composer::composer(): types({
-        {"unit", std::make_shared<type>("unit", 0)},
-        {"int", std::make_shared<type>("int", 4)},
-        {"long", std::make_shared<type>("long", 8)},
-        {"float", std::make_shared<type>("float", 4)},
-        {"double", std::make_shared<type>("double", 8)},
-        {"bool", std::make_shared<type>("bool", 1)},
-        {"byte", std::make_shared<type>("byte", 1)}
-    }),
-    functions({
+    composer::vm::composer::composer(int& ilc_offset):
+        zen::composer::composer(ilc_offset),
+        functions({
             {"int", {signature{}, 0}},
             {"long", {signature{}, 0}},
             {"float", {signature{}, 0}},
             {"double", {signature{}, 0}},
             {"bool", {signature{}, 0}},
             {"byte", {signature{}, 0}}
-    })
-    {}
+        }),
+        types({
+            {"unit", std::make_shared<type>("unit", 0)},
+            {"int", std::make_shared<type>("int", 4)},
+            {"long", std::make_shared<type>("long", 8)},
+            {"float", std::make_shared<type>("float", 4)},
+            {"double", std::make_shared<type>("double", 8)},
+            {"function", std::make_shared<type>("function", 8)},
+            {"bool", std::make_shared<type>("bool", 1)},
+            {"byte", std::make_shared<type>("byte", 1)}
+        })
+    {
+        code.push_back(hlt);
+    }
 
     void composer::vm::composer::begin(std::string name)
     {
         scope.function_name = name;
         functions.emplace(std::move(name), std::make_tuple<signature, size_t>(
-                                                                               signature{
-                                                                                   .type = types.at("unit")
-                                                                               }, code.size()));
+                              signature{
+                                  .type = types.at("unit")
+                              }, code.size()));
     }
 
     void composer::vm::composer::set_parameter(std::string name, const std::string& type)
     {
-        std::get<signature>(functions.at(scope.function_name)).parameters.emplace_back(types.at(type));
+        std::get<signature>(functions.at(scope.function_name)).parameters.emplace_back(get_type(type));
         set_local(name, type);
     }
 
@@ -128,7 +135,7 @@ namespace zen
         }
         if (auto const return_value = scope.return_value)
         {
-            if (const auto most_delta = scope.local_most_size -return_value->type->size; most_delta > 0)
+            if (const auto most_delta = scope.local_most_size - return_value->type->size; most_delta > 0)
             {
                 code.push_back(zen::most);
                 code.push_back(most_delta);
@@ -144,8 +151,8 @@ namespace zen
         {
             return types.at(name);
         }
-        throw std::out_of_range(fmt::format(
-            "[Error: No such type] You are trying to use the type {}, but it has not been declared yet", name));
+        throw exceptions::semantic_error(fmt::format(
+                                             "no such type \"{}\"", name), ilc_offset);
     }
 
     void composer::vm::composer::bake()
@@ -179,9 +186,11 @@ namespace zen
                 }
                 else if (_code == ret)
                     fmt::print("ret ");
+                else if (_code == hlt)
+                    fmt::print("hlt ");
                 else
                     std::cout << _code << ' ';
-                if (_code == zen::ret) break;
+                if (_code == zen::ret || _code == zen::hlt) break;
             }
             std::cout << std::endl;
         }
@@ -190,18 +199,21 @@ namespace zen
     void composer::vm::composer::assign()
     {
         if (stack.size() < 2)
-            throw std::logic_error(fmt::format(
-                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
-                __FUNCTION__, stack.size()));
-        const value lhs = top();
-        pop();
+        {
+            throw exceptions::semantic_error(fmt::format(
+                                                 "<KAIZEN-INTERNAL-API> Cannot compose operation {} because stack size {} is below expected",
+                                                 __FUNCTION__, stack.size()), ilc_offset);
+        }
         const value rhs = top();
         pop();
-        if (lhs.kind == constant)
+        const value lhs = top();
+        pop();
+        if (lhs.kind == constant or lhs.kind == temporary)
         {
-            throw std::logic_error(fmt::format(
-                "[Error: Invalid operation] Cannot compose operation " __FUNCTION__
-                " to a constant, consider changing assign operands order"));
+            throw exceptions::semantic_error("cannot assign value to a constant or temporary value", ilc_offset,
+                                             rhs.kind == variable
+                                                 ? "please consider changing operands order from x = y to y = x"
+                                                 : "");
         }
         if (rhs.is("short") and rhs.has_same_type_as(lhs))
             code.push_back(zen::i16_to_i16);
@@ -216,10 +228,12 @@ namespace zen
         else if ((lhs.is("byte") or lhs.is("bool")) and rhs.has_same_type_as(lhs))
             code.push_back(zen::i8_to_i8);
         else
-            throw std::logic_error(fmt::format(
-                "[Error: Invalid types] Cannot compose operation " __FUNCTION__
-                " for types {0} and {1}, please use type casting. Eg. x = {1}(y) // with y: {0}", rhs.type->name,
-                lhs.type->name));
+            throw exceptions::semantic_error(fmt::format(
+                                                 "cannot assign {} to {}", rhs.type->name,
+                                                 lhs.type->name), ilc_offset,
+                                             fmt::format(
+                                                 "please consider using type casting. Eg. x = {}(y) // with y: {}",
+                                                 lhs.type->name, rhs.type->name));
         code.push_back(lhs.address(scope.local_most_size));
         code.push_back(rhs.address(scope.local_most_size));
         umost({rhs});
@@ -230,22 +244,27 @@ namespace zen
         if (const auto location = scope.locals.find(name); location != scope.locals.end())
         {
             push(location->second);
-        } else if (const auto function = functions.find(name); function != functions.end())
+        }
+        else if (const auto function = functions.find(name); function != functions.end())
         {
             long address = std::get<i64>(function->second);
-            zen::composer::composer::push(std::move(address), "long");
-        } else if (name == "<return>" && scope.return_value)
+            zen::composer::composer::push(std::move(address), "function");
+        }
+        else if (name == "<return>" && scope.return_value)
         {
             push(scope.return_value.value());
-        } else if (name.starts_with("<") and name.ends_with(">"))
+        }
+        else if (name.starts_with("<") and name.ends_with(">"))
         {
-            push(get_type(name.substr(1, name.size()-2)));
-        } else
+            push(get_type(name.substr(1, name.size() - 2)));
+        }
+        else
         {
-            throw std::out_of_range(fmt::format(
-                "[Error: Symbol not found] Cannot compose operation " __FUNCTION__
-                " for symbol \"{0}\" because it was not found, please define it in the respective scope. \nEg. {0}: T = V // with T & B being it's type and value respectively.",
-                name));
+            throw exceptions::semantic_error(fmt::format(
+                                                 "no such symbol {}", name), ilc_offset,
+                                             fmt::format(
+                                                 "please define it in the respective scope. Eg. {0}: T = V // with T & V being it's type and value respectively.",
+                                                 name));
         }
     }
 
@@ -288,15 +307,17 @@ namespace zen
         {
             KAIZEN_IF_ARITHMETICS_CHAIN(add)
             else
-                throw std::logic_error(fmt::format(
-                    "[Error: Invalid types] Cannot compose operation {0} for types {1} because its not supported (try with long, double or byte)",
-                    __FUNCTION__, lhs.type->name, rhs.type->name));
+                throw exceptions::semantic_error(fmt::format(
+                                                     "cannot sum type \"{}\"", lhs.type->name), ilc_offset);
         }
         else
         {
-            throw std::logic_error(fmt::format(
-                "[Error: Invalid types] Cannot compose operation {0} for types {1} and {2}, please use type casting and only work with integers (byte, short long). Eg. x = {2}(y) // with y: {1}",
-                __FUNCTION__, lhs.type->name, rhs.type->name));
+            throw exceptions::semantic_error(fmt::format(
+                                                 "cannot sum {} with {}", lhs.type->name,
+                                                 rhs.type->name), ilc_offset,
+                                             fmt::format(
+                                                 "please consider using type casting. Eg. x = {}(y) // with y: {}",
+                                                 lhs.type->name, rhs.type->name));
         }
         code.push_back(top().address(scope.local_most_size));
         code.push_back(lhs.address(scope.local_most_size));
@@ -319,15 +340,17 @@ namespace zen
         {
             KAIZEN_IF_ARITHMETICS_CHAIN(sub)
             else
-                throw std::logic_error(fmt::format(
-                    "[Error: Invalid types] Cannot compose operation {0} for types {1} because its not supported (try with long, double or byte)",
-                    __FUNCTION__, lhs.type->name, rhs.type->name));
+                throw exceptions::semantic_error(fmt::format(
+                                                     "cannot subtract type \"{}\"", lhs.type->name), ilc_offset);
         }
         else
         {
-            throw std::logic_error(fmt::format(
-                "[Error: Invalid types] Cannot compose operation {0} for types {1} and {2}, please use type casting and only work with integers (byte, short long). Eg. x = {2}(y) // with y: {1}",
-                __FUNCTION__, lhs.type->name, rhs.type->name));
+            throw exceptions::semantic_error(fmt::format(
+                                                 "cannot subtract {} with {}", lhs.type->name,
+                                                 rhs.type->name), ilc_offset,
+                                             fmt::format(
+                                                 "please consider using type casting. Eg. x = {}(y) // with y: {}",
+                                                 lhs.type->name, rhs.type->name));
         }
         code.push_back(top().address(scope.local_most_size));
         code.push_back(lhs.address(scope.local_most_size));
@@ -350,15 +373,17 @@ namespace zen
         {
             KAIZEN_IF_ARITHMETICS_CHAIN(mul)
             else
-                throw std::logic_error(fmt::format(
-                    "[Error: Invalid types] Cannot compose operation {0} for types {1} because its not supported (try with long, double or byte)",
-                    __FUNCTION__, lhs.type->name, rhs.type->name));
+                throw exceptions::semantic_error(fmt::format(
+                                                     "cannot multiply type \"{}\"", lhs.type->name), ilc_offset);
         }
         else
         {
-            throw std::logic_error(fmt::format(
-                "[Error: Invalid types] Cannot compose operation {0} for types {1} and {2}, please use type casting and only work with integers (byte, short long). Eg. x = {2}(y) // with y: {1}",
-                __FUNCTION__, lhs.type->name, rhs.type->name));
+            throw exceptions::semantic_error(fmt::format(
+                                                 "cannot multiply {} with {}", lhs.type->name,
+                                                 rhs.type->name), ilc_offset,
+                                             fmt::format(
+                                                 "please consider using type casting. Eg. x = {}(y) // with y: {}",
+                                                 lhs.type->name, rhs.type->name));
         }
         code.push_back(top().address(scope.local_most_size));
         code.push_back(lhs.address(scope.local_most_size));
@@ -381,15 +406,17 @@ namespace zen
         {
             KAIZEN_IF_ARITHMETICS_CHAIN(div)
             else
-                throw std::logic_error(fmt::format(
-                    "[Error: Invalid types] Cannot compose operation {0} for types {1} because its not supported (try with long, double or byte)",
-                    __FUNCTION__, lhs.type->name, rhs.type->name));
+                throw exceptions::semantic_error(fmt::format(
+                                                     "cannot divide type \"{}\"", lhs.type->name), ilc_offset);
         }
         else
         {
-            throw std::logic_error(fmt::format(
-                "[Error: Invalid types] Cannot compose operation {0} for types {1} and {2}, please use type casting and only work with integers (byte, short long). Eg. x = {2}(y) // with y: {1}",
-                __FUNCTION__, lhs.type->name, rhs.type->name));
+            throw exceptions::semantic_error(fmt::format(
+                                                 "cannot divide {} with {}", lhs.type->name,
+                                                 rhs.type->name), ilc_offset,
+                                             fmt::format(
+                                                 "please consider using type casting. Eg. x = {}(y) // with y: {}",
+                                                 lhs.type->name, rhs.type->name));
         }
         code.push_back(top().address(scope.local_most_size));
         code.push_back(lhs.address(scope.local_most_size));
@@ -412,15 +439,19 @@ namespace zen
         {
             KAIZEN_IF_ARITHMETICS_CHAIN_FLOAT(mod)
             else
-                throw std::logic_error(fmt::format(
-                    "[Error: Invalid types] Cannot compose operation {0} for types {1} because its not supported (try with long or byte)",
-                    __FUNCTION__, lhs.type->name, rhs.type->name));
+                throw exceptions::semantic_error(fmt::format(
+                                                     "cannot compute modulo type \"{}\"", lhs.type->name,
+                                                     "please consider casting operands to integers (byte, short, int, long) if applicable"),
+                                                 ilc_offset);
         }
         else
         {
-            throw std::logic_error(fmt::format(
-                "[Error: Invalid types] Cannot compose operation {0} for types {1} and {2}, please use type casting and only work with integers (byte, short long). Eg. x = {2}(y) // with y: {1}",
-                __FUNCTION__, lhs.type->name, rhs.type->name));
+            throw exceptions::semantic_error(fmt::format(
+                                                 "cannot compute modulo of {} with {}", lhs.type->name,
+                                                 rhs.type->name), ilc_offset,
+                                             fmt::format(
+                                                 "please consider using type casting. Eg. x = {}(y) // with y: {}",
+                                                 lhs.type->name, rhs.type->name));
         }
         code.push_back(top().address(scope.local_most_size));
         code.push_back(lhs.address(scope.local_most_size));
@@ -429,7 +460,7 @@ namespace zen
     }
 
 
-    #define KAIZEN_CASTER_MAP_FOR(T)\
+#define KAIZEN_CASTER_MAP_FOR(T)\
         {\
         {"byte", T##_to_i8},\
         {"bool", T##_to_i8},\
@@ -440,9 +471,9 @@ namespace zen
         {"double", T##_to_f64},\
         }
 
-    void composer::vm::composer::call(const std::string& name, const i8& args_count)
+    composer::call_result composer::vm::composer::call(const std::string& name, const i8& args_count)
     {
-        static std::unordered_map<std::string,std::unordered_map<std::string,i64>> casters {
+        static std::unordered_map<std::string, std::unordered_map<std::string, i64>> casters{
             {"bool", KAIZEN_CASTER_MAP_FOR(i8)},
             {"byte", KAIZEN_CASTER_MAP_FOR(i8)},
             {"short", KAIZEN_CASTER_MAP_FOR(i16)},
@@ -456,51 +487,67 @@ namespace zen
             if (stack.size() < 2)
             {
                 throw std::logic_error(fmt::format(
-                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
-                __FUNCTION__, stack.size()));
+                    "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
+                    __FUNCTION__, stack.size()));
             }
 
             if (args_count != 1 and args_count != -1)
             {
-                throw std::logic_error(fmt::format(
-                    "[Error: Invalid state] wrong number of arguments for caster. If converting multiple values is the objetive, specify in different instructions.\nEg. u = {0}(w) x = {0}(y)",
-                    name));
+                throw exceptions::semantic_error(fmt::format(
+                                                     "wrong number of arguments for caster of {}", name), ilc_offset,
+                                                 fmt::format(
+                                                     "please consider using multiple instructions when converting multiple values.\nEg. v = {0}(w) x = {0}(y)",
+                                                     name));
             }
-
-            const value lhs = top();
-            pop();
             const value rhs = top();
             pop();
-
-            fmt::println("<{}> detected casting {} <- {}", scope.function_name,lhs.type->name, rhs.type->name);
+            if (top().is("function"))
+            {
+                pop(); // pop the caster itself from composer's stack
+                if (stack.empty())
+                {
+                    throw std::logic_error(fmt::format(
+                        "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
+                        __FUNCTION__, stack.size()));
+                }
+            }
+            const value lhs = top();
+            pop();
 
             if (lhs.is(name))
             {
                 if (const auto caster = (*caster_set).second.find(rhs.type->name); caster != caster_set->second.end())
                 {
                     code.push_back((*caster).second);
+                    code.push_back(lhs.address(scope.local_most_size));
                     code.push_back(rhs.address(scope.local_most_size));
                     umost({rhs});
                     if (args_count == -1)
                     {
                         push(lhs);
                     }
-                } else
-                {
-                    throw std::logic_error(fmt::format(
-                    "[Error: Invalid state] Cannot compose operation {} because the '{}' caster cannot convert from type '{}'.",
-                    __FUNCTION__, name, rhs.type->name));
+                    return call_result::casting;
                 }
-            } else
+                else
+                {
+                    throw exceptions::semantic_error(fmt::format(
+                                                         "cannot cast from {} to {}", rhs.type->name, name),
+                                                     ilc_offset);
+                }
+            }
+            else
             {
-                throw std::logic_error(fmt::format(
-                "[Error: Invalid state] Cannot compose operation {} because a wrong caster was found. Try using the '{}' caster instead.",
-                __FUNCTION__, lhs.type->name));
+                throw exceptions::semantic_error(fmt::format(
+                                                     "cannot cast from {} to {} using {} caster", rhs.type->name,
+                                                     lhs.type->name, name), ilc_offset,
+                                                 fmt::format("please consider using a {} caster if applicable",
+                                                             lhs.type->name));
             }
         }
         else
         {
             push(name);
+            return call_result::result;
         }
     }
 

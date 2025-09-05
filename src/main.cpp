@@ -261,28 +261,28 @@ int main(int argc, char** argv) try
 
     composer->begin("internal::cast_test");
     composer->set_local("x", "double");
-    composer->push(20, "int");
     composer->push("x");
+    composer->push(20, "int");
     composer->call("double",1);
     composer->end();
 
     composer->begin("internal::float_to_int");
-    composer->set_return_type("float");
+    composer->set_return_type("int");
     composer->set_parameter("x", "float");
-    composer->push("x");
     composer->push("<return>");
-    composer->call("float",1);
+    composer->push("x");
+    composer->call("int",1);
     composer->end();
 
     composer->begin("internal::sum_ints_as_doubles");
     composer->set_return_type("double");
     composer->set_parameter("x", "int");
     composer->set_parameter("y", "int");
+    composer->push("<double>");
     composer->push("x");
-    composer->push("<double>");
     composer->call("double", -1);
-    composer->push("y");
     composer->push("<double>");
+    composer->push("y");
     composer->call("double", -1);
     composer->plus();
     composer->return_value();
@@ -312,24 +312,13 @@ int main(int argc, char** argv) try
     composer->set_return_name("result");
     composer->set_parameter("x", "long"); // most x
     composer->set_local("result", "long"); // most x
+    composer->push("result");
     composer->push(3, "long");
     composer->push("x");
     composer->times();  // most x
-    composer->push("result");
     composer->assign();
     composer->end();
     composer->bake();
-    return 0;
-    // for (int i = 0; i < 10000; ++i)
-    // {
-    //     test_stack();
-    // }
-    // return 0;
-    // test_vm();
-    // test_constants();
-    // test_ffi();
-    // test_vm_ffi();
-    // return 0;
 
 #ifdef NATIVE
     std::string filename = "test.zen";
@@ -343,6 +332,7 @@ int main(int argc, char** argv) try
     std::stringstream stream0;
 
     stream0.str(R"(
+
 sub(x: long, y: long) = long(result) {
     result: long = x - y
 }
@@ -361,13 +351,12 @@ printSum(x: long, y: long) = {
 
 
 main() = {
-    x : double = 10
+    x : double = 10.0
 //    print(sum(10,20))
 }
 
 intToDouble(x: int) = double(r) {
-    r: double = 1.0
-    r = double(100)
+    r: double = double(10i)
 }
 
 )");

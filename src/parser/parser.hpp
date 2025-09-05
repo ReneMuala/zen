@@ -7,22 +7,27 @@
 #include <iostream>
 #include "composer/composer.hpp"
 #include "composer/vm/composer.hpp"
+#include "exceptions/semantic_error.hpp"
+#include "exceptions/syntax_error.hpp"
+
 using namespace enums;
 extern std::vector<zen::token> tokens;
 static bool pragma_ignore_missing_symbols = false;
+static bool pragma_skip_assignment_because_of_conversion_special_call = false;
 static std::string pragma_ignore_missing_symbols_data;
 
-zen::composer::composer* get_composer()
-{
-    static auto composer = std::make_unique<zen::composer::vm::composer>();
-    return (zen::composer::composer*)(composer.get());
-}
 // namespace parser
 // {
 typedef enums::token_type SYMBOL;
 #include "ilc/include/ilc.hpp"
 
 BEGIN_ILC_CODEGEN
+
+zen::composer::composer* get_composer()
+{
+    static auto composer = std::make_unique<zen::composer::vm::composer>(ILC::offset);
+    return (zen::composer::composer*)(composer.get());
+}
 
 namespace parser
 {
@@ -38,9 +43,11 @@ namespace parser
     std::string id,type,value;
 }
 
+// std::cerr <<  "syntax error: expected " << ITEM << " found " << tokens[ILC::offset].value << " @" << (int)tokens[ILC::offset].type << " at " << tokens[ILC::offset-1].get_location_string();
+
 #define EXPECTED(ITEM) []() \
         {\
-            std::cerr <<  "syntax error: expected " << ITEM << " found " << tokens[ILC::offset].value << " @" << (int)tokens[ILC::offset].type << " at " << tokens[ILC::offset-1].get_location_string(); \
+            throw zen::exceptions::syntax_error(ITEM, ILC::offset);\
         }
 
 BEGIN_PRODUCTION(PRODUCTION_NUSING_STAT)
@@ -124,9 +131,10 @@ END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
     auto composer = get_composer();
+    bool assignment_call = ILC::offset > 2 && ILC::chain[ILC::offset - 2] == TEQU;
+    const std::string name = parser::id;
     if (TRY_REQUIRE_NON_TERMINAL(NGENERIC)){}
     REQUIRE_TERMINAL(TPARENTHESIS_OPEN)
-    const std::string name = parser::id;
     zen::i8 param_count = 0;
     while (TRY_REQUIRE_NON_TERMINAL(NVAL))
     {
@@ -137,8 +145,7 @@ BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
         }
     }
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
-    std::cout << "CALL";
-    composer->call(name, param_count);
+    pragma_skip_assignment_because_of_conversion_special_call = composer->call(name, assignment_call ? param_count : -param_count) == zen::composer::call_result::casting;
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
@@ -197,8 +204,8 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
                 composer->set_return_name(parser::id);
             } else if (not pragma_ignore_missing_symbols_data.empty())
             {
-                // std::cout << ILC::offset - offset_before << std::endl;
-                throw std::out_of_range("No such local symbol(s): " + pragma_ignore_missing_symbols_data);
+                throw zen::exceptions::semantic_error(fmt::format(
+                                                          "no such symbol(s) {}", pragma_ignore_missing_symbols_data), ILC::offset);
             }
             REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
         }
@@ -452,7 +459,7 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_ID)
     try
     {
         composer->push(parser::id);
-    } catch (const std::out_of_range & e)
+    } catch (const zen::exceptions::semantic_error & e)
     {
         if (not pragma_ignore_missing_symbols)
             throw;
@@ -507,7 +514,8 @@ BEGIN_PRODUCTION(PRODUCTION_NVARIABLE_DEFINITION)
     composer->push(name);
     if (TRY_REQUIRE_TERMINAL(TEQU))
     {
-        REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
+        ILC::offset--;
+        REQUIRE_NON_TERMINAL_CALLBACK(NSUFFIX_ASGN, EXPECTED("ASSIGNMENT"))
     }
 END_PRODUCTION
 
@@ -518,8 +526,11 @@ BEGIN_PRODUCTION(PRODUCTION_NASGN_SUFFIX)
     {
         ROLLBACK_PRODUCTION()
     }
-    composer->push(parser::id);
     REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
+    if (not pragma_skip_assignment_because_of_conversion_special_call)
+        composer->assign();
+    else
+        pragma_skip_assignment_because_of_conversion_special_call = false;
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NRETURN)
