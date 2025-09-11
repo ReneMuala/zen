@@ -220,16 +220,11 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
     }
     if (TRY_REQUIRE_TERMINAL(TBRACES_OPEN))
     {
-        while (true)
+        while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
+        {} // improve return handler
+        if (TRY_REQUIRE_NON_TERMINAL(NVAL))
         {
-            if (TRY_REQUIRE_NON_TERMINAL(NSTAT))
-            {
-
-            }
-            else if (TRY_REQUIRE_NON_TERMINAL(NVAL))
-            {
-                composer->return_value();
-            } else break;
+            composer->return_value();
         }
         REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
     } else
@@ -631,8 +626,8 @@ BEGIN_SYMBOL_BINDING(NSTAT)
             PRODUCTION_NVARIABLE_DEFINITION() or
             PRODUCTION_NIF() or
             PRODUCTION_NFOR() or
-            PRODUCTION_NWHILE() or
-            PRODUCTION_NSTAT_FROM_VAL_or_ASGN_or_OR_or_AND()
+            PRODUCTION_NWHILE()
+            // or  PRODUCTION_NSTAT_FROM_VAL_or_ASGN_or_OR_or_AND()
         END_SYMBOL_BINDING
 
 BEGIN_SYMBOL_BINDING(NVAL)

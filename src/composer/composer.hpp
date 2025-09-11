@@ -51,6 +51,7 @@ namespace zen::composer
         }
         [[nodiscard]] i64 address(const i64 & relative_point) const
         {
+            if (kind == constant) return _address;
             return  _address - relative_point;
         }
         value(const std::shared_ptr<const composer::type> & type, const i64 & address, const composer::kind & kind = variable) : type(type), kind(kind), _address(address) {}
@@ -66,7 +67,7 @@ namespace zen::composer
     struct signature
     {
         std::shared_ptr<const type> type;
-        std::list<std::shared_ptr<const composer::type>> parameters {};
+        std::vector<std::shared_ptr<const composer::type>> parameters {};
     };
 
 class composer {
@@ -77,6 +78,11 @@ protected:
     virtual std::shared_ptr<const type>& get_type(const std::string& name) = 0;
     virtual void push(const std::shared_ptr<const type>& type) = 0;
     public:
+    virtual void reset()
+    {
+        pool.data.clear();
+        while (not stack.empty()) stack.pop();
+    }
     explicit composer(int & ilc_offset): ilc_offset(ilc_offset) {}
     virtual ~composer() = default;
 

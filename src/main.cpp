@@ -6,6 +6,13 @@
 #include <vm/vm.hpp>
 #include <sstream>
 #include "utils/utils.hpp"
+
+#ifdef KAIZEN_WASM
+#include <emscripten.h>
+#else
+#define EMSCRIPTEN_KEEPALIVE
+#endif
+
 std::vector<zen::token> tokens;
 /*
 void test_vm()
@@ -176,7 +183,7 @@ void test_stack()
     stack -= 8;
     stack -= 8;
     stack -= 8;
-    int * ptr = static_cast<int*>(stack - 4);
+    int* ptr = static_cast<int*>(stack - 4);
     *ptr = 10;
     std::cout << *ptr << std::endl;
     stack += 4;
@@ -190,16 +197,17 @@ void test_constants()
     std::cout << c.as<int>() << std::endl;
 
     constant_pool pool;
-    auto & name = pool.get("name");
+    auto& name = pool.get("name");
 
-    for (auto & [k,v] : pool.data)
+    for (auto& [k,v] : pool.data)
     {
         std::cout << k << std::endl;
     }
 
-    std::cout << ( name.type_hash == typeid(char const*).hash_code() )<< std::endl;
+    std::cout << (name.type_hash == typeid(char const*).hash_code()) << std::endl;
     // std::cout << (char*)(name_addr) << std::endl;
 }
+
 /*
 #include <iostream>
 #include <ffi.h>
@@ -255,89 +263,171 @@ void test_vm_ffi()
 
 }
 */
+extern "C" {
+EMSCRIPTEN_KEEPALIVE
+void zen_sum(int a, int b){
+    fmt::print("{} + {} = {}\n", a, b, a+b);
+}
+
+void EMSCRIPTEN_KEEPALIVE zen_reset(){
+    get_composer()->reset();
+}
+
+EMSCRIPTEN_KEEPALIVE
+bool zen_run(const char* entrance)
+{
+    if (entrance == nullptr){
+        fmt::println("[zen_run] called with null argument.");
+        return false;
+    }
+    fmt::println("[run not implemented.]");
+    return true;
+}
+
+EMSCRIPTEN_KEEPALIVE
+bool zen_compile(const char* code)
+try {
+    if (code == nullptr){
+        fmt::println("[zen_compile] called with null argument.");
+        return false;
+    }
+
+    tokens.clear();
+    ILC::chain.clear();
+    std::stringstream stream0;
+    stream0.str(code);
+    zen::lexer lexer(stream0);
+    while (auto token = lexer.next())
+    {
+        // fmt::println(">> {}: '{}'", static_cast<int>(token->type), token->value);
+        ILC::chain.push_back(token->type);
+        tokens.emplace_back(token.value());
+    }
+    ILC::chain_size = ILC::chain.size();
+    if (parse())
+    {
+        get_composer()->bake();
+    }
+    else
+    {
+        std::cout << "Failed " << std::endl;
+    }
+    return true;
+} catch (std::exception& e){
+    std::cout << e.what() << std::endl;
+    return false;
+}
+}
+
 int main(int argc, char** argv) try
 {
-    zen::composer::composer * composer = get_composer();
-
-    composer->begin("internal::cast_test");
-    composer->set_local("x", "double");
-    composer->push("x");
-    composer->push(20, "int");
-    composer->call("double",1);
-    composer->end();
-
-    composer->begin("internal::float_to_int");
-    composer->set_return_type("int");
-    composer->set_parameter("x", "float");
-    composer->push("<return>");
-    composer->push("x");
-    composer->call("int",1);
-    composer->end();
-
-    composer->begin("internal::sum_ints_as_doubles");
-    composer->set_return_type("double");
-    composer->set_parameter("x", "int");
-    composer->set_parameter("y", "int");
-    composer->push("<double>");
-    composer->push("x");
-    composer->call("double", -1);
-    composer->push("<double>");
-    composer->push("y");
-    composer->call("double", -1);
-    composer->plus();
-    composer->return_value();
-    composer->end();
-
-    composer->begin("internal::sum");
-    composer->set_return_type("long");
-    composer->set_parameter("x", "long");
-    composer->set_parameter("y", "long");
-    composer->push("x");
-    composer->push("y");
-    composer->plus();
-    composer->return_value();
-    composer->end();
-
-    composer->begin("internal::timesTwo");
-    composer->set_return_type("double");
-    composer->set_parameter("x", "double");
-    composer->push(2.0, "double");
-    composer->push("x");
-    composer->times();
-    composer->return_value();
-    composer->end();
-
-    composer->begin("internal::timesThree");
-    composer->set_return_type("long"); // most x
-    composer->set_return_name("result");
-    composer->set_parameter("x", "long"); // most x
-    composer->set_local("result", "long"); // most x
-    composer->push("result");
-    composer->push(3, "long");
-    composer->push("x");
-    composer->times();  // most x
-    composer->assign();
-    composer->end();
-    composer->bake();
-
-#ifdef NATIVE
-    std::string filename = "test.zen";
-    std::ifstream stream0(filename);
-    stream0.open(filename);
-    if (not stream0.is_open())
-    {
-        throw zen::exceptions::file_not_found(filename);
-    }
+#ifdef KAIZEN_WASM
+return 0;
 #else
-    std::stringstream stream0;
+    if (false)
+    {
+        zen::composer::composer* composer = get_composer();
+        composer->begin("internal::1_param_test");
+        composer->set_return_type("double");
+        composer->set_parameter("x", "double");
+        composer->push("x");
+        composer->end();
+        composer->bake();
 
+        composer->begin("internal::0_param_test");
+        composer->set_return_type("double");
+        composer->push<double>(0.0, "double");
+        composer->end();
+        composer->bake();
+
+        composer->begin("internal::call_test");
+        composer->push("internal::1_param_test");
+        composer->push<double>(1.0, "double");
+        composer->call("internal::1_param_test", 1);
+        composer->end();
+
+        composer->begin("internal::cast_test");
+        composer->set_local("x", "double");
+        composer->push("x");
+        composer->push(20, "int");
+        composer->call("double", 1);
+        composer->end();
+
+        composer->begin("internal::float_to_int");
+        composer->set_return_type("int");
+        composer->set_parameter("x", "float");
+        composer->push("<return>");
+        composer->push("x");
+        composer->call("int", 1);
+        composer->end();
+
+        composer->begin("internal::sum_ints_as_doubles");
+        composer->set_return_type("double");
+        composer->set_parameter("x", "int");
+        composer->set_parameter("y", "int");
+        composer->push("<double>");
+        composer->push("x");
+        composer->call("double", -1);
+        composer->push("<double>");
+        composer->push("y");
+        composer->call("double", -1);
+        composer->plus();
+        composer->return_value();
+        composer->end();
+
+        composer->begin("internal::sum");
+        composer->set_return_type("long");
+        composer->set_parameter("x", "long");
+        composer->set_parameter("y", "long");
+        composer->push("x");
+        composer->push("y");
+        composer->plus();
+        composer->return_value();
+        composer->end();
+
+        composer->begin("internal::timesTwo");
+        composer->set_return_type("double");
+        composer->set_parameter("x", "double");
+        composer->push(2.0, "double");
+        composer->push("x");
+        composer->times();
+        composer->return_value();
+        composer->end();
+
+        composer->begin("internal::timesThree");
+        composer->set_return_type("long"); // most x
+        composer->set_return_name("result");
+        composer->set_parameter("x", "long"); // most x
+        composer->set_local("result", "long"); // most x
+        composer->push("result");
+        composer->push(3, "long");
+        composer->push("x");
+        composer->times(); // most x
+        composer->assign();
+        composer->end();
+        composer->bake();
+    }
+    // #define  NATIVE
+
+
+    std::stringstream stream0;
     stream0.str(R"(
 
-sub(x: long, y: long) = long(result) {
-    result: long = x - y
+duplicate(x: int) = int(x * 2)
+
+callDuplicate() = int {
+    duplicate(1)
+}
+
+one() = long {
+    1l
 }
 
 sum(x: long, y: long) = long(x+y)
+
+callSum() = {
+    result: long = sum(100l,200l)
+}
 
 magic(x: long, y: long) = long(result) {
     sum: long = x + y
@@ -349,18 +439,24 @@ printSum(x: long, y: long) = {
 //    print(sum(x,y))
 }
 
-
 main() = {
     x : double = 10.0
-//    print(sum(10,20))
+    // x
 }
 
 intToDouble(x: int) = double(r) {
     r: double = double(10i)
 }
 
+sumsub(x: int, y: int) = float {
+    float(x + y)
+}
+
+roo(a: int, b: float, c: byte, d: long, e: short, f: double) = short{
+    short(a + int(b))
+}
+
 )");
-#endif
 
     zen::lexer lexer(stream0);
     while (auto token = lexer.next())
@@ -379,8 +475,10 @@ intToDouble(x: int) = double(r) {
         std::cout << "Failed " << std::endl;
     }
     return 0;
+#endif
 }
 catch (std::exception& e)
 {
     std::cerr << e.what() << std::endl;
 }
+

@@ -44,6 +44,9 @@ T##_to_i16,\
 T##_to_f32,\
 T##_to_boolean
 
+#define DECL_KAIZEN_PUSH_FOR_TYPE(T) \
+push_ ## T
+
 namespace zen
 {
     using boolean = bool;
@@ -64,8 +67,14 @@ namespace zen
 `--------'`------'`--'  `--'  )";
     enum instruction
     {
-        push,
-        pop,
+        DECL_KAIZEN_PUSH_FOR_TYPE(i8),
+        DECL_KAIZEN_PUSH_FOR_TYPE(i16),
+        DECL_KAIZEN_PUSH_FOR_TYPE(i32),
+        DECL_KAIZEN_PUSH_FOR_TYPE(i64),
+        DECL_KAIZEN_PUSH_FOR_TYPE(f32),
+        DECL_KAIZEN_PUSH_FOR_TYPE(f64),
+        DECL_KAIZEN_PUSH_FOR_TYPE(boolean),
+        // pop,
         DECL_KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i8),
         DECL_KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i16),
         DECL_KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i32),
@@ -126,8 +135,8 @@ namespace zen
             bool operator-=(const i64 & size);
             bool operator+=(const i64 & size);
             ~stack();
-            bool empty() const;
-            i64 size() const;
+            [[nodiscard]] bool empty() const;
+            [[nodiscard]] i64 size() const;
         };
 
     private:

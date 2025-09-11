@@ -40,10 +40,10 @@ protected:
             return_name = std::nullopt;
         }
     } scope;
-    void umost(const std::initializer_list<value> && values);
     value top();
     void push(const value&);
 public:
+    void reset() override;
     composer(int & ilc_offset);
     ~composer() override = default;
     void begin(std::string name) override;
@@ -62,6 +62,9 @@ public:
     void times() override;
     void slash() override;
     void modulo() override;
+    std::optional<value> _push_calle_return_value(const signature& sig);
+    void _push_calle_arguments(const signature& sig, const i8& args_count);
+    call_result _call_caster(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::unordered_map<std::string, i64>>::iterator & caster_set);
     call_result call(const std::string& name, const i8& args_count) override;
 
 protected:

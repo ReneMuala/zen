@@ -10,100 +10,106 @@
 #include <fmt/core.h>
 
 #define KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(T) \
-case add_##T: \
-*address<##T>(this->code[i + 1], stack) = *address<##T>(this->code[i + 2], stack) + *address<##T>(this->code[i + 3], stack); \
+case add_ ## T: \
+*address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) + *address<T>(this->code[i + 3], stack); \
 i+=3;\
 break; \
-case sub_##T:\
-*address<##T>(this->code[i + 1], stack) = *address<##T>(this->code[i + 2], stack) - *address<##T>(this->code[i + 3], stack);\
+case sub_ ## T:\
+*address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) - *address<T>(this->code[i + 3], stack);\
 i+=3;\
 break;\
-case mul_##T:\
-*address<##T>(this->code[i + 1], stack) = *address<##T>(this->code[i + 2], stack) * *address<##T>(this->code[i + 3], stack);\
+case mul_ ## T:\
+*address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) * *address<T>(this->code[i + 3], stack);\
             i+=3;\
 break;\
-case div_##T:\
-    *address<##T>(this->code[i + 1], stack) = *address<##T>(this->code[i + 2], stack) / *address<##T>(this->code[i + 3], stack);\
+case div_ ## T:\
+    *address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) / *address<T>(this->code[i + 3], stack);\
 i+=3;\
 break;\
-case mod_##T:\
-*address<##T>(this->code[i + 1], stack) = *address<##T>(this->code[i + 2], stack) % *address<##T>(this->code[i + 3], stack);\
+case mod_ ## T:\
+*address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) % *address<T>(this->code[i + 3], stack);\
 i+=3;\
 break;
 
 #define KAIZEN_ARITHMETICS_FOR_FLOAT_TYPE(T) \
-case add_##T: \
-*address<##T>(this->code[i + 1], stack) = *address<##T>(this->code[i + 2], stack) + *address<##T>(this->code[i + 3], stack); \
+case add_ ## T: \
+*address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) + *address<T>(this->code[i + 3], stack); \
 i+=3;\
 break; \
-case sub_##T:\
-*address<##T>(this->code[i + 1], stack) = *address<##T>(this->code[i + 2], stack) - *address<##T>(this->code[i + 3], stack);\
+case sub_ ## T:\
+*address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) - *address<T>(this->code[i + 3], stack);\
 i+=3;\
 break;\
-case mul_##T:\
-*address<##T>(this->code[i + 1], stack) = *address<##T>(this->code[i + 2], stack) * *address<##T>(this->code[i + 3], stack);\
+case mul_ ## T:\
+*address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) * *address<T>(this->code[i + 3], stack);\
 i+=3;\
 break;\
-case div_##T:\
-*address<##T>(this->code[i + 1], stack) = *address<##T>(this->code[i + 2], stack) / *address<##T>(this->code[i + 3], stack);\
+case div_ ## T:\
+*address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) / *address<T>(this->code[i + 3], stack);\
 i+=3;\
 break;
 
 #define KAIZEN_RELATIONAL_FOR_TYPE(T) \
-case gt_##T:\
-*address<boolean>(this->code[i + 1], stack) = *address<##T>(this->code[i + 2], stack) > *address<##T>(this->code[i + 3], stack);\
+case gt_ ## T:\
+*address<boolean>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) > *address<T>(this->code[i + 3], stack);\
 i+=3;\
 break;\
-case lt_##T:\
-*address<boolean>(this->code[i + 1], stack) = *address<##T>(this->code[i + 2], stack) < *address<##T>(this->code[i + 3], stack);\
+case lt_ ## T:\
+*address<boolean>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) < *address<T>(this->code[i + 3], stack);\
 i+=3;\
 break;\
-case gte_##T:\
-*address<boolean>(this->code[i + 1], stack) = *address<##T>(this->code[i + 2], stack) >= *address<##T>(this->code[i + 3], stack);\
+case gte_ ## T:\
+*address<boolean>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) >= *address<T>(this->code[i + 3], stack);\
 i+=3;\
 break;\
-case lte_##T:\
-*address<boolean>(this->code[i + 1], stack) = *address<##T>(this->code[i + 2], stack) <= *address<##T>(this->code[i + 3], stack);\
+case lte_ ## T:\
+*address<boolean>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) <= *address<T>(this->code[i + 3], stack);\
 i+=3;\
 break;\
-case eq_##T:\
-*address<boolean>(this->code[i + 1], stack) = *address<##T>(this->code[i + 2], stack) == *address<##T>(this->code[i + 3], stack);\
+case eq_ ## T:\
+*address<boolean>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) == *address<T>(this->code[i + 3], stack);\
 i+=3;\
 break;\
-case neq_##T:\
-*address<boolean>(this->code[i + 1], stack) = *address<##T>(this->code[i + 2], stack) != *address<##T>(this->code[i + 3], stack);\
+case neq_ ## T:\
+*address<boolean>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) != *address<T>(this->code[i + 3], stack);\
 i+=3;\
 break;
 
 #define KAIZEN_CONVERSION_FOR_TYPE(T) \
-case (##T##_to_i64):\
-*address<##T##>(this->code[i + 1], stack) = *address<##T##>(this->code[i + 2], stack);\
+case ( T ## _to_i64):\
+*address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack);\
 i += 2;\
 break;\
-case (##T##_to_f64):\
-*address<f64>(this->code[i + 1], stack) = static_cast<f64>(*address<##T##>(this->code[i + 2], stack));\
+case (T ## _to_f64):\
+*address<f64>(this->code[i + 1], stack) = static_cast<f64>(*address<T>(this->code[i + 2], stack));\
 i += 2;\
 break;\
-case (##T##_to_i8):\
-*address<i8>(this->code[i + 1], stack) = static_cast<i8>(*address<##T##>(this->code[i + 2], stack));\
+case (T ## _to_i8):\
+*address<i8>(this->code[i + 1], stack) = static_cast<i8>(*address<T>(this->code[i + 2], stack));\
 i += 2;\
 break;\
-case (##T##_to_i32):\
-*address<i32>(this->code[i + 1], stack) = static_cast<i32>(*address<##T##>(this->code[i + 2], stack));\
+case (T ## _to_i32):\
+*address<i32>(this->code[i + 1], stack) = static_cast<i32>(*address<T>(this->code[i + 2], stack));\
 i += 2;\
 break;\
-case (##T##_to_i16):\
-*address<i16>(this->code[i + 1], stack) = static_cast<i16>(*address<##T##>(this->code[i + 2], stack));\
+case (T ## _to_i16):\
+*address<i16>(this->code[i + 1], stack) = static_cast<i16>(*address<T>(this->code[i + 2], stack));\
 i += 2;\
 break;\
-case (##T##_to_f32):\
-*address<f32>(this->code[i + 1], stack) = static_cast<f32>(*address<##T##>(this->code[i + 2], stack));\
+case (T ## _to_f32):\
+*address<f32>(this->code[i + 1], stack) = static_cast<f32>(*address<T>(this->code[i + 2], stack));\
 i += 2;\
 break;\
-case (##T##_to_boolean):\
-*address<boolean>(this->code[i + 1], stack) = static_cast<boolean>(*address<##T##>(this->code[i + 2], stack));\
+case (T ## _to_boolean):\
+*address<boolean>(this->code[i + 1], stack) = static_cast<boolean>(*address<T>(this->code[i + 2], stack));\
 i += 2;\
 break;
+
+#define KAIZEN_PUSH_FOR_TYPE(T) \
+case push_ ## T:\
+stack -= sizeof(T); \
+*static_cast<T*>(stack - sizeof(T)) = *address<T>(this->code[i + 1], stack); \
+i += 1;
 
 void* zen::vm::stack::operator-(const i64& size)
 {
@@ -168,16 +174,18 @@ void zen::vm::run(stack& stack, const i64& entry_point)
     {
         switch (this->code[i])
         {
-        case push:
-            stack -= sizeof(i64); // NOLINT
-            *static_cast<i64*>(stack - sizeof(i64)) = *address<i64>(this->code[i + 1], stack);
-            i += 1;
-            break;
-        case pop:
-            *address<i64>(this->code[i + 1], stack) = *static_cast<i64*>(stack - sizeof(i64));
-            stack += sizeof(i64); // NOLINT
-            i += 1;
-            break;
+            KAIZEN_PUSH_FOR_TYPE(i8)
+            KAIZEN_PUSH_FOR_TYPE(i16)
+            KAIZEN_PUSH_FOR_TYPE(i32)
+            KAIZEN_PUSH_FOR_TYPE(i64)
+            KAIZEN_PUSH_FOR_TYPE(f32)
+            KAIZEN_PUSH_FOR_TYPE(f64)
+            KAIZEN_PUSH_FOR_TYPE(boolean)
+        // case pop:
+        //     *address<i64>(this->code[i + 1], stack) = *static_cast<i64*>(stack - sizeof(i64));
+        //     stack += sizeof(i64); // NOLINT
+        //     i += 1;
+        //     break;
         KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i8)
         KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i16)
         KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i32)
