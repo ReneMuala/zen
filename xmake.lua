@@ -2,8 +2,12 @@ add_rules("mode.debug", "mode.release")
 --add_requires("fmt", "asmjit", "libffi")
 add_requires("fmt", "asmjit")
 
-add_cxflags("-fexceptions")
-add_ldflags("-fexceptions")
+if is_plat("wasm") then
+    add_cxflags([[-DKAIZEN_WASM]])
+    add_cxflags("-fexceptions")
+    add_ldflags("-fexceptions")
+    --add_cxflags([[-sEXPORTED_RUNTIME_METHODS=ccall,cwrap]])
+end
 
 target("zen")
     set_languages("c++23")
