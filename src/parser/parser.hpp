@@ -9,6 +9,8 @@
 #include "composer/vm/composer.hpp"
 #include "exceptions/semantic_error.hpp"
 #include "exceptions/syntax_error.hpp"
+#include "types/stack.hpp"
+#include "types/heap.hpp"
 
 using namespace enums;
 extern std::vector<zen::token> tokens;
@@ -413,7 +415,7 @@ END_PRODUCTION
 BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_CHAR_ARRAY)
     static auto composer = get_composer();
     REQUIRE_TERMINAL(TCHAR_ARRAY)
-    composer->push<std::string>(std::move(tokens[ILC::offset-1].value),"string");
+    composer->push<zen::types::heap::string*>(zen::types::heap::string::make(tokens[ILC::offset-1].value),"string");
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_NOT_VAL)

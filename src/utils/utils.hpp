@@ -10,6 +10,9 @@
 #include <unordered_map>
 #include <stdlib.h>
 
+#include "types/heap.hpp"
+#include "types/stack.hpp"
+
 namespace zen::utils
 {
     template <typename type = void>
@@ -83,6 +86,8 @@ namespace zen::utils
             if constexpr (std::is_same_v<type, std::string> or std::is_same_v<type, char> or std::is_same_v<type, char*>
                 or std::is_same_v<type, const char*>)
                 key += value;
+            else if constexpr (std::is_same_v<type, zen::types::heap::string*>)
+                key += value == nullptr ? std::string("<null>") : std::string(*value);
             else
                 key += std::to_string(value);
             if (!data.contains(key))

@@ -385,10 +385,14 @@ return 0;
         composer->push<zen::i64>(reinterpret_cast<zen::i64>(stdout), "long");
         composer->push("string");
         composer->call("write_string", 2);
-        composer->bake();
+        composer->end();
 
+        composer->begin("test::print_string");
+        composer->push("print_string");
+        composer->push<zen::types::heap::string*>(zen::types::heap::string::make("hello world"), "string");
+        composer->call("print_string", 1);
+        composer->end();
 
-        return 0;
         composer->begin("internal::1_param_test");
         composer->set_return_type("double");
         composer->set_parameter("x", "double");
@@ -398,7 +402,6 @@ return 0;
         composer->set_return_type("double");
         composer->push<double>(0.0, "double");
         composer->end();
-        composer->bake();
 
         composer->begin("internal::call_test");
         composer->push("internal::1_param_test");
@@ -465,10 +468,9 @@ return 0;
         composer->times(); // most x
         composer->assign();
         composer->end();
-        composer->bake();
+        // composer->bake();
     }
     // #define  NATIVE
-
 
     std::stringstream stream0;
     stream0.str(R"(

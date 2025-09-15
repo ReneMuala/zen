@@ -276,6 +276,8 @@ namespace zen
             code.push_back(zen::f64_to_f64);
         else if ((lhs.is("byte") or lhs.is("bool")) and rhs.has_same_type_as(lhs))
             code.push_back(zen::i8_to_i8);
+        else if (lhs.type->kind == type::heap and rhs.has_same_type_as(lhs))
+            code.push_back(zen::i64_to_i64);
         else
             throw exceptions::semantic_error(fmt::format(
                                                  "cannot assign {} to {}", rhs.type->name,
@@ -600,6 +602,9 @@ namespace zen
                 } else if (value.is("double"))
                 {
                     code.push_back(zen::push_f64);
+                } else
+                {
+                    code.push_back(zen::push_i64);
                 }
                 code.push_back(value.address(scope.local_most_size));
             }
