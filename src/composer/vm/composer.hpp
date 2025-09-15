@@ -55,6 +55,10 @@ public:
     void end() override;
     void bake() override;
     void assign() override;
+    void _push_variable(const std::vector<std::string> & tokens, const std::map<std::string, symbol>::iterator& location);
+    void _push_function(const std::unordered_map<std::string, std::tuple<signature, long long>>::iterator& function);
+    void _push_return_value();
+    void _push_temporary_value(const std::string& type_name);
     void push(const std::string& name) override;
     void pop() override;
     void plus() override;
@@ -65,6 +69,9 @@ public:
     std::optional<value> _push_calle_return_value(const signature& sig);
     void _push_calle_arguments(const signature& sig, const i8& args_count);
     call_result _call_caster(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::unordered_map<std::string, i64>>::iterator & caster_set);
+    call_result _call_function(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::tuple<signature, long long>>::iterator &func_it);
+    call_result _call_instruction_write_str(const std::string& name, const i8& args_count);
+    call_result _call_instruction(const zen::instruction & insn, const i8& args_count, const i8& expected_args_count);
     call_result call(const std::string& name, const i8& args_count) override;
 
 protected:

@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 
+#include "exceptions/semantic_error.hpp"
 #include "utils/utils.hpp"
 #include "vm/vm.hpp"
 
@@ -14,22 +15,41 @@ namespace zen::composer
 {
     struct type
     {
+        enum kind
+        {
+            stack,
+            heap
+        } kind;
         const std::string name;
-        const i64 size;
+        std::shared_ptr<type> base;
+        std::vector<std::pair<std::string, std::shared_ptr<const type>>> fields;
+        [[nodiscard]] std::pair<i64, std::shared_ptr<const type>> get_field(const std::string & name, const i32 & ilc_offset = 0) const
+        {
+            i64 offset = 0;
+            for (const auto & [fst, snd] : fields)
+            {
+                if (fst == name) return {offset, snd};
+                offset += snd->_size;
+            }
+            throw exceptions::semantic_error(fmt::format("no such field {} in type {}", name, this->name), ilc_offset);
+        }
+        void add_field(const std::string & name, const std::shared_ptr<const type> & type)
+        {
+            _size += type->_size;
+            fields.emplace_back(name, type);
+        }
         explicit operator const std::string&() const { return name; }
-        explicit type(std::string  name, const i64 size) : name(std::move(name)), size(size) {}
+        explicit type(std::string  name, const i64 size, enum kind kind = stack) : name(std::move(name)), _size(size), kind(kind) {}
         bool operator==(const type& other) const
         {
-            return name == other.name && size == other.size;
+            return name == other.name && _size == other._size;
         }
+        [[nodiscard]] i64 get_size() const { return kind == stack ? _size : static_cast<i64>(sizeof(i64)); }
+    private:
+        i64 _size;
     };
 
-    enum kind
-    {
-        temporary,
-        constant,
-        variable
-    };
+
 
     enum call_result
     {
@@ -39,8 +59,26 @@ namespace zen::composer
 
     struct value
     {
+        enum kind
+        {
+            temporary,
+            constant,
+            variable
+        };
         kind kind;
-        const std::shared_ptr<const type> type;
+        i64 offset;
+        std::shared_ptr<const type> type;
+        void prepare(std::vector<i64> & code, const i64 & most_size)
+        {
+            if (offset)
+            {
+                code.push_back(zen::modify);
+                code.push_back(address(most_size));
+                code.push_back(offset);
+                offset = 0;
+            }
+        }
+
         [[nodiscard]] bool is(const std::string & type_name) const
         {
             return type->name == type_name;
@@ -54,7 +92,11 @@ namespace zen::composer
             if (kind == constant) return _address;
             return  _address - relative_point;
         }
-        value(const std::shared_ptr<const composer::type> & type, const i64 & address, const composer::kind & kind = variable) : type(type), kind(kind), _address(address) {}
+        explicit value(const std::shared_ptr<const composer::type> & type, const i64 & address, const enum kind & kind = variable) :
+            type(type), kind(kind), offset(0), _address(address)
+        {
+        }
+
         const i64 _address;
     };
 
@@ -116,7 +158,7 @@ protected:
         else
         {
             const i64 address = (i64)(pool.get<native>(data).get());
-            stack.emplace(t, address, constant);
+            stack.emplace(t, address, value::constant);
         }
     }
 

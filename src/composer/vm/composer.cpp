@@ -6,6 +6,7 @@
 
 #include <iostream>
 #include <queue>
+#include <sstream>
 
 #include "exceptions/semantic_error.hpp"
 
@@ -40,7 +41,7 @@ namespace zen
             {"bool", {signature{}, 0}},
             {"byte", {signature{}, 0}}
         };
-
+        auto string_type = std::make_shared<type>("string", 0, type::kind::heap);
         types = {
             {"unit", std::make_shared<type>("unit", 0)},
             {"int", std::make_shared<type>("int", 4)},
@@ -50,8 +51,11 @@ namespace zen
             {"double", std::make_shared<type>("double", 8)},
             {"function", std::make_shared<type>("function", 8)},
             {"bool", std::make_shared<type>("bool", 1)},
-            {"byte", std::make_shared<type>("byte", 1)}
+            {"byte", std::make_shared<type>("byte", 1)},
+            {"string", string_type},
         };
+        string_type->add_field("len", get_type("long"));
+        string_type->add_field("data", get_type("long"));
     }
 
     composer::vm::composer::composer(int& ilc_offset):
@@ -76,7 +80,7 @@ namespace zen
         std::get<signature>(functions.at(scope.function_name)).parameters.emplace_back(get_type(type));
         const auto& t = get_type(type);
         const i64 address = scope.local_most_size;
-        scope.local_most_size += t->size;
+        scope.local_most_size += t->get_size();
         scope.locals.emplace(name, symbol(name, t, address));
     }
 
@@ -87,10 +91,10 @@ namespace zen
             throw std::logic_error("Function returned more than once or return is being set after parameters");
         }
         const auto type = get_type(name);
-        if (type->size != 0)
+        if (type->get_size() != 0)
         {
             scope.return_value.emplace(value(type, scope.local_most_size));
-            scope.local_most_size += type->size;
+            scope.local_most_size += type->get_size();
         }
         std::get<signature>(functions.at(scope.function_name)).type = type;
     }
@@ -114,8 +118,8 @@ namespace zen
         const auto& t = get_type(type);
         const i64 address = scope.local_most_size;
         code.push_back(zen::most);
-        code.push_back(-t->size);
-        scope.local_most_size += t->size;
+        code.push_back(-t->get_size());
+        scope.local_most_size += t->get_size();
         scope.locals.emplace(name, symbol(name, t, address));
     }
 
@@ -128,7 +132,7 @@ namespace zen
         }
         if (auto const return_value = scope.return_value)
         {
-            if (const auto most_delta = scope.local_most_size - return_value->type->size; most_delta > 0)
+            if (const auto most_delta = scope.local_most_size - return_value->type->get_size(); most_delta > 0)
             {
                 code.push_back(zen::most);
                 code.push_back(most_delta);
@@ -161,6 +165,11 @@ namespace zen
                 {
                     fmt::print("most {} ", code[i + 1]);
                     i += 1;
+                }
+                else if (_code == modify)
+                {
+                    fmt::print("modify {} {} ", code[i + 1], code[i + 2]);
+                    i += 2;
                 }
                 else if (_code == zen::call)
                 {
@@ -201,6 +210,21 @@ namespace zen
                     fmt::print("cp {} {} ", code[i + 1], code[i + 2]);
                     i += 2;
                 }
+                else if (_code == write_str)
+                {
+                    fmt::print("write {} {} ", code[i + 1], code[i + 2]);
+                    i += 2;
+                }
+                else if (_code >= write_i8 && _code <= write_f64)
+                {
+                    fmt::print("write {} ", code[i + 1]);
+                    i += 1;
+                }
+                else if (_code >= read_i8 && _code <= read_f64)
+                {
+                    fmt::print("read {} ", code[i + 1]);
+                    i += 1;
+                }
                 else if (_code == ret)
                     fmt::print("ret ");
                 else if (_code == hlt)
@@ -225,10 +249,10 @@ namespace zen
         pop();
         const value lhs = top();
         pop();
-        if (lhs.kind == constant or lhs.kind == temporary)
+        if (lhs.kind == value::constant or lhs.kind == value::temporary)
         {
             throw exceptions::semantic_error("cannot assign value to a constant or temporary value", ilc_offset,
-                                             rhs.kind == variable
+                                             rhs.kind == value::variable
                                                  ? "please consider changing operands order from x = y to y = x"
                                                  : "");
         }
@@ -263,33 +287,71 @@ namespace zen
         code.push_back(rhs.address(scope.local_most_size));
     }
 
+    std::vector<std::string> split_name(const std::string &name)
+    {
+        std::vector<std::string> result;
+        std::istringstream iss(name);
+        std::string token;
+        while (std::getline(iss, token, '.'))
+        {
+            if (not token.empty())
+                result.push_back(token);
+        }
+        return result;
+    }
+
+    void composer::vm::composer::_push_variable(const std::vector<std::string> & tokens, const std::map<std::string, symbol>::iterator& location)
+    {
+        value val = location->second;
+        std::pair<i64, std::shared_ptr<const type>> item = {0, val.type};
+        for (int i = 1; i < tokens.size(); ++i)
+        {
+            const auto [fst, snd] = item.second->get_field(tokens[i], ilc_offset);
+            item.first += fst;
+            item.second = snd;
+        }
+        val.offset = item.first;
+        val.type = item.second;
+        // fmt::println("{}: {} [{}]", name, val.type->name, val.offset);
+        push(val);
+    }
+
+    void composer::vm::composer::_push_function(const std::unordered_map<std::string, std::tuple<signature, long long>>::iterator& function)
+    {
+        long address = std::get<i64>(function->second);
+        zen::composer::composer::push(std::move(address), "function");
+    }
+
+    void composer::vm::composer::_push_return_value()
+    {
+        push(scope.return_value.value());
+    }
+
+    void composer::vm::composer::_push_temporary_value(const std::string& type_name)
+    {
+        push(get_type(type_name.substr(1, type_name.size() - 2)));
+    }
+
     void composer::vm::composer::push(const std::string& name)
     {
-        if (const auto location = scope.locals.find(name); location != scope.locals.end())
-        {
-            push(location->second);
-        }
-        else if (const auto function = functions.find(name); function != functions.end())
-        {
-            long address = std::get<i64>(function->second);
-            zen::composer::composer::push(std::move(address), "function");
-        }
+        std::vector<std::string> tokens = split_name(name);
+        if (tokens.empty())
+            throw exceptions::semantic_error(fmt::format("invalid name '{}'", name), ilc_offset);
+
+        if (const auto location = scope.locals.find(tokens.front()); location != scope.locals.end())
+            _push_variable(tokens, location);
+        else if (const auto function = functions.find(tokens.front()); function != functions.end())
+            _push_function(function);
         else if (name == "<return>" && scope.return_value)
-        {
-            push(scope.return_value.value());
-        }
+            _push_return_value();
         else if (name.starts_with("<") and name.ends_with(">"))
-        {
-            push(get_type(name.substr(1, name.size() - 2)));
-        }
+            _push_temporary_value(name);
         else
-        {
             throw exceptions::semantic_error(fmt::format(
                                                  "no such symbol {}", name), ilc_offset,
                                              fmt::format(
                                                  "please define it in the respective scope. Eg. {0}: T = V // with T & V being it's type and value respectively.",
                                                  name));
-        }
     }
 
 #define KAIZEN_IF_ARITHMETICS_CHAIN(F)\
@@ -493,13 +555,13 @@ namespace zen
     std::optional<composer::value> composer::vm::composer::_push_calle_return_value(const signature& sig)
     {
         std::optional<value> result;
-        if (sig.type->size)
+        if (sig.type->get_size())
         {
             const i64 address = scope.local_most_size;
             code.push_back(zen::most);
-            code.push_back(-sig.type->size);
-            scope.local_most_size += sig.type->size;
-            return value(sig.type, address, kind::temporary);
+            code.push_back(-sig.type->get_size());
+            scope.local_most_size += sig.type->get_size();
+            return value(sig.type, address, value::temporary);
         }
         return std::nullopt;
     }
@@ -538,11 +600,6 @@ namespace zen
                 } else if (value.is("double"))
                 {
                     code.push_back(zen::push_f64);
-                } else
-                {
-                    throw exceptions::semantic_error(fmt::format(
-                                                     "cannot pass argument type {}",
-                                                     value.type->name), ilc_offset);
                 }
                 code.push_back(value.address(scope.local_most_size));
             }
@@ -625,6 +682,82 @@ namespace zen
         }
     }
 
+    composer::call_result composer::vm::composer::_call_function(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::tuple<signature, long long>>::iterator& func_it)
+    {
+        const i8 abs_args_count = abs(args_count);
+        const i64& addr = std::get<i64>(func_it->second);
+        const signature& sig = std::get<signature>(func_it->second);
+        if (stack.size() < abs_args_count + 1 || abs_args_count != sig.parameters.size())
+        {
+            throw exceptions::semantic_error(fmt::format(
+                                                 "wrong number of arguments for \"{}\"", name), ilc_offset);
+        }
+        // if (args_count < 0) // when assigning, copy the value directly to lhs
+        // {
+        auto returned = _push_calle_return_value(sig);
+        // }
+        _push_calle_arguments(sig, abs_args_count);
+        if (top().is("function"))
+        {
+            pop(); // pop the function itself from composer's stack
+        }
+        if (returned)
+        {
+            push(returned.value());
+        }
+        code.push_back(zen::call);
+        code.push_back(addr);
+        return call_result::result;
+    }
+
+    composer::call_result composer::vm::composer::_call_instruction_write_str(const std::string& name, const i8& args_count)
+    {
+        if (stack.size() < 3 or args_count != 3)
+        {
+            throw exceptions::semantic_error(fmt::format(
+                                                 "wrong number of arguments for <native>\"{}\" 3 expected", name), ilc_offset);
+        }
+        std::stack<value> args;
+        for (int i = 0 ; i < args_count; i++)
+        {
+            value v = top();
+            pop();
+            v.prepare(code, scope.local_most_size);
+            args.push(v);
+        }
+        code.push_back(zen::write_str);
+        for (int i = 0 ; i < args_count; i++)
+        {
+            code.push_back(args.top().address(scope.local_most_size));
+            args.pop();
+        }
+        return call_result::result;
+    }
+
+    composer::call_result composer::vm::composer::_call_instruction(const zen::instruction& name, const i8& args_count, const i8& expected_args_count)
+    {
+        if (stack.size() < expected_args_count or args_count != expected_args_count)
+        {
+            throw exceptions::semantic_error(fmt::format(
+                                                 "wrong number of arguments for <native>\"{}\" 3 expected", static_cast<i32>(name)), ilc_offset);
+        }
+        std::stack<value> args;
+        for (int i = 0 ; i < args_count; i++)
+        {
+            value v = top();
+            pop();
+            v.prepare(code, scope.local_most_size);
+            args.push(v);
+        }
+        code.push_back(name);
+        for (int i = 0 ; i < args_count; i++)
+        {
+            code.push_back(args.top().address(scope.local_most_size));
+            args.pop();
+        }
+        return call_result::result;
+    }
+
     composer::call_result composer::vm::composer::call(const std::string& name, const i8& args_count)
     {
         static std::unordered_map<std::string, std::unordered_map<std::string, i64>> casters{
@@ -643,43 +776,26 @@ namespace zen
 
         if (const auto func_it = functions.find(name); func_it != functions.end())
         {
-            const i8 abs_args_count = abs(args_count);
-            const i64& addr = std::get<i64>(func_it->second);
-            const signature& sig = std::get<signature>(func_it->second);
-            if (stack.size() < abs_args_count + 1 || abs_args_count != sig.parameters.size())
-            {
-                throw exceptions::semantic_error(fmt::format(
-                                                     "wrong number of arguments for \"{}\"", name), ilc_offset);
-            }
-            // if (args_count < 0) // when assigning, copy the value directly to lhs
-            // {
-            auto returned = _push_calle_return_value(sig);
-            // }
-            _push_calle_arguments(sig, abs_args_count);
-            if (top().is("function"))
-            {
-                pop(); // pop the function itself from composer's stack
-            }
-            if (returned)
-            {
-                push(returned.value());
-            }
-            code.push_back(zen::call);
-            code.push_back(addr);
+            return _call_function(name, args_count, func_it);
         }
-        else
+        const int name_i32 = strtol(name.c_str(), nullptr, 10);
+        if (name_i32 == write_str)
         {
-            throw exceptions::semantic_error(fmt::format("function \"{}\" was not found", name), ilc_offset);
+            return _call_instruction_write_str(name, args_count);
         }
-        return call_result::result;
+        if (name_i32 >= write_i8 and name_i32 <= write_f64)
+        {
+            return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 1);
+        }
+        throw exceptions::semantic_error(fmt::format("function \"{}\" was not found", name), ilc_offset);
     }
 
     void composer::vm::composer::push(const std::shared_ptr<const type>& type)
     {
-        stack.emplace(type, scope.local_most_size, temporary);
+        stack.emplace(type, scope.local_most_size, value::temporary);
         code.push_back(most);
-        code.push_back(-type->size);
-        scope.local_most_size += type->size;
+        code.push_back(-type->get_size());
+        scope.local_most_size += type->get_size();
     }
 
     void composer::vm::composer::pop()
