@@ -14,7 +14,31 @@
 #endif
 
 std::vector<zen::token> tokens;
+
+
 /*
+
+void test_vm_ref()
+{
+    using namespace zen;
+    vm vm1;
+    struct _person_t
+    {
+        int age;
+        const char* name;
+    };
+
+    _person_t p = {
+        .age = 20,
+        .name = "Descartes"
+    };
+
+    std::vector<i64> code = {
+        most,-8,
+        i64_to_i64, -8, vm::ref(p),
+        mod_ptr,-8, 3,
+    };
+}
 void test_vm()
 {
     using namespace zen;
@@ -319,21 +343,57 @@ try {
 }
 }
 
+void* make_zen_string(const std::string & str)
+{
+    void * data = malloc(sizeof(char) * str.size() + sizeof(zen::i64));
+    *static_cast<zen::i64*>(data) = str.length();
+    memcpy((char*)(data) + sizeof(zen::i64), str.data(), str.length());
+    return data;
+}
+
+void print_zen_string(void * str)
+{
+    zen::i64 len = *static_cast<zen::i64*>(str);
+    zen::i64 i= 0;
+    while (i < len)
+    {
+        printf("%c", *(char*)((char*)str + sizeof(zen::i64) + i++));
+    }
+    printf("(%d bytes)", len);
+}
+
 int main(int argc, char** argv) try
 {
 #ifdef KAIZEN_WASM
 return 0;
 #else
-    if (false)
+    if (true)
     {
         zen::composer::composer* composer = get_composer();
+        composer->begin("write_string");
+        composer->set_parameter("fd", "long");
+        composer->set_parameter("str", "string");
+        composer->push("str.data");
+        composer->push("str.len");
+        composer->push("fd");
+        composer->call(std::to_string(zen::write_str), 3);
+        composer->end();
+
+        composer->begin("print_string");
+        composer->set_parameter("string", "string");
+        composer->push("write_string");
+        composer->push<zen::i64>(reinterpret_cast<zen::i64>(stdout), "long");
+        composer->push("string");
+        composer->call("write_string", 2);
+        composer->bake();
+
+
+        return 0;
         composer->begin("internal::1_param_test");
         composer->set_return_type("double");
         composer->set_parameter("x", "double");
         composer->push("x");
         composer->end();
-        composer->bake();
-
         composer->begin("internal::0_param_test");
         composer->set_return_type("double");
         composer->push<double>(0.0, "double");
