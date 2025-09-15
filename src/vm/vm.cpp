@@ -105,11 +105,24 @@ case (T ## _to_boolean):\
 i += 2;\
 break;
 
-#define KAIZEN_PUSH_FOR_TYPE(T) \
+#define KAIZEN_STACK_PUSH_FOR_TYPE(T) \
 case push_ ## T:\
 stack -= sizeof(T); \
 *static_cast<T*>(stack - sizeof(T)) = *address<T>(this->code[i + 1], stack); \
-i += 1;
+i += 1; \
+break;
+
+#define KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(T) \
+case write_ ## T: \
+fwrite(address<T>(this->code[i + 2], stack), sizeof(T), 1, reinterpret_cast<FILE*>(*address<i64>(this->code[i + 2], stack))); \
+i += 2;\
+break;
+
+#define KAIZEN_IO_READ_FOR_SCALAR_TYPE(T) \
+case read_ ## T: \
+fread(address<T>(this->code[i + 2], stack), sizeof(T), 1, reinterpret_cast<FILE*>(*address<i64>(this->code[i + 2], stack)));\
+i += 2;\
+break;
 
 void* zen::vm::stack::operator-(const i64& size)
 {
@@ -174,18 +187,14 @@ void zen::vm::run(stack& stack, const i64& entry_point)
     {
         switch (this->code[i])
         {
-            KAIZEN_PUSH_FOR_TYPE(i8)
-            KAIZEN_PUSH_FOR_TYPE(i16)
-            KAIZEN_PUSH_FOR_TYPE(i32)
-            KAIZEN_PUSH_FOR_TYPE(i64)
-            KAIZEN_PUSH_FOR_TYPE(f32)
-            KAIZEN_PUSH_FOR_TYPE(f64)
-            KAIZEN_PUSH_FOR_TYPE(boolean)
-        // case pop:
-        //     *address<i64>(this->code[i + 1], stack) = *static_cast<i64*>(stack - sizeof(i64));
-        //     stack += sizeof(i64); // NOLINT
-        //     i += 1;
-        //     break;
+        KAIZEN_STACK_PUSH_FOR_TYPE(i8)
+        KAIZEN_STACK_PUSH_FOR_TYPE(i16)
+        KAIZEN_STACK_PUSH_FOR_TYPE(i32)
+        KAIZEN_STACK_PUSH_FOR_TYPE(i64)
+        KAIZEN_STACK_PUSH_FOR_TYPE(f32)
+        KAIZEN_STACK_PUSH_FOR_TYPE(f64)
+        KAIZEN_STACK_PUSH_FOR_TYPE(boolean)
+
         KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i8)
         KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i16)
         KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i32)
@@ -206,7 +215,30 @@ void zen::vm::run(stack& stack, const i64& entry_point)
         KAIZEN_CONVERSION_FOR_TYPE(i64)
         KAIZEN_CONVERSION_FOR_TYPE(f32)
         KAIZEN_CONVERSION_FOR_TYPE(f64)
-        // KAIZEN_CONVERSION_FOR_TYPE(boolean)
+            // KAIZEN_CONVERSION_FOR_TYPE(boolean)
+        KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i8)
+        KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i16)
+        KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i32)
+        KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i64)
+        KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(f32)
+        KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(f64)
+        case write_str:
+            fwrite(reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)), sizeof(char),
+                   *address<i64>(this->code[i + 2], stack),
+                   reinterpret_cast<FILE*>(*address<i64>(this->code[i + 3], stack)));
+            i += 3;
+            break;
+        KAIZEN_IO_READ_FOR_SCALAR_TYPE(i8)
+        KAIZEN_IO_READ_FOR_SCALAR_TYPE(i16)
+        KAIZEN_IO_READ_FOR_SCALAR_TYPE(i32)
+        KAIZEN_IO_READ_FOR_SCALAR_TYPE(i64)
+        KAIZEN_IO_READ_FOR_SCALAR_TYPE(f32)
+        KAIZEN_IO_READ_FOR_SCALAR_TYPE(f64)
+
+        // case read_str:
+        //     fread(address<str>(this->code[i + 2], stack)->d, sizeof(str), 1, reinterpret_cast<FILE*>(*address<i64>(this->code[i + 2], stack)));
+        //     i += 2;
+        //     break;
 
         case boolean_and:
             *address<boolean>(this->code[i + 1], stack) = *address<boolean>(this->code[i + 2], stack) and *address<
@@ -248,11 +280,34 @@ void zen::vm::run(stack& stack, const i64& entry_point)
             stack -= sizeof(i64); // NOLINT
             *static_cast<i64*>(stack - sizeof(i64)) = i + 2;
             // i = *address<i64>(this->code[i + 1], stack) - 1;
-            i = *static_cast<i64*>(stack - ((this->code[i + 1]+2) * sizeof(i64))) - 1;
+            i = *static_cast<i64*>(stack - ((this->code[i + 1] + 2) * sizeof(i64))) - 1;
             break;
         case ret:
             i = *static_cast<i64*>(stack - sizeof(i64)) - 1;
             stack += sizeof(i64); // NOLINT
+            break;
+        case allocate:
+            *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(malloc(
+                *address<boolean>(this->code[i + 2], stack)));
+            i += 2;
+            break;
+        case deallocate:
+            free(reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)));
+            i += 1;
+            break;
+        case reallocate:
+            *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(realloc(reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)),
+                *address<boolean>(this->code[i + 2], stack)));
+            i += 2;
+            break;
+        case copy:
+            memcpy(reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)), reinterpret_cast<void*>(*address<i64>(this->code[i + 2], stack)),*address<i64>(this->code[i + 3], stack));
+            i += 3;
+            break;
+        case modify:
+            *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(reinterpret_cast<char*>(*address<i64>(this->code[i + 1], stack))) +
+                static_cast<i64>(sizeof(this->code[i + 2]));
+            i += 2;
             break;
         default:
             fmt::println(stderr, "fatal error: unsupported operation {} (zen vm halted at {})", this->code[i], i);

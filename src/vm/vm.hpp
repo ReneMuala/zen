@@ -13,6 +13,8 @@
 #include <string>
 #include <unordered_map>
 #include <fmt/base.h>
+#include "types/stack.hpp"
+#include "types/heap.hpp"
 
 #define DECL_KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(T) \
 add_##T, \
@@ -44,18 +46,19 @@ T##_to_i16,\
 T##_to_f32,\
 T##_to_boolean
 
-#define DECL_KAIZEN_PUSH_FOR_TYPE(T) \
+#define DECL_KAIZEN_STACK_PUSH_FOR_TYPE(T) \
 push_ ## T
+
+#define DECL_KAIZEN_IO_WRITE_FOR_TYPE(T) \
+write_ ## T
+
+#define DECL_KAIZEN_IO_READ_FOR_TYPE(T) \
+read_ ## T
 
 namespace zen
 {
-    using boolean = bool;
-    using i8 = int8_t;
-    using i16 = int16_t;
-    using i32 = int32_t;
-    using i64 = int64_t;
-    using f32 = float;
-    using f64 = double;
+    using namespace zen::types::stack;
+    using namespace zen::types::heap;
     constexpr static auto ascii_art = R"(   .-') _   ('-.       .-') _
   (  OO) )_(  OO)     ( OO ) )
 ,(_)----.(,------.,--./ ,--,'
@@ -67,14 +70,14 @@ namespace zen
 `--------'`------'`--'  `--'  )";
     enum instruction
     {
-        DECL_KAIZEN_PUSH_FOR_TYPE(i8),
-        DECL_KAIZEN_PUSH_FOR_TYPE(i16),
-        DECL_KAIZEN_PUSH_FOR_TYPE(i32),
-        DECL_KAIZEN_PUSH_FOR_TYPE(i64),
-        DECL_KAIZEN_PUSH_FOR_TYPE(f32),
-        DECL_KAIZEN_PUSH_FOR_TYPE(f64),
-        DECL_KAIZEN_PUSH_FOR_TYPE(boolean),
-        // pop,
+        DECL_KAIZEN_STACK_PUSH_FOR_TYPE(i8),
+        DECL_KAIZEN_STACK_PUSH_FOR_TYPE(i16),
+        DECL_KAIZEN_STACK_PUSH_FOR_TYPE(i32),
+        DECL_KAIZEN_STACK_PUSH_FOR_TYPE(i64),
+        DECL_KAIZEN_STACK_PUSH_FOR_TYPE(f32),
+        DECL_KAIZEN_STACK_PUSH_FOR_TYPE(f64),
+        DECL_KAIZEN_STACK_PUSH_FOR_TYPE(boolean),
+
         DECL_KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i8),
         DECL_KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i16),
         DECL_KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i32),
@@ -95,6 +98,22 @@ namespace zen
         DECL_KAIZEN_CONVERSION_FOR_TYPE(i64),
         DECL_KAIZEN_CONVERSION_FOR_TYPE(f32),
         DECL_KAIZEN_CONVERSION_FOR_TYPE(f64),
+
+        DECL_KAIZEN_IO_WRITE_FOR_TYPE(i8),
+        DECL_KAIZEN_IO_WRITE_FOR_TYPE(i16),
+        DECL_KAIZEN_IO_WRITE_FOR_TYPE(i32),
+        DECL_KAIZEN_IO_WRITE_FOR_TYPE(i64),
+        DECL_KAIZEN_IO_WRITE_FOR_TYPE(f32),
+        DECL_KAIZEN_IO_WRITE_FOR_TYPE(f64),
+        DECL_KAIZEN_IO_WRITE_FOR_TYPE(str),
+
+        DECL_KAIZEN_IO_READ_FOR_TYPE(i8),
+        DECL_KAIZEN_IO_READ_FOR_TYPE(i16),
+        DECL_KAIZEN_IO_READ_FOR_TYPE(i32),
+        DECL_KAIZEN_IO_READ_FOR_TYPE(i64),
+        DECL_KAIZEN_IO_READ_FOR_TYPE(f32),
+        DECL_KAIZEN_IO_READ_FOR_TYPE(f64),
+        // DECL_KAIZEN_IO_READ_FOR_TYPE(str),
 
         boolean_and,
         boolean_or,
@@ -120,7 +139,19 @@ namespace zen
         // send_f64,
         // send_boolean,
         // memory_of,
+        /// allocate <pointer:i64> <n-bytes:i64>
+        allocate,
+        /// deallocate <pointer:i64>
+        deallocate,
+        /// reallocate <pointer:i64> <n-bytes:i64>
+        reallocate,
+        /// shink <pointer:i64>
+        copy,
+        /// modify <pointer:i64> <offset:i64> # Modify Stack Top Pointer -> advance pointer in offset bytes.
+        modify,
         placeholder,
+        /// work on attribute fetching for struct fields
+        // <...>
     };
     class vm
     {
