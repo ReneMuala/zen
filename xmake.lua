@@ -1,6 +1,6 @@
 add_rules("mode.debug", "mode.release")
 --add_requires("fmt", "asmjit", "libffi")
-add_requires("fmt", "asmjit")
+add_requires("fmt", "asmjit", "gtest")
 
 if is_plat("wasm") then
     add_cxflags([[-DKAIZEN_WASM]])
@@ -8,6 +8,20 @@ if is_plat("wasm") then
     add_ldflags("-fexceptions")
     --add_cxflags([[-sEXPORTED_RUNTIME_METHODS=ccall,cwrap]])
 end
+
+target("tests")
+    set_languages("c++23")
+    set_kind("binary")
+    add_packages("fmt", "asmjit", "gtest")
+    add_includedirs("src/", "libs/")
+    add_files(
+            "src/lexer/*.cpp",
+            "src/vm/*.cpp",
+    --"src/parser/*.cpp",
+            "src/exceptions/*.cpp",
+            "src/composer/vm/*.cpp",
+            "test/unit/*.cpp"
+    )
 
 target("zen")
     set_languages("c++23")

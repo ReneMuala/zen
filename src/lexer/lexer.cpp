@@ -21,7 +21,11 @@ zen::token zen::lexer::next_number()
     restart:
     do
     {
-        if (it == '_') continue;
+        if (it == '_')
+        {
+            getchar();
+            continue;
+        }
         value += it;
         getchar();
     } while (isdigit(it) or it == '_');
@@ -115,7 +119,7 @@ zen::token zen::lexer::next_or()
     getchar();
     if(it == '|')
     {
-        type = enums::TAND;
+        type = enums::TOR;
         value+=it;
         getchar();
     }
@@ -366,70 +370,67 @@ void zen::lexer::getchar()
 
 std::optional<zen::token> zen::lexer::next()
 {
-    begin:
-    while (std::isspace(it) or it == 0)
-        getchar();
-    if (stream.eof())
-        return std::nullopt;
-    if (isdigit(it))
-        return next_number();
-    if (isalpha(it))
-        return next_id_or_keyword();
-    if (it == '{')
-        return next_single(enums::TBRACES_OPEN);
-    if (it == '}')
-        return next_single(enums::TBRACES_CLOSE);
-    if (it == '[')
-        return  next_single(enums::TBRACKETS_OPEN);
-    if (it == ']')
-        return next_single(enums::TBRACKETS_CLOSE);
-    if (it == '(')
-        return next_single(enums::TPARENTHESIS_OPEN);
-    if (it == ')')
-        return next_single(enums::TPARENTHESIS_CLOSE);
-    if (it == '.')
-        return next_single(enums::TDOT);
-    if (it == ',')
-        return next_single(enums::TCOMMA);
-    if (it == '?')
-        return next_single(enums::TQUESTION);
-    if (it == ':')
-        return next_single(enums::TCOLON);
-    if (it == ';')
-        return next_single(enums::TSEMICOLON);
-    if (it == '"')
-        return next_string();
-    if (it == '=')
-        return next_equ_or_equal();
-    if (it == '&')
-        return next_and();
-    if (it == '|')
-        return next_or();
-    if (it == '!')
+    while (true)
     {
-        auto && token = next_not_or_not_equal();
-        if (token.type == enums::TCOMMENT)
-            goto begin;
-        return token;
+        while (std::isspace(it) or it == 0)
+            getchar();
+        if (stream.eof())
+            return std::nullopt;
+        if (isdigit(it))
+            return next_number();
+        if (isalpha(it) or it == '_')
+            return next_id_or_keyword();
+        if (it == '{')
+            return next_single(enums::TBRACES_OPEN);
+        if (it == '}')
+            return next_single(enums::TBRACES_CLOSE);
+        if (it == '[')
+            return  next_single(enums::TBRACKETS_OPEN);
+        if (it == ']')
+            return next_single(enums::TBRACKETS_CLOSE);
+        if (it == '(')
+            return next_single(enums::TPARENTHESIS_OPEN);
+        if (it == ')')
+            return next_single(enums::TPARENTHESIS_CLOSE);
+        if (it == '.')
+            return next_single(enums::TDOT);
+        if (it == ',')
+            return next_single(enums::TCOMMA);
+        if (it == '?')
+            return next_single(enums::TQUESTION);
+        if (it == ':')
+            return next_single(enums::TCOLON);
+        if (it == ';')
+            return next_single(enums::TSEMICOLON);
+        if (it == '"')
+            return next_string();
+        if (it == '=')
+            return next_equ_or_equal();
+        if (it == '&')
+            return next_and();
+        if (it == '|')
+            return next_or();
+        if (it == '!')
+            return next_not_or_not_equal();
+        if (it == '>')
+            return next_greater_or_greater_equal();
+        if (it == '<')
+            return next_lower_or_lower_equal();
+        if (it == '+')
+            return next_plus_or_plus_plus_or_plus_equal();
+        if (it == '-')
+            return next_minus_or_minus_minus_or_minus_equal();
+        if (it == '*')
+            return next_times_or_times_equal();
+        if (it == '%')
+            return next_modulo_or_modulo_equal();
+        if (it == '/')
+        {
+            auto && token = next_slash_or_slash_equal_or_comment();
+            if (token.type == enums::TCOMMENT)
+                continue;
+            return token;
+        }
+        return next_error();
     }
-    if (it == '>')
-        return next_greater_or_greater_equal();
-    if (it == '<')
-        return next_lower_or_lower_equal();
-    if (it == '+')
-        return next_plus_or_plus_plus_or_plus_equal();
-    if (it == '-')
-        return next_minus_or_minus_minus_or_minus_equal();
-    if (it == '*')
-        return next_times_or_times_equal();
-    if (it == '%')
-        return next_modulo_or_modulo_equal();
-    if (it == '/')
-    {
-        auto && token = next_slash_or_slash_equal_or_comment();
-        if (token.type == enums::TCOMMENT)
-            goto begin;
-        return token;
-    }
-    return next_error();
 }
