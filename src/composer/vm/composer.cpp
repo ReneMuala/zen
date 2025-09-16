@@ -103,9 +103,12 @@ namespace zen
     {
         const value rhs = top();
         pop();
-        push(scope.return_value.value());
-        push(rhs);
-        assign();
+        if (not scope.return_value->is("unit"))
+        {
+            push(scope.return_value.value());
+            push(rhs);
+            assign();
+        }
     }
 
     void composer::vm::composer::set_return_name(const std::string& name)
