@@ -515,6 +515,9 @@ sumsub(x: int, y: int) = float {
 }
 
 roo(a: int, b: float, c: byte, d: long, e: short, f: double) = short{
+    x: int = 1
+    y: int = 2
+    x = y
     short(a + int(b))
 }
 

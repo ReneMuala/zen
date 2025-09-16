@@ -2,6 +2,7 @@
 // Created by dte on 9/15/2025.
 //
 #include "lexer/lexer_tests.hpp"
+#include "parser/parser_tests.hpp"
 #include "parser/parser.hpp"
 std::vector<zen::token> tokens;
 

@@ -1,6 +1,8 @@
 //
 // Created by dte on 9/15/2025.
 //
+#pragma once
+
 #include <gtest/gtest.h>
 
 #include "lexer/lexer.hpp"

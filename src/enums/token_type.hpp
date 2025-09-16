@@ -203,8 +203,6 @@ namespace enums
     TKEYWORD_BREAK,
     // continue
     TKEYWORD_CONTINUE,
-    // return,
-    TKEYWORD_RETURN,
     // switch
     TKEYWORD_SWITCH,
     // class

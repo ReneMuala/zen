@@ -41,8 +41,15 @@ namespace parser
         CONSTANT
     };
 
-    state_t state = STATEMENT;
-    std::string id,type,value;
+    // state_t state = STATEMENT;
+    std::string id, type, value;
+
+    inline void reset()
+    {
+        id.clear();
+        type.clear();
+        value.clear();
+    }
 }
 
 // std::cerr <<  "syntax error: expected " << ITEM << " found " << tokens[ILC::offset].value << " @" << (int)tokens[ILC::offset].type << " at " << tokens[ILC::offset-1].get_location_string();
@@ -60,10 +67,14 @@ END_PRODUCTION
 BEGIN_PRODUCTION(PRODUCTION_NCLASS)
     REQUIRE_TERMINAL(TKEYWORD_CLASS)
     REQUIRE_NON_TERMINAL_CALLBACK(NID, EXPECTED("ID"))
-    if (TRY_REQUIRE_NON_TERMINAL(NGENERIC)){}
+    if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
+    {
+        parser::type.clear();
+    }
     REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
     bool is_static;
-    while (TRY_REQUIRE_TERMINAL(TID) or ((is_static = TRY_REQUIRE_TERMINAL(TKEYWORD_STATIC))) and TRY_REQUIRE_TERMINAL(TID))
+    while (TRY_REQUIRE_TERMINAL(TID) or ((is_static = TRY_REQUIRE_TERMINAL(TKEYWORD_STATIC))) and
+        TRY_REQUIRE_TERMINAL(TID))
     {
         if (TRY_REQUIRE_TERMINAL(TCOLON))
         {
@@ -72,7 +83,8 @@ BEGIN_PRODUCTION(PRODUCTION_NCLASS)
             {
                 REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
             }
-        } else
+        }
+        else
         {
             REQUIRE_NON_TERMINAL_CALLBACK(NSUFFIX_FUNCTION_DEFINITION, EXPECTED("FUNCTION"))
         }
@@ -87,17 +99,21 @@ BEGIN_PRODUCTION(PRODUCTION_NIF)
     do
     {
         REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
-        if (ILC::chain[ILC::offset - 1] == TID and (ILC::chain[ILC::offset - 2] == TPARENTHESIS_OPEN or not first)  and TRY_REQUIRE_TERMINAL(TCOLON))
+        if (ILC::chain[ILC::offset - 1] == TID and (ILC::chain[ILC::offset - 2] == TPARENTHESIS_OPEN or not first) and
+            TRY_REQUIRE_TERMINAL(TCOLON))
         {
             first = false;
             REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
             REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
             REQUIRE_NON_TERMINAL_CALLBACK(NSINGLE_VAL, EXPECTED("VALUE"))
         }
-    } while (TRY_REQUIRE_TERMINAL(TAND));
+    }
+    while (TRY_REQUIRE_TERMINAL(TAND));
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
     REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
-    while (TRY_REQUIRE_NON_TERMINAL(NSTAT)){}
+    while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
+    {
+    }
     REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
     while (TRY_REQUIRE_TERMINAL(TKEYWORD_ELSE))
     {
@@ -108,23 +124,29 @@ BEGIN_PRODUCTION(PRODUCTION_NIF)
             do
             {
                 REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
-                if (ILC::chain[ILC::offset - 1] == TID and (ILC::chain[ILC::offset - 2] == TPARENTHESIS_OPEN or not first)  and TRY_REQUIRE_TERMINAL(TCOLON))
+                if (ILC::chain[ILC::offset - 1] == TID and (ILC::chain[ILC::offset - 2] == TPARENTHESIS_OPEN or not
+                    first) and TRY_REQUIRE_TERMINAL(TCOLON))
                 {
                     first = false;
                     REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
                     REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
                     REQUIRE_NON_TERMINAL_CALLBACK(NSINGLE_VAL, EXPECTED("VALUE"))
                 }
-            } while (TRY_REQUIRE_TERMINAL(TAND));
+            }
+            while (TRY_REQUIRE_TERMINAL(TAND));
             REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
             REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
-            while (TRY_REQUIRE_NON_TERMINAL(NSTAT)){}
+            while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
+            {
+            }
             REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
         }
         else
         {
             REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
-            while (TRY_REQUIRE_NON_TERMINAL(NSTAT)){}
+            while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
+            {
+            }
             REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
             break;
         }
@@ -135,7 +157,10 @@ BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
     auto composer = get_composer();
     bool assignment_call = ILC::offset > 2 && ILC::chain[ILC::offset - 2] == TEQU;
     const std::string name = parser::id;
-    if (TRY_REQUIRE_NON_TERMINAL(NGENERIC)){}
+    if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
+    {
+        parser::type.clear();
+    }
     REQUIRE_TERMINAL(TPARENTHESIS_OPEN)
     zen::i8 param_count = 0;
     while (TRY_REQUIRE_NON_TERMINAL(NVAL))
@@ -147,22 +172,29 @@ BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
         }
     }
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
-    pragma_skip_assignment_because_of_conversion_special_call = composer->call(name, assignment_call ? param_count : -param_count) == zen::composer::call_result::casting;
+    pragma_skip_assignment_because_of_conversion_special_call = composer->call(
+        name, assignment_call ? param_count : -param_count) == zen::composer::call_result::casting;
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
     static auto composer = get_composer();
     static bool begin_function_invoked;
     static std::list<std::tuple<std::string, std::string>> parameters = {};
+    if (not parameters.empty())
+    {
+        parameters.clear();
+    }
     // provides parser::id
     // REQUIRE_NON_TERMINAL(NID)
     if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
     {
+        parser::type.clear();
     }
     if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
     {
         composer->begin(parser::id);
         begin_function_invoked = true;
+        bool first_it = true;
         do
         {
             if (TRY_REQUIRE_NON_TERMINAL(NID))
@@ -173,10 +205,16 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
                 REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
                 parameters.emplace_back(name, parser::type);
             }
+            else if (not first_it)
+            {
+                EXPECTED("ID")();
+            }
+            first_it = false;
         }
         while (TRY_REQUIRE_TERMINAL(TCOMMA));
         REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
-    } else
+    }
+    else
     {
         begin_function_invoked = false;
     }
@@ -204,14 +242,17 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
             if (ILC::offset - offset_before == 1 and ILC::chain[ILC::offset - 1] == TID)
             {
                 composer->set_return_name(parser::id);
-            } else if (not pragma_ignore_missing_symbols_data.empty())
+            }
+            else if (not pragma_ignore_missing_symbols_data.empty())
             {
                 throw zen::exceptions::semantic_error(fmt::format(
-                                                          "no such symbol(s) {}", pragma_ignore_missing_symbols_data), ILC::offset);
+                                                          "no such symbol(s) {}", pragma_ignore_missing_symbols_data),
+                                                      ILC::offset);
             }
             REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
         }
-    } else
+    }
+    else
     {
         composer->set_return_type("unit");
         for (auto parameter : parameters)
@@ -223,13 +264,15 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
     if (TRY_REQUIRE_TERMINAL(TBRACES_OPEN))
     {
         while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
-        {} // improve return handler
+        {
+        } // improve return handler
         if (TRY_REQUIRE_NON_TERMINAL(NVAL))
         {
             composer->return_value();
         }
         REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
-    } else
+    }
+    else
     {
         composer->return_value();
     }
@@ -254,10 +297,13 @@ BEGIN_PRODUCTION(PRODUCTION_NFOR)
         {
             REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
         }
-    } while (TRY_REQUIRE_TERMINAL(TSEMICOLON));
+    }
+    while (TRY_REQUIRE_TERMINAL(TSEMICOLON));
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
     REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
-    while (TRY_REQUIRE_NON_TERMINAL(NSTAT)){}
+    while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
+    {
+    }
     REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
 END_PRODUCTION
 
@@ -368,7 +414,8 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_NUM)
             data = -data;
         }
         composer->push<int>(std::move(data), "int");
-    }  else if (TRY_REQUIRE_TERMINAL(TBYTE_NUM))
+    }
+    else if (TRY_REQUIRE_TERMINAL(TBYTE_NUM))
     {
         char data = static_cast<char>(strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10));
         if (negative)
@@ -376,7 +423,8 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_NUM)
             data = -data;
         }
         composer->push<char>(std::move(data), "byte");
-    } else if (TRY_REQUIRE_TERMINAL(TSHORT_NUM))
+    }
+    else if (TRY_REQUIRE_TERMINAL(TSHORT_NUM))
     {
         short data = static_cast<short>(strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10));
         if (negative)
@@ -384,7 +432,8 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_NUM)
             data = -data;
         }
         composer->push<short>(std::move(data), "short");
-    } else if (TRY_REQUIRE_TERMINAL(TLONG_NUM))
+    }
+    else if (TRY_REQUIRE_TERMINAL(TLONG_NUM))
     {
         long data = strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10);
         if (negative)
@@ -392,7 +441,8 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_NUM)
             data = -data;
         }
         composer->push<long>(std::move(data), "long");
-    } else if (TRY_REQUIRE_TERMINAL(TFLOAT_NUM))
+    }
+    else if (TRY_REQUIRE_TERMINAL(TFLOAT_NUM))
     {
         float data = strtof(tokens[ILC::offset - 1].value.c_str(), nullptr);
         if (negative)
@@ -400,7 +450,8 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_NUM)
             data = -data;
         }
         composer->push<float>(std::move(data), "float");
-    } else
+    }
+    else
     {
         REQUIRE_TERMINAL(TDOUBLE_NUM)
         double data = strtod(tokens[ILC::offset - 1].value.c_str(), nullptr);
@@ -415,7 +466,7 @@ END_PRODUCTION
 BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_CHAR_ARRAY)
     static auto composer = get_composer();
     REQUIRE_TERMINAL(TCHAR_ARRAY)
-    composer->push<zen::types::heap::string*>(zen::types::heap::string::make(tokens[ILC::offset-1].value),"string");
+    composer->push<zen::types::heap::string*>(zen::types::heap::string::make(tokens[ILC::offset - 1].value), "string");
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_NOT_VAL)
@@ -441,7 +492,8 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_LIST)
     do
     {
         REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
-    } while (TRY_REQUIRE_TERMINAL(TCOMMA));
+    }
+    while (TRY_REQUIRE_TERMINAL(TCOMMA));
     REQUIRE_TERMINAL_CALLBACK(TBRACKETS_CLOSE, EXPECTED("]"))
 END_PRODUCTION
 
@@ -456,7 +508,8 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_ID)
     try
     {
         composer->push(parser::id);
-    } catch (const zen::exceptions::semantic_error & e)
+    }
+    catch (const zen::exceptions::semantic_error& e)
     {
         if (not pragma_ignore_missing_symbols)
             throw;
@@ -472,7 +525,8 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_BOOLEAN)
     {
         REQUIRE_TERMINAL(TKEYWORD_FALSE)
         composer->push<bool>(false, "bool");
-    } else
+    }
+    else
     {
         composer->push<bool>(true, "bool");
     }
@@ -483,7 +537,8 @@ BEGIN_PRODUCTION(PRODUCTION_NGENERIC)
     do
     {
         REQUIRE_NON_TERMINAL(NTYPE)
-    } while (TRY_REQUIRE_TERMINAL(TCOMMA));
+    }
+    while (TRY_REQUIRE_TERMINAL(TCOMMA));
     REQUIRE_TERMINAL(TGREATER)
 END_PRODUCTION
 
@@ -492,9 +547,11 @@ BEGIN_PRODUCTION(PRODUCTION_NTYPE)
     {
         ROLLBACK_PRODUCTION()
     }
-    parser::type += tokens[ILC::offset-1].value;
+    parser::type += tokens[ILC::offset - 1].value;
     if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
-    {}
+    {
+        parser::type.clear();
+    }
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVARIABLE_DEFINITION)
@@ -508,9 +565,9 @@ BEGIN_PRODUCTION(PRODUCTION_NVARIABLE_DEFINITION)
     parser::type.clear();
     REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
     composer->set_local(name, parser::type);
-    composer->push(name);
     if (TRY_REQUIRE_TERMINAL(TEQU))
     {
+        composer->push(name);
         ILC::offset--;
         REQUIRE_NON_TERMINAL_CALLBACK(NSUFFIX_ASGN, EXPECTED("ASSIGNMENT"))
     }
@@ -518,8 +575,12 @@ END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NASGN_SUFFIX)
     static auto composer = get_composer();
-    if (not(TRY_REQUIRE_TERMINAL(TEQU) or TRY_REQUIRE_TERMINAL(TPLUS_EQU) or TRY_REQUIRE_TERMINAL(TMINUS_EQU) or
-        TRY_REQUIRE_TERMINAL(TTIMES_EQU) or TRY_REQUIRE_TERMINAL(TSLASH_EQU) or TRY_REQUIRE_TERMINAL(TMINUS_EQU)))
+    if (not(TRY_REQUIRE_TERMINAL(TEQU) or
+        TRY_REQUIRE_TERMINAL(TPLUS_EQU) or
+        TRY_REQUIRE_TERMINAL(TMINUS_EQU) or
+        TRY_REQUIRE_TERMINAL(TTIMES_EQU) or
+        TRY_REQUIRE_TERMINAL(TSLASH_EQU) or
+        TRY_REQUIRE_TERMINAL(TMINUS_EQU)))
     {
         ROLLBACK_PRODUCTION()
     }
@@ -530,24 +591,31 @@ BEGIN_PRODUCTION(PRODUCTION_NASGN_SUFFIX)
         pragma_skip_assignment_because_of_conversion_special_call = false;
 END_PRODUCTION
 
-BEGIN_PRODUCTION(PRODUCTION_NRETURN)
-    REQUIRE_TERMINAL(TKEYWORD_RETURN)
-    if (TRY_REQUIRE_NON_TERMINAL(NVAL))
+BEGIN_PRODUCTION(PRODUCTION_ENDLESS_SUFFIXES)
+    while (TRY_REQUIRE_NON_TERMINAL(NSUFIXED_VAL))
     {
     }
 END_PRODUCTION
 
-BEGIN_PRODUCTION(PRODUCTION_ENDLESS_SUFFIXES)
-    while (TRY_REQUIRE_NON_TERMINAL(NSUFIXED_VAL)){}
-END_PRODUCTION
-
 BEGIN_PRODUCTION(META_PRODUCTION_GLOBAL_STAT)
-    while (TRY_REQUIRE_NON_TERMINAL(NGLOBAL_STAT)){}
+    while (TRY_REQUIRE_NON_TERMINAL(NGLOBAL_STAT))
+    {
+    }
 END_PRODUCTION
 
-BEGIN_PRODUCTION(PRODUCTION_NSTAT_FROM_VAL_or_ASGN_or_OR_or_AND)
-    REQUIRE_NON_TERMINAL(NVAL)
-    while (TRY_REQUIRE_NON_TERMINAL(NSUFFIX_ASGN)){}
+BEGIN_PRODUCTION(PRODUCTION_NSTAT_FROM_ASGN)
+    static auto composer = get_composer();
+    REQUIRE_NON_TERMINAL(NID)
+    if (TRY_REQUIRE_TERMINAL(TEQU))
+    {
+        composer->push(parser::id);
+        ILC::offset--;
+        REQUIRE_NON_TERMINAL(NSUFFIX_ASGN)
+    }
+    else
+    {
+        ROLLBACK_PRODUCTION()
+    }
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NSINGLE_VAL)
@@ -565,11 +633,11 @@ BEGIN_PRODUCTION(PRODUCTION_NID)
     {
         if (TRY_REQUIRE_TERMINAL(TTIMES))
         {
-            parser::id += "."  + tokens[ILC::offset - 1].value;
+            parser::id += "." + tokens[ILC::offset - 1].value;
             break;
         }
         REQUIRE_TERMINAL_CALLBACK(TID, EXPECTED("identifier"))
-        parser::id += "."  + tokens[ILC::offset - 1].value;
+        parser::id += "." + tokens[ILC::offset - 1].value;
     }
 END_PRODUCTION
 
@@ -590,10 +658,6 @@ BEGIN_SYMBOL_BINDING(NSUFFIX_ASGN)
             PRODUCTION_NASGN_SUFFIX()
         END_SYMBOL_BINDING
 
-BEGIN_SYMBOL_BINDING(NRETURN)
-           PRODUCTION_NRETURN()
-        END_SYMBOL_BINDING
-
 BEGIN_SYMBOL_BINDING(NID)
            PRODUCTION_NID()
         END_SYMBOL_BINDING
@@ -606,9 +670,9 @@ BEGIN_SYMBOL_BINDING(NGENERIC)
            PRODUCTION_NGENERIC()
         END_SYMBOL_BINDING
 
-// BEGIN_SYMBOL_BINDING(NVARIABLE_DEFINITION)
-//             PRODUCTION_NVARIABLE_DEFINITION()
-//         END_SYMBOL_BINDING
+    // BEGIN_SYMBOL_BINDING(NVARIABLE_DEFINITION)
+    //             PRODUCTION_NVARIABLE_DEFINITION()
+    //         END_SYMBOL_BINDING
 
 BEGIN_SYMBOL_BINDING(NSUFFIX_FUNCTION_CALL)
             PRODUCTION_NSUFFIX_FUNCTION_CALL()
@@ -619,7 +683,7 @@ BEGIN_SYMBOL_BINDING(NSUFFIX_FUNCTION_DEFINITION)
 END_SYMBOL_BINDING
 
 BEGIN_SYMBOL_BINDING(NGLOBAL_STAT)
-            (PRODUCTION_NID() and PRODUCTION_NFUNCTION_SUFFIX()) or
+        (PRODUCTION_NID() and PRODUCTION_NFUNCTION_SUFFIX()) or
             PRODUCTION_NUSING_STAT() or
             PRODUCTION_NCLASS()
         END_SYMBOL_BINDING
@@ -628,8 +692,8 @@ BEGIN_SYMBOL_BINDING(NSTAT)
             PRODUCTION_NVARIABLE_DEFINITION() or
             PRODUCTION_NIF() or
             PRODUCTION_NFOR() or
-            PRODUCTION_NWHILE()
-            // or  PRODUCTION_NSTAT_FROM_VAL_or_ASGN_or_OR_or_AND()
+            PRODUCTION_NWHILE() or
+            PRODUCTION_NSTAT_FROM_ASGN()
         END_SYMBOL_BINDING
 
 BEGIN_SYMBOL_BINDING(NVAL)
