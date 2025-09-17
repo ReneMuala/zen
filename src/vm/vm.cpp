@@ -77,7 +77,7 @@ break;
 
 #define KAIZEN_CONVERSION_FOR_TYPE(T) \
 case ( T ## _to_i64):\
-*address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack);\
+*address<i64>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack);\
 i += 2;\
 break;\
 case (T ## _to_f64):\
@@ -114,13 +114,13 @@ break;
 
 #define KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(T) \
 case write_ ## T: \
-fwrite(address<T>(this->code[i + 2], stack), sizeof(T), 1, reinterpret_cast<FILE*>(*address<i64>(this->code[i + 2], stack))); \
+fwrite(address<T>(this->code[i + 1], stack), sizeof(T), 1, reinterpret_cast<FILE*>(*address<i64>(this->code[i + 2], stack))); \
 i += 2;\
 break;
 
 #define KAIZEN_IO_READ_FOR_SCALAR_TYPE(T) \
 case read_ ## T: \
-fread(address<T>(this->code[i + 2], stack), sizeof(T), 1, reinterpret_cast<FILE*>(*address<i64>(this->code[i + 2], stack)));\
+fread(address<T>(this->code[i + 1], stack), sizeof(T), 1, reinterpret_cast<FILE*>(*address<i64>(this->code[i + 2], stack)));\
 i += 2;\
 break;
 
@@ -288,7 +288,7 @@ void zen::vm::run(stack& stack, const i64& entry_point)
             break;
         case allocate:
             *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(malloc(
-                *address<boolean>(this->code[i + 2], stack)));
+                *address<i64>(this->code[i + 2], stack)));
             i += 2;
             break;
         case deallocate:
@@ -297,7 +297,7 @@ void zen::vm::run(stack& stack, const i64& entry_point)
             break;
         case reallocate:
             *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(realloc(reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)),
-                *address<boolean>(this->code[i + 2], stack)));
+                *address<i64>(this->code[i + 2], stack)));
             i += 2;
             break;
         case copy:
