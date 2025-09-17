@@ -3,6 +3,7 @@
 //
 #include "lexer/lexer_tests.hpp"
 #include "parser/parser_tests.hpp"
+#include "composer/composer_tests.hpp"
 #include "parser/parser.hpp"
 std::vector<zen::token> tokens;
 

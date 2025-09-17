@@ -14,18 +14,18 @@ namespace zen
 {
     composer::value composer::vm::composer::top()
     {
-        if (stack.empty())
+        if (_stack.empty())
         {
             throw exceptions::semantic_error(fmt::format(
                                                  "value expected",
-                                                 __FUNCTION__, stack.size()), ilc_offset);
+                                                 __FUNCTION__, _stack.size()), _ilc_offset);
         }
-        return stack.top();
+        return _stack.top();
     }
 
     void composer::vm::composer::push(const value& v)
     {
-        stack.push(v);
+        _stack.push(v);
     }
 
     void composer::vm::composer::reset()
@@ -152,7 +152,7 @@ namespace zen
             return types.at(name);
         }
         throw exceptions::semantic_error(fmt::format(
-                                             "no such type \"{}\"", name), ilc_offset);
+                                             "no such type \"{}\"", name), _ilc_offset);
     }
 
     void composer::vm::composer::bake()
@@ -166,72 +166,72 @@ namespace zen
                 const auto& _code = code[i];
                 if (_code == most)
                 {
-                    fmt::print("most {} ", code[i + 1]);
+                    fmt::print("most, {}, ", code[i + 1]);
                     i += 1;
                 }
                 else if (_code == modify)
                 {
-                    fmt::print("modify {} {} ", code[i + 1], code[i + 2]);
+                    fmt::print("modify, {}, {}, ", code[i + 1], code[i + 2]);
                     i += 2;
                 }
                 else if (_code == zen::call)
                 {
-                    fmt::print("call {} ", code[i + 1]);
+                    fmt::print("call, {}, ", code[i + 1]);
                     i += 1;
                 }
                 else if (_code == add_i32 || _code == add_i64 || _code == add_f64 || _code == add_i8 || _code ==
                     add_i16)
                 {
-                    fmt::print("add {} {} {} ", code[i + 1], code[i + 2], code[i + 3]);
+                    fmt::print("add, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
                     i += 3;
                 }
                 else if (_code == sub_i64 || _code == sub_i32 || _code == sub_f64 || _code == sub_i8 || _code ==
                     sub_i16)
                 {
-                    fmt::print("sub {} {} {} ", code[i + 1], code[i + 2], code[i + 3]);
+                    fmt::print("sub, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
                     i += 3;
                 }
                 else if (_code == mul_i32 || _code == mul_i64 || _code == mul_f64 || _code == mul_i8 || _code ==
                     mul_i16)
                 {
-                    fmt::print("mul {} {} {} ", code[i + 1], code[i + 2], code[i + 3]);
+                    fmt::print("mul, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
                     i += 3;
                 }
                 else if (_code == div_i32 || _code == div_i64 || _code == div_f64 || _code == div_i8 || _code ==
                     div_i16)
                 {
-                    fmt::print("div {} {} {} ", code[i + 1], code[i + 2], code[i + 3]);
+                    fmt::print("div, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
                     i += 3;
                 }
                 else if (_code >= push_i8 && _code <= push_boolean)
                 {
-                    fmt::print("push {} ", code[i + 1]);
+                    fmt::print("push, {}, ", code[i + 1]);
                     i += 1;
                 }
                 else if (_code >= i8_to_i64 && _code <= f64_to_boolean)
                 {
-                    fmt::print("cp {} {} ", code[i + 1], code[i + 2]);
+                    fmt::print("cp, {}, {}, ", code[i + 1], code[i + 2]);
                     i += 2;
                 }
                 else if (_code == write_str)
                 {
-                    fmt::print("write {} {} ", code[i + 1], code[i + 2]);
+                    fmt::print("write, {}, {}, ", code[i + 1], code[i + 2]);
                     i += 2;
                 }
                 else if (_code >= write_i8 && _code <= write_f64)
                 {
-                    fmt::print("write {} ", code[i + 1]);
+                    fmt::print("write, {}, ", code[i + 1]);
                     i += 1;
                 }
                 else if (_code >= read_i8 && _code <= read_f64)
                 {
-                    fmt::print("read {} ", code[i + 1]);
+                    fmt::print("read, {}, ", code[i + 1]);
                     i += 1;
                 }
                 else if (_code == ret)
-                    fmt::print("ret ");
+                    fmt::print("ret, ");
                 else if (_code == hlt)
-                    fmt::print("hlt ");
+                    fmt::print("hlt, ");
                 else
                     std::cout << _code << ' ';
                 if (_code == zen::ret || _code == zen::hlt) break;
@@ -242,11 +242,11 @@ namespace zen
 
     void composer::vm::composer::assign()
     {
-        if (stack.size() < 2)
+        if (_stack.size() < 2)
         {
             throw exceptions::semantic_error(fmt::format(
                                                  "<KAIZEN-INTERNAL-API> Cannot compose operation {} because stack size {} is below expected",
-                                                 __FUNCTION__, stack.size()), ilc_offset);
+                                                 __FUNCTION__, _stack.size()), _ilc_offset);
         }
         const value rhs = top();
         pop();
@@ -254,7 +254,7 @@ namespace zen
         pop();
         if (lhs.kind == value::constant or lhs.kind == value::temporary)
         {
-            throw exceptions::semantic_error("cannot assign value to a constant or temporary value", ilc_offset,
+            throw exceptions::semantic_error("cannot assign value to a constant or temporary value", _ilc_offset,
                                              rhs.kind == value::variable
                                                  ? "please consider changing operands order from x = y to y = x"
                                                  : "");
@@ -262,7 +262,7 @@ namespace zen
 
         if (lhs.is("unit"))
         {
-            throw exceptions::semantic_error("cannot return values from unit function", ilc_offset,
+            throw exceptions::semantic_error("cannot return values from unit function", _ilc_offset,
                                              fmt::format("please consider changing the return type of \"{}\" to {}",
                                                          scope.function_name, rhs.type->name));
         }
@@ -284,7 +284,7 @@ namespace zen
         else
             throw exceptions::semantic_error(fmt::format(
                                                  "cannot assign {} to {}", rhs.type->name,
-                                                 lhs.type->name), ilc_offset,
+                                                 lhs.type->name), _ilc_offset,
                                              fmt::format(
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
@@ -311,7 +311,7 @@ namespace zen
         std::pair<i64, std::shared_ptr<const type>> item = {0, val.type};
         for (int i = 1; i < tokens.size(); ++i)
         {
-            const auto [fst, snd] = item.second->get_field(tokens[i], ilc_offset);
+            const auto [fst, snd] = item.second->get_field(tokens[i], _ilc_offset);
             item.first += fst;
             item.second = snd;
         }
@@ -341,7 +341,7 @@ namespace zen
     {
         std::vector<std::string> tokens = split_name(name);
         if (tokens.empty())
-            throw exceptions::semantic_error(fmt::format("invalid name '{}'", name), ilc_offset);
+            throw exceptions::semantic_error(fmt::format("invalid name '{}'", name), _ilc_offset);
 
         if (const auto location = scope.locals.find(tokens.front()); location != scope.locals.end())
             _push_variable(tokens, location);
@@ -353,7 +353,7 @@ namespace zen
             _push_temporary_value(name);
         else
             throw exceptions::semantic_error(fmt::format(
-                                                 "no such symbol {}", name), ilc_offset,
+                                                 "no such symbol {}", name), _ilc_offset,
                                              fmt::format(
                                                  "please define it in the respective scope. Eg. {0}: T = V // with T & V being it's type and value respectively.",
                                                  name));
@@ -385,10 +385,10 @@ namespace zen
 
     void composer::vm::composer::plus()
     {
-        if (stack.size() < 2)
+        if (_stack.size() < 2)
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
-                __FUNCTION__, stack.size()));
+                __FUNCTION__, _stack.size()));
         const value rhs = top();
         pop();
         const value lhs = top();
@@ -399,13 +399,13 @@ namespace zen
             KAIZEN_IF_ARITHMETICS_CHAIN(add)
             else
                 throw exceptions::semantic_error(fmt::format(
-                                                     "cannot sum type \"{}\"", lhs.type->name), ilc_offset);
+                                                     "cannot sum type \"{}\"", lhs.type->name), _ilc_offset);
         }
         else
         {
             throw exceptions::semantic_error(fmt::format(
                                                  "cannot sum {} with {}", lhs.type->name,
-                                                 rhs.type->name), ilc_offset,
+                                                 rhs.type->name), _ilc_offset,
                                              fmt::format(
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
@@ -417,10 +417,10 @@ namespace zen
 
     void composer::vm::composer::minus()
     {
-        if (stack.size() < 2)
+        if (_stack.size() < 2)
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
-                __FUNCTION__, stack.size()));
+                __FUNCTION__, _stack.size()));
         const value rhs = top();
         pop();
         const value lhs = top();
@@ -431,13 +431,13 @@ namespace zen
             KAIZEN_IF_ARITHMETICS_CHAIN(sub)
             else
                 throw exceptions::semantic_error(fmt::format(
-                                                     "cannot subtract type \"{}\"", lhs.type->name), ilc_offset);
+                                                     "cannot subtract type \"{}\"", lhs.type->name), _ilc_offset);
         }
         else
         {
             throw exceptions::semantic_error(fmt::format(
                                                  "cannot subtract {} with {}", lhs.type->name,
-                                                 rhs.type->name), ilc_offset,
+                                                 rhs.type->name), _ilc_offset,
                                              fmt::format(
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
@@ -449,10 +449,10 @@ namespace zen
 
     void composer::vm::composer::times()
     {
-        if (stack.size() < 2)
+        if (_stack.size() < 2)
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
-                __FUNCTION__, stack.size()));
+                __FUNCTION__, _stack.size()));
         const value rhs = top();
         pop();
         const value lhs = top();
@@ -463,13 +463,13 @@ namespace zen
             KAIZEN_IF_ARITHMETICS_CHAIN(mul)
             else
                 throw exceptions::semantic_error(fmt::format(
-                                                     "cannot multiply type \"{}\"", lhs.type->name), ilc_offset);
+                                                     "cannot multiply type \"{}\"", lhs.type->name), _ilc_offset);
         }
         else
         {
             throw exceptions::semantic_error(fmt::format(
                                                  "cannot multiply {} with {}", lhs.type->name,
-                                                 rhs.type->name), ilc_offset,
+                                                 rhs.type->name), _ilc_offset,
                                              fmt::format(
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
@@ -481,10 +481,10 @@ namespace zen
 
     void composer::vm::composer::slash()
     {
-        if (stack.size() < 2)
+        if (_stack.size() < 2)
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
-                __FUNCTION__, stack.size()));
+                __FUNCTION__, _stack.size()));
         const value rhs = top();
         pop();
         const value lhs = top();
@@ -495,13 +495,13 @@ namespace zen
             KAIZEN_IF_ARITHMETICS_CHAIN(div)
             else
                 throw exceptions::semantic_error(fmt::format(
-                                                     "cannot divide type \"{}\"", lhs.type->name), ilc_offset);
+                                                     "cannot divide type \"{}\"", lhs.type->name), _ilc_offset);
         }
         else
         {
             throw exceptions::semantic_error(fmt::format(
                                                  "cannot divide {} with {}", lhs.type->name,
-                                                 rhs.type->name), ilc_offset,
+                                                 rhs.type->name), _ilc_offset,
                                              fmt::format(
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
@@ -513,10 +513,10 @@ namespace zen
 
     void composer::vm::composer::modulo()
     {
-        if (stack.size() < 2)
+        if (_stack.size() < 2)
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
-                __FUNCTION__, stack.size()));
+                __FUNCTION__, _stack.size()));
         const value rhs = top();
         pop();
         const value lhs = top();
@@ -529,13 +529,13 @@ namespace zen
                 throw exceptions::semantic_error(fmt::format(
                                                      "cannot compute modulo type \"{}\"", lhs.type->name,
                                                      "please consider casting operands to integers (byte, short, int, long) if applicable"),
-                                                 ilc_offset);
+                                                 _ilc_offset);
         }
         else
         {
             throw exceptions::semantic_error(fmt::format(
                                                  "cannot compute modulo of {} with {}", lhs.type->name,
-                                                 rhs.type->name), ilc_offset,
+                                                 rhs.type->name), _ilc_offset,
                                              fmt::format(
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
@@ -548,13 +548,13 @@ namespace zen
 
 #define KAIZEN_CASTER_MAP_FOR(T)\
         {\
-        {"byte", T##_to_i8},\
-        {"bool", T##_to_i8},\
-        {"short", T##_to_i16},\
-        {"int", T##_to_i32},\
-        {"long", T##_to_i64},\
-        {"float", T##_to_f32},\
-        {"double", T##_to_f64},\
+        {"byte", i8_to_##T},\
+        {"bool", i8_to_##T},\
+        {"short", i16_to_##T},\
+        {"int", i32_to_##T},\
+        {"long", i64_to_##T},\
+        {"float", f32_to_##T},\
+        {"double", f64_to_##T},\
         }
 
     std::optional<composer::value> composer::vm::composer::_push_calle_return_value(const signature& sig)
@@ -616,7 +616,7 @@ namespace zen
                 throw exceptions::semantic_error(fmt::format(
                                                      "cannot pass {} argument to {} parameter in {} place at call",
                                                      value.type->name,
-                                                     param_type->name, i + 1), ilc_offset,
+                                                     param_type->name, i + 1), _ilc_offset,
                                                  fmt::format(
                                                      "please consider using type casting. Eg. {}(y) // with y: {}, if applicable.",
                                                      param_type->name, value.type->name));
@@ -626,17 +626,17 @@ namespace zen
 
     composer::call_result composer::vm::composer::_call_caster(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::unordered_map<std::string, i64>>::iterator & caster_set)
     {
-        if (stack.size() < 2)
+        if (_stack.size() < 2)
         {
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
-                __FUNCTION__, stack.size()));
+                __FUNCTION__, _stack.size()));
         }
 
         if (args_count != 1 and args_count != -1)
         {
             throw exceptions::semantic_error(fmt::format(
-                                                 "wrong number of arguments for caster of {}", name), ilc_offset,
+                                                 "wrong number of arguments for caster of {}", name), _ilc_offset,
                                              fmt::format(
                                                  "please consider using multiple instructions when converting multiple values.\nEg. v = {0}(w) x = {0}(y)",
                                                  name));
@@ -650,11 +650,11 @@ namespace zen
             {
                 push(get_type(name));
             }
-            else if (stack.empty())
+            else if (_stack.empty())
             {
                 throw exceptions::semantic_error(fmt::format(
                                                      "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
-                                                     __FUNCTION__, stack.size()), ilc_offset);
+                                                     __FUNCTION__, _stack.size()), _ilc_offset);
             }
         }
         const value lhs = top();
@@ -677,14 +677,14 @@ namespace zen
             {
                 throw exceptions::semantic_error(fmt::format(
                                                      "cannot cast from {} to {}", rhs.type->name, name),
-                                                 ilc_offset);
+                                                 _ilc_offset);
             }
         }
         else
         {
             throw exceptions::semantic_error(fmt::format(
                                                  "cannot cast from {} to {} using {} caster", rhs.type->name,
-                                                 lhs.type->name, name), ilc_offset,
+                                                 lhs.type->name, name), _ilc_offset,
                                              fmt::format("please consider using a {} caster if applicable",
                                                          lhs.type->name));
         }
@@ -695,10 +695,10 @@ namespace zen
         const i8 abs_args_count = abs(args_count);
         const i64& addr = std::get<i64>(func_it->second);
         const signature& sig = std::get<signature>(func_it->second);
-        if (stack.size() < abs_args_count + 1 || abs_args_count != sig.parameters.size())
+        if (_stack.size() < abs_args_count + 1 || abs_args_count != sig.parameters.size())
         {
             throw exceptions::semantic_error(fmt::format(
-                                                 "wrong number of arguments for \"{}\"", name), ilc_offset);
+                                                 "wrong number of arguments for \"{}\"", name), _ilc_offset);
         }
         // if (args_count < 0) // when assigning, copy the value directly to lhs
         // {
@@ -720,10 +720,10 @@ namespace zen
 
     composer::call_result composer::vm::composer::_call_instruction_write_str(const std::string& name, const i8& args_count)
     {
-        if (stack.size() < 3 or args_count != 3)
+        if (_stack.size() < 3 or args_count != 3)
         {
             throw exceptions::semantic_error(fmt::format(
-                                                 "wrong number of arguments for <native>\"{}\" 3 expected", name), ilc_offset);
+                                                 "wrong number of arguments for <native>\"{}\" 3 expected", name), _ilc_offset);
         }
         std::stack<value> args;
         for (int i = 0 ; i < args_count; i++)
@@ -744,10 +744,10 @@ namespace zen
 
     composer::call_result composer::vm::composer::_call_instruction(const zen::instruction& name, const i8& args_count, const i8& expected_args_count)
     {
-        if (stack.size() < expected_args_count or args_count != expected_args_count)
+        if (_stack.size() < expected_args_count or args_count != expected_args_count)
         {
             throw exceptions::semantic_error(fmt::format(
-                                                 "wrong number of arguments for <native>\"{}\" 3 expected", static_cast<i32>(name)), ilc_offset);
+                                                 "wrong number of arguments for <native>\"{}\" 3 expected", static_cast<i32>(name)), _ilc_offset);
         }
         std::stack<value> args;
         for (int i = 0 ; i < args_count; i++)
@@ -795,12 +795,12 @@ namespace zen
         {
             return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 1);
         }
-        throw exceptions::semantic_error(fmt::format("function \"{}\" was not found", name), ilc_offset);
+        throw exceptions::semantic_error(fmt::format("function \"{}\" was not found", name), _ilc_offset);
     }
 
     void composer::vm::composer::push(const std::shared_ptr<const type>& type)
     {
-        stack.emplace(type, scope.local_most_size, value::temporary);
+        _stack.emplace(type, scope.local_most_size, value::temporary);
         code.push_back(most);
         code.push_back(-type->get_size());
         scope.local_most_size += type->get_size();
@@ -808,6 +808,6 @@ namespace zen
 
     void composer::vm::composer::pop()
     {
-        stack.pop();
+        _stack.pop();
     }
 } // zen

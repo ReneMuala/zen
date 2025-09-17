@@ -468,7 +468,7 @@ return 0;
         composer->times(); // most x
         composer->assign();
         composer->end();
-        // composer->bake();
+        composer->bake();
     }
     // #define  NATIVE
 
@@ -518,9 +518,14 @@ roo(a: int, b: float, c: byte, d: long, e: short, f: double) = short{
     x: int = 1
     y: int = 2
     x = y
+    z: short = short(3)
+    z = short(4)
     short(a + int(b))
 }
 
+test_asgn(y: int) = {
+    x: int = int(0f)
+}
 )");
 
     zen::lexer lexer(stream0);

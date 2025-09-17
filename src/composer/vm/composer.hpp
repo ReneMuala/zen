@@ -12,9 +12,9 @@
 #include "utils/utils.hpp"
 
 namespace zen::composer::vm {
-class composer : zen::composer::composer
+class composer : public zen::composer::composer
 {
-protected:
+public:
     std::shared_ptr<const type>& get_type(const std::string& name) override;
     std::unordered_map<std::string,std::tuple<signature, i64>> functions;
     std::vector<i64> code;
@@ -42,7 +42,6 @@ protected:
     } scope;
     value top();
     void push(const value&);
-public:
     void reset() override;
     composer(int & ilc_offset);
     ~composer() override = default;

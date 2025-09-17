@@ -113,19 +113,19 @@ namespace zen::composer
     };
 
 class composer {
-protected:
-    int & ilc_offset;
-    utils::constant_pool pool;
-    std::stack<value> stack;
+public:
+    int & _ilc_offset;
+    utils::constant_pool _pool;
+    std::stack<value> _stack;
     virtual std::shared_ptr<const type>& get_type(const std::string& name) = 0;
     virtual void push(const std::shared_ptr<const type>& type) = 0;
-    public:
+
     virtual void reset()
     {
-        pool.data.clear();
-        while (not stack.empty()) stack.pop();
+        _pool.data.clear();
+        while (not _stack.empty()) _stack.pop();
     }
-    explicit composer(int & ilc_offset): ilc_offset(ilc_offset) {}
+    explicit composer(int & ilc_offset): _ilc_offset(ilc_offset) {}
     virtual ~composer() = default;
 
     // virtual void begin_generic_context() = 0;
@@ -154,11 +154,11 @@ protected:
     {
         auto t = get_type(type);
         if constexpr (std::is_same_v<native, value>)
-            stack.push(value(t, data.address));
+            _stack.push(value(t, data.address));
         else
         {
-            const i64 address = (i64)(pool.get<native>(data).get());
-            stack.emplace(t, address, value::constant);
+            const i64 address = (i64)(_pool.get<native>(data).get());
+            _stack.emplace(t, address, value::constant);
         }
     }
 
