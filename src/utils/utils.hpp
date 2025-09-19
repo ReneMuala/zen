@@ -21,8 +21,8 @@ namespace zen::utils
         type* data = nullptr;
 
     public:
+        explicit raii(bool test, void* d) : data((type*)d) {}
         size_t type_hash = typeid(void).hash_code();
-
         explicit raii(auto value): type_hash(typeid(decltype(value)).hash_code())
         {
             this->data = malloc(sizeof(decltype(value)));
@@ -91,7 +91,15 @@ namespace zen::utils
             else
                 key += std::to_string(value);
             if (!data.contains(key))
-                data.emplace(key, std::move(raii<>(value)));
+            {
+                if constexpr (std::is_pointer_v<type>)
+                {
+                    data.emplace(key, std::move(raii<>(true, (void*)value)));
+                } else
+                {
+                    data.emplace(key, std::move(raii<>(value)));
+                }
+            }
             return data.find(key)->second;
         }
     };

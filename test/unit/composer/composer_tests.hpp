@@ -20,7 +20,7 @@ TEST(composer_unit, write_string)
     composer->push("fd");
     composer->call(std::to_string(write_str), 3);
     composer->end();
-    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,modify, -8, 8, write_str, -8, -8, -16, most, 16, ret}));
+    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,walk, -8, 8, write_str, -8, -8, -16, most, 16, ret}));
 }
 
 TEST(composer_unit, print_string)
@@ -45,7 +45,7 @@ TEST(composer_unit, print_string)
     composer->call("write_string", 2);
     composer->end();
     auto _p = (i64)composer->_pool.get<i64>(reinterpret_cast<i64>(stdout)).get();
-    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,modify, -8, 8, write_str, -8, -8, -16, most, 16, ret, push_i64, _p, push_i64, -8, call, 1, most, 8, ret}));
+    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,walk, -8, 8, write_str, -8, -8, -16, most, 16, ret, push_i64, _p, push_i64, -8, call, 1, most, 8, ret}));
 }
 
 TEST(composer_unit, print_string_2)
@@ -72,12 +72,12 @@ TEST(composer_unit, print_string_2)
 
     composer->begin("print_string_2");
     composer->push("print_string");
-    composer->push<zen::types::heap::string*>(zen::types::heap::string::make("hello world"), "string");
+    composer->push<zen::types::heap::string*>(zen::types::heap::string::from_string("hello world"), "string");
     composer->call("print_string", 1);
     composer->end();
     auto _p = (i64)composer->_pool.get<i64>(reinterpret_cast<i64>(stdout)).get();
-    auto _p2 = (i64)composer->_pool.get<zen::types::heap::string*>(zen::types::heap::string::make("hello world")).get();
-    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,modify, -8, 8, write_str, -8, -8, -16, most, 16, ret, push_i64, _p, push_i64, -8, call, 1, most, 8, ret, push_i64, _p2, call, 11, ret,}));
+    auto _p2 = (i64)composer->_pool.get<zen::types::heap::string*>(zen::types::heap::string::from_string("hello world")).get();
+    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,walk, -8, 8, write_str, -8, -8, -16, most, 16, ret, push_i64, _p, push_i64, -8, call, 1, most, 8, ret, push_i64, _p2, call, 11, ret,}));
 }
 
 TEST(composer_unit, sum_ints_as_doubles)

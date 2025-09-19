@@ -359,7 +359,7 @@ void print_zen_string(void * str)
     {
         printf("%c", *(char*)((char*)str + sizeof(zen::i64) + i++));
     }
-    printf("(%d bytes)", len);
+    // printf("(%d bytes)", len);
 }
 
 int main(int argc, char** argv) try
@@ -389,7 +389,7 @@ return 0;
 
         composer->begin("test::print_string");
         composer->push("print_string");
-        composer->push<zen::types::heap::string*>(zen::types::heap::string::make("hello world"), "string");
+        composer->push<zen::types::heap::string*>(zen::types::heap::string::from_string("hello world"), "string");
         composer->call("print_string", 1);
         composer->end();
 

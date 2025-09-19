@@ -72,7 +72,7 @@ namespace zen::composer
         {
             if (offset)
             {
-                code.push_back(zen::modify);
+                code.push_back(zen::walk);
                 code.push_back(address(most_size));
                 code.push_back(offset);
                 offset = 0;

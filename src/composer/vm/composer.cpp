@@ -169,7 +169,7 @@ namespace zen
                     fmt::print("most, {}, ", code[i + 1]);
                     i += 1;
                 }
-                else if (_code == modify)
+                else if (_code == walk)
                 {
                     fmt::print("modify, {}, {}, ", code[i + 1], code[i + 2]);
                     i += 2;

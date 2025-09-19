@@ -113,7 +113,7 @@ namespace zen
         DECL_KAIZEN_IO_READ_FOR_TYPE(i64),
         DECL_KAIZEN_IO_READ_FOR_TYPE(f32),
         DECL_KAIZEN_IO_READ_FOR_TYPE(f64),
-        // DECL_KAIZEN_IO_READ_FOR_TYPE(str),
+        DECL_KAIZEN_IO_READ_FOR_TYPE(str),
 
         boolean_and,
         boolean_or,
@@ -147,8 +147,8 @@ namespace zen
         reallocate,
         /// shink <pointer:i64>
         copy,
-        /// modify <pointer:i64> <offset:i64> # Modify Stack Top Pointer -> advance pointer in offset bytes.
-        modify,
+        /// walk <pointer:i64> <offset:i64> # Modify Stack Top Pointer -> advance pointer in offset bytes.
+        walk,
         placeholder,
         /// work on attribute fetching for struct fields
         // <...>

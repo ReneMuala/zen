@@ -466,7 +466,7 @@ END_PRODUCTION
 BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_CHAR_ARRAY)
     static auto composer = get_composer();
     REQUIRE_TERMINAL(TCHAR_ARRAY)
-    composer->push<zen::types::heap::string*>(zen::types::heap::string::make(tokens[ILC::offset - 1].value), "string");
+    composer->push<zen::types::heap::string*>(zen::types::heap::string::from_string(tokens[ILC::offset - 1].value), "string");
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_NOT_VAL)

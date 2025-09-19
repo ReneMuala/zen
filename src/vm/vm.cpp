@@ -223,9 +223,30 @@ void zen::vm::run(stack& stack, const i64& entry_point)
         KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(f32)
         KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(f64)
         case write_str:
-            fwrite(reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)), sizeof(char),
-                   *address<i64>(this->code[i + 2], stack),
-                   reinterpret_cast<FILE*>(*address<i64>(this->code[i + 3], stack)));
+            fwrite((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8), 1,
+                   std::min(*address<i64>(this->code[i + 2], stack), *(i64*)(*address<i64>(this->code[i + 1], stack))),
+                   (FILE*)*(i64*)*address<i64>(this->code[i + 3], stack));
+            i += 3;
+            break;
+        case read_str: // ok, this looks messy, but let me explain because its actually simple and safe ;)
+            // before reading, resize the destination to the expected size (if necessary).
+            if (*(i64*)(*address<i64>(this->code[i + 1], stack)) != *address<i64>(this->code[i + 2], stack))
+            {
+                *(i64*)*address<i64>(this->code[i + 1], stack) = *address<i64>(this->code[i + 2], stack);
+                *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = (i64)realloc(
+                    (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8),
+                    *(i64*)*address<i64>(this->code[i + 1], stack));
+            }
+            // read and partially resize destination (updating its size member only)
+            *(i64*)*address<i64>(this->code[i + 1], stack) = (i64)fread(
+                (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8), 1,
+                *(i64*)*address<i64>(this->code[i + 1], stack), (FILE*)*(i64*)*address<i64>(this->code[i + 3], stack));
+            // complete destination resize operation leaving one extra byte for retro compatibility with c strings
+            *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = (i64)realloc(
+                (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8),
+                *(i64*)*address<i64>(this->code[i + 1], stack)+1);
+            // zero that extra byte
+            ((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8))[*(i64*)*address<i64>(this->code[i + 1], stack)] = 0;
             i += 3;
             break;
         KAIZEN_IO_READ_FOR_SCALAR_TYPE(i8)
@@ -234,11 +255,6 @@ void zen::vm::run(stack& stack, const i64& entry_point)
         KAIZEN_IO_READ_FOR_SCALAR_TYPE(i64)
         KAIZEN_IO_READ_FOR_SCALAR_TYPE(f32)
         KAIZEN_IO_READ_FOR_SCALAR_TYPE(f64)
-
-        // case read_str:
-        //     fread(address<str>(this->code[i + 2], stack)->d, sizeof(str), 1, reinterpret_cast<FILE*>(*address<i64>(this->code[i + 2], stack)));
-        //     i += 2;
-        //     break;
 
         case boolean_and:
             *address<boolean>(this->code[i + 1], stack) = *address<boolean>(this->code[i + 2], stack) and *address<
@@ -296,16 +312,20 @@ void zen::vm::run(stack& stack, const i64& entry_point)
             i += 1;
             break;
         case reallocate:
-            *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(realloc(reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)),
+            *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(realloc(
+                reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)),
                 *address<i64>(this->code[i + 2], stack)));
             i += 2;
             break;
         case copy:
-            memcpy(reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)), reinterpret_cast<void*>(*address<i64>(this->code[i + 2], stack)),*address<i64>(this->code[i + 3], stack));
+            memcpy(reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)),
+                   reinterpret_cast<void*>(*address<i64>(this->code[i + 2], stack)),
+                   *address<i64>(this->code[i + 3], stack));
             i += 3;
             break;
-        case modify:
-            *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(reinterpret_cast<char*>(*address<i64>(this->code[i + 1], stack))) +
+        case walk:
+            *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(reinterpret_cast<char*>(*address<i64>(
+                    this->code[i + 1], stack))) +
                 static_cast<i64>(sizeof(this->code[i + 2]));
             i += 2;
             break;

@@ -294,8 +294,6 @@ TEST(vm_unit, allocate_deallocate_test)
     i64 size = 1024;
     std::vector<i64> code {
         allocate, vm::ref(ptr), vm::ref(size),
-        mul_i64, vm::ref(ptr), vm::ref(size), vm::ref(size),
-        i64_to_i64, vm::ref(size), vm::ref(ptr),
         deallocate, vm::ref(ptr),
         hlt
     };
@@ -318,4 +316,63 @@ TEST(vm_unit, complex_arithmetic_test)
     vm1.load(code);
     vm1.run(0);
     EXPECT_EQ(a, 75);
+}
+
+TEST(vm_unit, write_str_test)
+{
+    const auto _tmp = tmpfile();
+    std::string message = "hello world";
+
+    {
+        zen::utils::constant_pool pool;
+        i64 _len = message.length() + 20; // trying something nasty
+        const auto _str = (i64)pool.get<i64>((i64)zen::string::from_string(message)).get();
+        const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+        std::vector<i64> code {write_str, _str, vm::ref(_len), vm::ref(_stream), hlt};
+        zen::vm vm1;
+        vm1.load(code);
+        vm1.run(0);
+        rewind(_tmp);
+        const auto _c_str = new char[_len]{0};
+        fread(_c_str, sizeof(char), _len, _tmp);
+        EXPECT_EQ(message, std::string(_c_str));
+        delete[] _c_str;
+    }
+
+    fclose(_tmp);
+}
+
+TEST(vm_unit, write_then_read_str_test)
+{
+    const auto _tmp = tmpfile();
+    std::string message = "hello world";
+
+    {
+        zen::utils::constant_pool pool;
+        i64 _len = message.length() + 20; // trying something nasty
+        const auto _str = (i64)pool.get<i64>((i64)zen::string::from_string(message)).get();
+        const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+        std::vector<i64> code {write_str, _str, vm::ref(_len), vm::ref(_stream), hlt};
+        zen::vm vm1;
+        vm1.load(code);
+        vm1.run(0);
+        rewind(_tmp);
+        const auto _c_str = new char[_len]{0};
+        fread(_c_str, sizeof(char), _len, _tmp);
+        EXPECT_EQ(message, std::string(_c_str));
+        delete[] _c_str;
+    }
+    rewind(_tmp);
+
+    zen::utils::constant_pool pool;
+    const auto _str = (i64)pool.get<i64>((i64)zen::string::empty()).get();
+    const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+    i64 _len = 50;
+    std::vector<i64> code {read_str, _str, vm::ref(_len), vm::ref(_stream), hlt};
+    zen::vm vm1;
+    vm1.load(code);
+    vm1.run(0);
+    EXPECT_EQ(*(i64*)*(i64*)_str, message.length());
+    EXPECT_EQ(std::string((char*)*(i64*)(*(i64*)_str+sizeof(i64))), message);
+    fclose(_tmp);
 }

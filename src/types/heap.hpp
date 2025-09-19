@@ -21,12 +21,25 @@ namespace zen::types::heap
             }
         }
 
-        static string* make(const std::string & candidate)
+        static string* from_string(const std::string & candidate)
         {
             const auto it  = new string;
             it->len = static_cast<stack::i64>(candidate.length());
             it->data = reinterpret_cast<stack::i64>(strdup(candidate.c_str()));
             return it;
+        }
+
+        static string* from_len(const stack::i64 len)
+        {
+            const auto it  = new string;
+            it->len = len;
+            it->data = reinterpret_cast<stack::i64>(new char[len+1]{0});
+            return it;
+        }
+
+        static string* empty()
+        {
+            return from_len(0);
         }
 
         static void destroy(const string* it)
