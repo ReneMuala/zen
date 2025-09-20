@@ -22,7 +22,7 @@ public:
     struct scope_data
     {
         std::string function_name;
-        i64 local_most_size{};
+        i64 st_point{};
         std::map<std::string, symbol> locals;
         std::optional<value> return_value;
         std::optional<std::string> return_name;
@@ -34,7 +34,7 @@ public:
 
         void clear()
         {
-            local_most_size = 0;
+            st_point = 0;
             locals.clear();
             return_value = std::nullopt;
             return_name = std::nullopt;
@@ -75,7 +75,8 @@ public:
 
 protected:
     void push(const std::shared_ptr<const type>& type) override;
-
+    i64 get_parameters_size(const signature& sig);
+    i64 get_return_size(const signature& sig);
 };
 
 } // zen

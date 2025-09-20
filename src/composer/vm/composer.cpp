@@ -79,22 +79,22 @@ namespace zen
     {
         std::get<signature>(functions.at(scope.function_name)).parameters.emplace_back(get_type(type));
         const auto& t = get_type(type);
-        const i64 address = scope.local_most_size;
-        scope.local_most_size += t->get_size();
+        const i64 address = scope.st_point - /* jump callee IP */static_cast<i64>(sizeof(i64));
+        scope.st_point += t->get_size();
         scope.locals.emplace(name, symbol(name, t, address));
     }
 
     void composer::vm::composer::set_return_type(const std::string& name)
     {
-        if (scope.local_most_size)
+        if (scope.st_point)
         {
             throw std::logic_error("Function returned more than once or return is being set after parameters");
         }
         const auto type = get_type(name);
         if (type->get_size() != 0)
         {
-            scope.return_value.emplace(value(type, scope.local_most_size));
-            scope.local_most_size += type->get_size();
+            scope.return_value.emplace(value(type, scope.st_point - /* jump callee IP */static_cast<i64>(sizeof(i64))));
+            scope.st_point += type->get_size();
         }
         std::get<signature>(functions.at(scope.function_name)).type = type;
     }
@@ -119,10 +119,10 @@ namespace zen
     void composer::vm::composer::set_local(std::string name, const std::string& type)
     {
         const auto& t = get_type(type);
-        const i64 address = scope.local_most_size;
+        const i64 address = scope.st_point;
         code.push_back(zen::most);
         code.push_back(-t->get_size());
-        scope.local_most_size += t->get_size();
+        scope.st_point += t->get_size();
         scope.locals.emplace(name, symbol(name, t, address));
     }
 
@@ -133,13 +133,12 @@ namespace zen
             push(scope.return_name.value());
             return_value();
         }
-        if (auto const return_value = scope.return_value)
+        const auto sig = std::get<signature>(functions.at(scope.function_name));
+        const auto sizes = get_return_size(sig) + get_parameters_size(sig);
+        if (const auto most_delta = scope.st_point - sizes; most_delta > 0)
         {
-            if (const auto most_delta = scope.local_most_size - return_value->type->get_size(); most_delta > 0)
-            {
-                code.push_back(zen::most);
-                code.push_back(most_delta);
-            }
+            code.push_back(zen::most);
+            code.push_back(most_delta);
         }
         code.push_back(zen::ret);
         scope.clear();
@@ -157,7 +156,6 @@ namespace zen
 
     void composer::vm::composer::bake()
     {
-        code.push_back(zen::hlt);
         for (const auto& function : functions)
         {
             std::cout << function.first << std::endl;
@@ -288,11 +286,11 @@ namespace zen
                                              fmt::format(
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
-        code.push_back(lhs.address(scope.local_most_size));
-        code.push_back(rhs.address(scope.local_most_size));
+        code.push_back(lhs.address(scope.st_point));
+        code.push_back(rhs.address(scope.st_point));
     }
 
-    std::vector<std::string> split_name(const std::string &name)
+    std::vector<std::string> split_name(const std::string& name)
     {
         std::vector<std::string> result;
         std::istringstream iss(name);
@@ -305,7 +303,8 @@ namespace zen
         return result;
     }
 
-    void composer::vm::composer::_push_variable(const std::vector<std::string> & tokens, const std::map<std::string, symbol>::iterator& location)
+    void composer::vm::composer::_push_variable(const std::vector<std::string>& tokens,
+                                                const std::map<std::string, symbol>::iterator& location)
     {
         value val = location->second;
         std::pair<i64, std::shared_ptr<const type>> item = {0, val.type};
@@ -321,7 +320,8 @@ namespace zen
         push(val);
     }
 
-    void composer::vm::composer::_push_function(const std::unordered_map<std::string, std::tuple<signature, long long>>::iterator& function)
+    void composer::vm::composer::_push_function(
+        const std::unordered_map<std::string, std::tuple<signature, long long>>::iterator& function)
     {
         long address = std::get<i64>(function->second);
         zen::composer::composer::push(std::move(address), "function");
@@ -410,9 +410,9 @@ namespace zen
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
         }
-        code.push_back(top().address(scope.local_most_size));
-        code.push_back(lhs.address(scope.local_most_size));
-        code.push_back(rhs.address(scope.local_most_size));
+        code.push_back(top().address(scope.st_point));
+        code.push_back(lhs.address(scope.st_point));
+        code.push_back(rhs.address(scope.st_point));
     }
 
     void composer::vm::composer::minus()
@@ -442,9 +442,9 @@ namespace zen
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
         }
-        code.push_back(top().address(scope.local_most_size));
-        code.push_back(lhs.address(scope.local_most_size));
-        code.push_back(rhs.address(scope.local_most_size));
+        code.push_back(top().address(scope.st_point));
+        code.push_back(lhs.address(scope.st_point));
+        code.push_back(rhs.address(scope.st_point));
     }
 
     void composer::vm::composer::times()
@@ -474,9 +474,9 @@ namespace zen
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
         }
-        code.push_back(top().address(scope.local_most_size));
-        code.push_back(lhs.address(scope.local_most_size));
-        code.push_back(rhs.address(scope.local_most_size));
+        code.push_back(top().address(scope.st_point));
+        code.push_back(lhs.address(scope.st_point));
+        code.push_back(rhs.address(scope.st_point));
     }
 
     void composer::vm::composer::slash()
@@ -506,9 +506,9 @@ namespace zen
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
         }
-        code.push_back(top().address(scope.local_most_size));
-        code.push_back(lhs.address(scope.local_most_size));
-        code.push_back(rhs.address(scope.local_most_size));
+        code.push_back(top().address(scope.st_point));
+        code.push_back(lhs.address(scope.st_point));
+        code.push_back(rhs.address(scope.st_point));
     }
 
     void composer::vm::composer::modulo()
@@ -540,9 +540,9 @@ namespace zen
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
         }
-        code.push_back(top().address(scope.local_most_size));
-        code.push_back(lhs.address(scope.local_most_size));
-        code.push_back(rhs.address(scope.local_most_size));
+        code.push_back(top().address(scope.st_point));
+        code.push_back(lhs.address(scope.st_point));
+        code.push_back(rhs.address(scope.st_point));
     }
 
 
@@ -562,10 +562,10 @@ namespace zen
         std::optional<value> result;
         if (sig.type->get_size())
         {
-            const i64 address = scope.local_most_size;
+            const i64 address = scope.st_point;
             code.push_back(zen::most);
             code.push_back(-sig.type->get_size());
-            scope.local_most_size += sig.type->get_size();
+            scope.st_point += sig.type->get_size();
             return value(sig.type, address, value::temporary);
         }
         return std::nullopt;
@@ -587,29 +587,36 @@ namespace zen
                 if (value.is("byte"))
                 {
                     code.push_back(zen::push_i8);
-                } else if (value.is("bool"))
+                }
+                else if (value.is("bool"))
                 {
                     code.push_back(zen::push_boolean);
-                } else if (value.is("short"))
+                }
+                else if (value.is("short"))
                 {
                     code.push_back(zen::push_i16);
-                } else if (value.is("int"))
+                }
+                else if (value.is("int"))
                 {
                     code.push_back(zen::push_i32);
-                } else if (value.is("long"))
-                {
-                    code.push_back(zen::push_i64);
-                } else if (value.is("float"))
-                {
-                    code.push_back(zen::push_f32);
-                } else if (value.is("double"))
-                {
-                    code.push_back(zen::push_f64);
-                } else
+                }
+                else if (value.is("long"))
                 {
                     code.push_back(zen::push_i64);
                 }
-                code.push_back(value.address(scope.local_most_size));
+                else if (value.is("float"))
+                {
+                    code.push_back(zen::push_f32);
+                }
+                else if (value.is("double"))
+                {
+                    code.push_back(zen::push_f64);
+                }
+                else
+                {
+                    code.push_back(zen::push_i64);
+                }
+                code.push_back(value.address(scope.st_point));
             }
             else
             {
@@ -624,7 +631,10 @@ namespace zen
         }
     }
 
-    composer::call_result composer::vm::composer::_call_caster(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::unordered_map<std::string, i64>>::iterator & caster_set)
+    composer::call_result composer::vm::composer::_call_caster(const std::string& name, const i8& args_count,
+                                                               const std::unordered_map<
+                                                                   std::string, std::unordered_map<
+                                                                       std::string, i64>>::iterator& caster_set)
     {
         if (_stack.size() < 2)
         {
@@ -665,8 +675,8 @@ namespace zen
             if (const auto caster = (*caster_set).second.find(rhs.type->name); caster != caster_set->second.end())
             {
                 code.push_back((*caster).second);
-                code.push_back(lhs.address(scope.local_most_size));
-                code.push_back(rhs.address(scope.local_most_size));
+                code.push_back(lhs.address(scope.st_point));
+                code.push_back(rhs.address(scope.st_point));
                 if (args_count == -1)
                 {
                     push(lhs);
@@ -690,7 +700,10 @@ namespace zen
         }
     }
 
-    composer::call_result composer::vm::composer::_call_function(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::tuple<signature, long long>>::iterator& func_it)
+    composer::call_result composer::vm::composer::_call_function(const std::string& name, const i8& args_count,
+                                                                 const std::unordered_map<
+                                                                     std::string, std::tuple<
+                                                                         signature, long long>>::iterator& func_it)
     {
         const i8 abs_args_count = abs(args_count);
         const i64& addr = std::get<i64>(func_it->second);
@@ -715,52 +728,62 @@ namespace zen
         }
         code.push_back(zen::call);
         code.push_back(addr);
+        const i64 call_cost = get_parameters_size(sig) + get_return_size(sig);
+        if (call_cost)
+        {
+            code.push_back(zen::most);
+            code.push_back(call_cost);
+        }
         return call_result::result;
     }
 
-    composer::call_result composer::vm::composer::_call_instruction_write_str(const std::string& name, const i8& args_count)
+    composer::call_result composer::vm::composer::_call_instruction_write_str(
+        const std::string& name, const i8& args_count)
     {
         if (_stack.size() < 3 or args_count != 3)
         {
             throw exceptions::semantic_error(fmt::format(
-                                                 "wrong number of arguments for <native>\"{}\" 3 expected", name), _ilc_offset);
+                                                 "wrong number of arguments for <native>\"{}\" 3 expected", name),
+                                             _ilc_offset);
         }
         std::stack<value> args;
-        for (int i = 0 ; i < args_count; i++)
+        for (int i = 0; i < args_count; i++)
         {
             value v = top();
             pop();
-            v.prepare(code, scope.local_most_size);
+            v.prepare(code, scope.st_point);
             args.push(v);
         }
         code.push_back(zen::write_str);
-        for (int i = 0 ; i < args_count; i++)
+        for (int i = 0; i < args_count; i++)
         {
-            code.push_back(args.top().address(scope.local_most_size));
+            code.push_back(args.top().address(scope.st_point));
             args.pop();
         }
         return call_result::result;
     }
 
-    composer::call_result composer::vm::composer::_call_instruction(const zen::instruction& name, const i8& args_count, const i8& expected_args_count)
+    composer::call_result composer::vm::composer::_call_instruction(const zen::instruction& name, const i8& args_count,
+                                                                    const i8& expected_args_count)
     {
         if (_stack.size() < expected_args_count or args_count != expected_args_count)
         {
             throw exceptions::semantic_error(fmt::format(
-                                                 "wrong number of arguments for <native>\"{}\" 3 expected", static_cast<i32>(name)), _ilc_offset);
+                                                 "wrong number of arguments for <native>\"{}\" 3 expected",
+                                                 static_cast<i32>(name)), _ilc_offset);
         }
         std::stack<value> args;
-        for (int i = 0 ; i < args_count; i++)
+        for (int i = 0; i < args_count; i++)
         {
             value v = top();
             pop();
-            v.prepare(code, scope.local_most_size);
+            v.prepare(code, scope.st_point);
             args.push(v);
         }
         code.push_back(name);
-        for (int i = 0 ; i < args_count; i++)
+        for (int i = 0; i < args_count; i++)
         {
-            code.push_back(args.top().address(scope.local_most_size));
+            code.push_back(args.top().address(scope.st_point));
             args.pop();
         }
         return call_result::result;
@@ -800,10 +823,25 @@ namespace zen
 
     void composer::vm::composer::push(const std::shared_ptr<const type>& type)
     {
-        _stack.emplace(type, scope.local_most_size, value::temporary);
+        _stack.emplace(type, scope.st_point, value::temporary);
         code.push_back(most);
         code.push_back(-type->get_size());
-        scope.local_most_size += type->get_size();
+        scope.st_point += type->get_size();
+    }
+
+    i64 composer::vm::composer::get_parameters_size(const signature& sig)
+    {
+        i64 size = 0;
+        for (const auto& param : sig.parameters)
+        {
+            size += param->get_size();
+        }
+        return size;
+    }
+
+    i64 composer::vm::composer::get_return_size(const signature& sig)
+    {
+        return sig.type->get_size();
     }
 
     void composer::vm::composer::pop()

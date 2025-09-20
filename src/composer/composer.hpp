@@ -87,10 +87,10 @@ namespace zen::composer
         {
             return *type == *other.type;
         }
-        [[nodiscard]] i64 address(const i64 & relative_point) const
+        [[nodiscard]] i64 address(const i64 & st_point) const
         {
             if (kind == constant) return _address;
-            return  _address - relative_point;
+            return  _address - st_point;
         }
         explicit value(const std::shared_ptr<const composer::type> & type, const i64 & address, const enum kind & kind = variable) :
             type(type), kind(kind), offset(0), _address(address)
