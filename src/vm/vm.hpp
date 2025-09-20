@@ -106,6 +106,7 @@ namespace zen
         DECL_KAIZEN_IO_WRITE_FOR_TYPE(f32),
         DECL_KAIZEN_IO_WRITE_FOR_TYPE(f64),
         DECL_KAIZEN_IO_WRITE_FOR_TYPE(str),
+        DECL_KAIZEN_IO_WRITE_FOR_TYPE(boolean),
 
         DECL_KAIZEN_IO_READ_FOR_TYPE(i8),
         DECL_KAIZEN_IO_READ_FOR_TYPE(i16),
@@ -114,6 +115,7 @@ namespace zen
         DECL_KAIZEN_IO_READ_FOR_TYPE(f32),
         DECL_KAIZEN_IO_READ_FOR_TYPE(f64),
         DECL_KAIZEN_IO_READ_FOR_TYPE(str),
+        DECL_KAIZEN_IO_READ_FOR_TYPE(boolean),
 
         boolean_and,
         boolean_or,

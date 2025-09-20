@@ -328,7 +328,7 @@ TEST(vm_unit, write_str_test)
         i64 _len = message.length() + 20; // trying something nasty
         const auto _str = (i64)pool.get<i64>((i64)zen::string::from_string(message)).get();
         const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
-        std::vector<i64> code {write_str, _str, vm::ref(_len), vm::ref(_stream), hlt};
+        std::vector<i64> code {write_str, _str, vm::ref(_len), _stream, hlt};
         zen::vm vm1;
         vm1.load(code);
         vm1.run(0);
@@ -352,7 +352,7 @@ TEST(vm_unit, write_then_read_str_test)
         i64 _len = message.length() + 20; // trying something nasty
         const auto _str = (i64)pool.get<i64>((i64)zen::string::from_string(message)).get();
         const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
-        std::vector<i64> code {write_str, _str, vm::ref(_len), vm::ref(_stream), hlt};
+        std::vector<i64> code {write_str, _str, vm::ref(_len), _stream, hlt};
         zen::vm vm1;
         vm1.load(code);
         vm1.run(0);
@@ -368,11 +368,389 @@ TEST(vm_unit, write_then_read_str_test)
     const auto _str = (i64)pool.get<i64>((i64)zen::string::empty()).get();
     const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
     i64 _len = 50;
-    std::vector<i64> code {read_str, _str, vm::ref(_len), vm::ref(_stream), hlt};
+    std::vector<i64> code {read_str, _str, vm::ref(_len), _stream, hlt};
     zen::vm vm1;
     vm1.load(code);
     vm1.run(0);
     EXPECT_EQ(*(i64*)*(i64*)_str, message.length());
     EXPECT_EQ(std::string((char*)*(i64*)(*(i64*)_str+sizeof(i64))), message);
+    fclose(_tmp);
+}
+
+TEST(vm_unit, write_i8_test)
+{
+    const auto _tmp = tmpfile();
+    i8 _i8 = 10;
+
+    {
+        zen::utils::constant_pool pool;
+        const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+        std::vector<i64> code {write_i8, vm::ref(_i8), _stream, hlt};
+        zen::vm vm1;
+        vm1.load(code);
+        vm1.run(0);
+        rewind(_tmp);
+        i8 _i8_2;
+        fread(&_i8_2, sizeof(i8), 1, _tmp);
+        EXPECT_EQ(_i8, _i8_2);
+    }
+
+    fclose(_tmp);
+}
+
+
+TEST(vm_unit, write_then_read_i8_test)
+{
+    const auto _tmp = tmpfile();
+    i8 _i8 = 10;
+
+    {
+        zen::utils::constant_pool pool;
+        const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+        std::vector<i64> code {write_i8, vm::ref(_i8), _stream, hlt};
+        zen::vm vm1;
+        vm1.load(code);
+        vm1.run(0);
+        rewind(_tmp);
+        i8 _i8_2;
+        fread(&_i8_2, sizeof(i8), 1, _tmp);
+        EXPECT_EQ(_i8, _i8_2);
+    }
+    rewind(_tmp);
+
+    zen::utils::constant_pool pool;
+    const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+    i8 _i8_2;
+    std::vector<i64> code {read_i8, vm::ref(_i8_2), _stream, hlt};
+    zen::vm vm1;
+    vm1.load(code);
+    vm1.run(0);
+    rewind(_tmp);
+    EXPECT_EQ(_i8, _i8_2);
+
+    fclose(_tmp);
+}
+
+// Boolean write tests
+TEST(vm_unit, write_boolean_test)
+{
+    const auto _tmp = tmpfile();
+    boolean _boolean = true;
+
+    {
+        zen::utils::constant_pool pool;
+        const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+        std::vector<i64> code {write_boolean, vm::ref(_boolean), _stream, hlt};
+        zen::vm vm1;
+        vm1.load(code);
+        vm1.run(0);
+        rewind(_tmp);
+        boolean _boolean_2;
+        fread(&_boolean_2, sizeof(boolean), 1, _tmp);
+        EXPECT_EQ(_boolean, _boolean_2);
+    }
+
+    fclose(_tmp);
+}
+
+TEST(vm_unit, write_then_read_boolean_test)
+{
+    const auto _tmp = tmpfile();
+    boolean _boolean = false;
+
+    {
+        zen::utils::constant_pool pool;
+        const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+        std::vector<i64> code {write_boolean, vm::ref(_boolean), _stream, hlt};
+        zen::vm vm1;
+        vm1.load(code);
+        vm1.run(0);
+        rewind(_tmp);
+        boolean _boolean_2;
+        fread(&_boolean_2, sizeof(boolean), 1, _tmp);
+        EXPECT_EQ(_boolean, _boolean_2);
+    }
+    rewind(_tmp);
+
+    zen::utils::constant_pool pool;
+    const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+    boolean _boolean_2;
+    std::vector<i64> code {read_boolean, vm::ref(_boolean_2), _stream, hlt};
+    zen::vm vm1;
+    vm1.load(code);
+    vm1.run(0);
+    rewind(_tmp);
+    EXPECT_EQ(_boolean, _boolean_2);
+
+    fclose(_tmp);
+}
+
+// i16 write tests
+TEST(vm_unit, write_i16_test)
+{
+    const auto _tmp = tmpfile();
+    i16 _i16 = 1024;
+
+    {
+        zen::utils::constant_pool pool;
+        const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+        std::vector<i64> code {write_i16, vm::ref(_i16), _stream, hlt};
+        zen::vm vm1;
+        vm1.load(code);
+        vm1.run(0);
+        rewind(_tmp);
+        i16 _i16_2;
+        fread(&_i16_2, sizeof(i16), 1, _tmp);
+        EXPECT_EQ(_i16, _i16_2);
+    }
+
+    fclose(_tmp);
+}
+
+TEST(vm_unit, write_then_read_i16_test)
+{
+    const auto _tmp = tmpfile();
+    i16 _i16 = -512;
+
+    {
+        zen::utils::constant_pool pool;
+        const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+        std::vector<i64> code {write_i16, vm::ref(_i16), _stream, hlt};
+        zen::vm vm1;
+        vm1.load(code);
+        vm1.run(0);
+        rewind(_tmp);
+        i16 _i16_2;
+        fread(&_i16_2, sizeof(i16), 1, _tmp);
+        EXPECT_EQ(_i16, _i16_2);
+    }
+    rewind(_tmp);
+
+    zen::utils::constant_pool pool;
+    const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+    i16 _i16_2;
+    std::vector<i64> code {read_i16, vm::ref(_i16_2), _stream, hlt};
+    zen::vm vm1;
+    vm1.load(code);
+    vm1.run(0);
+    rewind(_tmp);
+    EXPECT_EQ(_i16, _i16_2);
+
+    fclose(_tmp);
+}
+
+// i32 write tests
+TEST(vm_unit, write_i32_test)
+{
+    const auto _tmp = tmpfile();
+    i32 _i32 = 65536;
+
+    {
+        zen::utils::constant_pool pool;
+        const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+        std::vector<i64> code {write_i32, vm::ref(_i32), _stream, hlt};
+        zen::vm vm1;
+        vm1.load(code);
+        vm1.run(0);
+        rewind(_tmp);
+        i32 _i32_2;
+        fread(&_i32_2, sizeof(i32), 1, _tmp);
+        EXPECT_EQ(_i32, _i32_2);
+    }
+
+    fclose(_tmp);
+}
+
+TEST(vm_unit, write_then_read_i32_test)
+{
+    const auto _tmp = tmpfile();
+    i32 _i32 = -1000000;
+
+    {
+        zen::utils::constant_pool pool;
+        const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+        std::vector<i64> code {write_i32, vm::ref(_i32), _stream, hlt};
+        zen::vm vm1;
+        vm1.load(code);
+        vm1.run(0);
+        rewind(_tmp);
+        i32 _i32_2;
+        fread(&_i32_2, sizeof(i32), 1, _tmp);
+        EXPECT_EQ(_i32, _i32_2);
+    }
+    rewind(_tmp);
+
+    zen::utils::constant_pool pool;
+    const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+    i32 _i32_2;
+    std::vector<i64> code {read_i32, vm::ref(_i32_2), _stream, hlt};
+    zen::vm vm1;
+    vm1.load(code);
+    vm1.run(0);
+    rewind(_tmp);
+    EXPECT_EQ(_i32, _i32_2);
+
+    fclose(_tmp);
+}
+
+// i64 write tests
+TEST(vm_unit, write_i64_test)
+{
+    const auto _tmp = tmpfile();
+    i64 _i64 = 4294967296LL;
+
+    {
+        zen::utils::constant_pool pool;
+        const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+        std::vector<i64> code {write_i64, vm::ref(_i64), _stream, hlt};
+        zen::vm vm1;
+        vm1.load(code);
+        vm1.run(0);
+        rewind(_tmp);
+        i64 _i64_2;
+        fread(&_i64_2, sizeof(i64), 1, _tmp);
+        EXPECT_EQ(_i64, _i64_2);
+    }
+
+    fclose(_tmp);
+}
+
+TEST(vm_unit, write_then_read_i64_test)
+{
+    const auto _tmp = tmpfile();
+    i64 _i64 = -9223372036854775807LL;
+
+    {
+        zen::utils::constant_pool pool;
+        const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+        std::vector<i64> code {write_i64, vm::ref(_i64), _stream, hlt};
+        zen::vm vm1;
+        vm1.load(code);
+        vm1.run(0);
+        rewind(_tmp);
+        i64 _i64_2;
+        fread(&_i64_2, sizeof(i64), 1, _tmp);
+        EXPECT_EQ(_i64, _i64_2);
+    }
+    rewind(_tmp);
+
+    zen::utils::constant_pool pool;
+    const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+    i64 _i64_2;
+    std::vector<i64> code {read_i64, vm::ref(_i64_2), _stream, hlt};
+    zen::vm vm1;
+    vm1.load(code);
+    vm1.run(0);
+    rewind(_tmp);
+    EXPECT_EQ(_i64, _i64_2);
+
+    fclose(_tmp);
+}
+
+// f32 write tests
+TEST(vm_unit, write_f32_test)
+{
+    const auto _tmp = tmpfile();
+    f32 _f32 = 3.14159f;
+
+    {
+        zen::utils::constant_pool pool;
+        const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+        std::vector<i64> code {write_f32, vm::ref(_f32), _stream, hlt};
+        zen::vm vm1;
+        vm1.load(code);
+        vm1.run(0);
+        rewind(_tmp);
+        f32 _f32_2;
+        fread(&_f32_2, sizeof(f32), 1, _tmp);
+        EXPECT_FLOAT_EQ(_f32, _f32_2);
+    }
+
+    fclose(_tmp);
+}
+
+TEST(vm_unit, write_then_read_f32_test)
+{
+    const auto _tmp = tmpfile();
+    f32 _f32 = -2.71828f;
+
+    {
+        zen::utils::constant_pool pool;
+        const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+        std::vector<i64> code {write_f32, vm::ref(_f32), _stream, hlt};
+        zen::vm vm1;
+        vm1.load(code);
+        vm1.run(0);
+        rewind(_tmp);
+        f32 _f32_2;
+        fread(&_f32_2, sizeof(f32), 1, _tmp);
+        EXPECT_FLOAT_EQ(_f32, _f32_2);
+    }
+    rewind(_tmp);
+
+    zen::utils::constant_pool pool;
+    const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+    f32 _f32_2;
+    std::vector<i64> code {read_f32, vm::ref(_f32_2), _stream, hlt};
+    zen::vm vm1;
+    vm1.load(code);
+    vm1.run(0);
+    rewind(_tmp);
+    EXPECT_FLOAT_EQ(_f32, _f32_2);
+
+    fclose(_tmp);
+}
+
+// f64 write tests
+TEST(vm_unit, write_f64_test)
+{
+    const auto _tmp = tmpfile();
+    f64 _f64 = 1.41421356237;
+
+    {
+        zen::utils::constant_pool pool;
+        const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+        std::vector<i64> code {write_f64, vm::ref(_f64), _stream, hlt};
+        zen::vm vm1;
+        vm1.load(code);
+        vm1.run(0);
+        rewind(_tmp);
+        f64 _f64_2;
+        fread(&_f64_2, sizeof(f64), 1, _tmp);
+        EXPECT_DOUBLE_EQ(_f64, _f64_2);
+    }
+
+    fclose(_tmp);
+}
+
+TEST(vm_unit, write_then_read_f64_test)
+{
+    const auto _tmp = tmpfile();
+    f64 _f64 = -1.61803398875;
+
+    {
+        zen::utils::constant_pool pool;
+        const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+        std::vector<i64> code {write_f64, vm::ref(_f64), _stream, hlt};
+        zen::vm vm1;
+        vm1.load(code);
+        vm1.run(0);
+        rewind(_tmp);
+        f64 _f64_2;
+        fread(&_f64_2, sizeof(f64), 1, _tmp);
+        EXPECT_DOUBLE_EQ(_f64, _f64_2);
+    }
+    rewind(_tmp);
+
+    zen::utils::constant_pool pool;
+    const auto _stream = (i64)pool.get<i64>((i64)_tmp).get();
+    f64 _f64_2;
+    std::vector<i64> code {read_f64, vm::ref(_f64_2), _stream, hlt};
+    zen::vm vm1;
+    vm1.load(code);
+    vm1.run(0);
+    rewind(_tmp);
+    EXPECT_DOUBLE_EQ(_f64, _f64_2);
+
     fclose(_tmp);
 }
