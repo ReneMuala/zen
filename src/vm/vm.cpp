@@ -138,9 +138,9 @@ bool zen::vm::stack::operator-=(const i64& size)
 {
     negative_stack_size -= size;
     if (negative_stack_size <= 0)
-        return (data = realloc(data, abs(negative_stack_size)));
+        return (data = realloc(data, std::abs(negative_stack_size)));
     fmt::println(stderr, "zen::vm::stack invalid resize: {}", size);
-    negative_stack_size -= abs(size);
+    negative_stack_size -= std::abs(size);
     return false;
 }
 
@@ -148,9 +148,9 @@ bool zen::vm::stack::operator+=(const i64& size)
 {
     negative_stack_size += size;
     if (negative_stack_size <= 0)
-        return (data = realloc(data, abs(negative_stack_size)));
+        return (data = realloc(data, std::abs(negative_stack_size)));
     fmt::println(stderr, "zen::vm::stack stack overflow: {}", size);
-    negative_stack_size -= abs(size);
+    negative_stack_size -= std::abs(size);
     return false;
 }
 
@@ -335,12 +335,9 @@ void zen::vm::run(stack& stack, const i64& entry_point)
         default:
             fmt::println(stderr, "fatal error: unsupported operation {} (zen vm halted at {})", this->code[i], i);
         case hlt:
-            goto __end;
+            return;
         }
     }
-__end:
-    if (not stack.empty())
-        fmt::println(stderr, "fatal error: stack not cleared, {} items remaining", stack.size());
 }
 
 

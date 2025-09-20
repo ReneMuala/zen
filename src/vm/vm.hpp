@@ -167,6 +167,22 @@ namespace zen
             void * operator-(const i64 & size);
             bool operator-=(const i64 & size);
             bool operator+=(const i64 & size);
+            template<typename T>
+            void push(T value)
+            {
+                *this-=sizeof(T);
+                *static_cast<T*>(*this - sizeof(T)) = value;
+            }
+            template<typename T>
+            void pop()
+            {
+                *this+=sizeof(T);
+            }
+            template<typename T>
+            T& top()
+            {
+                return *static_cast<T*>(*this - sizeof(T));
+            }
             ~stack();
             [[nodiscard]] bool empty() const;
             [[nodiscard]] i64 size() const;
