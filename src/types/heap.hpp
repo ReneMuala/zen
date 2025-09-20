@@ -47,7 +47,7 @@ namespace zen::types::heap
             delete it;
         }
 
-        explicit operator const std::string&() const {
+        explicit operator std::string() const {
             const auto _ptr = reinterpret_cast<const char*>(data);
             return std::string(_ptr);
         }
