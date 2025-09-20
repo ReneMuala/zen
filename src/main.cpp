@@ -526,6 +526,8 @@ roo(a: int, b: float, c: byte, d: long, e: short, f: double) = short{
 test_asgn(y: int) = {
     x: int = int(0f)
 }
+add(a: int, b: int, c: int) = int { a + b + c }
+add2(a: int, b: int, c: int) =  int { a + b }
 )");
 
     zen::lexer lexer(stream0);

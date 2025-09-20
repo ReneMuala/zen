@@ -20,7 +20,7 @@ TEST(composer_unit, write_string)
     composer->push("fd");
     composer->call(std::to_string(write_str), 3);
     composer->end();
-    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,walk, -8, 8, write_str, -8, -8, -16, most, 16, ret}));
+    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,walk, -16, 8, write_str, -16, -16, -24, ret}));
 }
 
 TEST(composer_unit, print_string)
@@ -45,7 +45,7 @@ TEST(composer_unit, print_string)
     composer->call("write_string", 2);
     composer->end();
     auto _p = (i64)composer->_pool.get<i64>(reinterpret_cast<i64>(stdout)).get();
-    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,walk, -8, 8, write_str, -8, -8, -16, most, 16, ret, push_i64, _p, push_i64, -8, call, 1, most, 8, ret}));
+    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,walk, -16, 8, write_str, -16, -16, -24, ret, push_i64, _p, push_i64, -16, call, 1, most, 16, ret,}));
 }
 
 TEST(composer_unit, print_string_2)
@@ -77,7 +77,7 @@ TEST(composer_unit, print_string_2)
     composer->end();
     auto _p = (i64)composer->_pool.get<i64>(reinterpret_cast<i64>(stdout)).get();
     auto _p2 = (i64)composer->_pool.get<zen::types::heap::string*>(zen::types::heap::string::from_string("hello world")).get();
-    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,walk, -8, 8, write_str, -8, -8, -16, most, 16, ret, push_i64, _p, push_i64, -8, call, 1, most, 8, ret, push_i64, _p2, call, 11, ret,}));
+    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,walk, -16, 8, write_str, -16, -16, -24, ret, push_i64, _p, push_i64, -16, call, 1, most, 16, ret, push_i64, _p2, call, 9, most, 8, ret,}));
 }
 
 TEST(composer_unit, sum_ints_as_doubles)
@@ -98,7 +98,7 @@ TEST(composer_unit, sum_ints_as_doubles)
     composer->plus();
     composer->return_value();
     composer->end();
-    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,most, -8, i32_to_f64, -8, -16, most, -8, i32_to_f64, -8, -20, most, -8, add_f64, -8, -24, -16, f64_to_f64, -40, -8, most, 32, ret,}));
+    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,most, -8, i32_to_f64, -8, -24, most, -8, i32_to_f64, -8, -28, most, -8, add_f64, -8, -24, -16, f64_to_f64, -48, -8, most, 24, ret,}));
 }
 
 TEST(composer_unit, _1_param_test)
@@ -110,8 +110,9 @@ TEST(composer_unit, _1_param_test)
     composer->set_return_type("double");
     composer->set_parameter("x", "double");
     composer->push("x");
+    composer->return_value();
     composer->end();
-    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,most, 8, ret,}));
+    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt, f64_to_f64, -24, -16, ret,}));
 }
 
 TEST(composer_unit, _0_param_test)
@@ -122,8 +123,10 @@ TEST(composer_unit, _0_param_test)
     composer->begin("_0_param_test");
     composer->set_return_type("double");
     composer->push<double>(0.0, "double");
+    composer->return_value();
     composer->end();
-    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt, ret,}));
+    auto _p = (i64)composer->_pool.get<f64>(0.0).get();
+    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt, f64_to_f64, -16, _p, ret,}));
 }
 
 TEST(composer_unit, cast_int_to_double)
@@ -850,7 +853,7 @@ TEST(composer_unit, sum_long_function) {
     composer->end();
 
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
-        (std::vector<i64>{hlt, most, -8, add_i64, -8, -24, -16, i64_to_i64, -32, -8, most, 24, ret}));
+        (std::vector<i64>{hlt, most, -8, add_i64, -8, -32, -24, i64_to_i64, -40, -8, most, 8, ret}));
 }
 
 TEST(composer_unit, times_two_double_function) {
@@ -868,7 +871,7 @@ TEST(composer_unit, times_two_double_function) {
 
     auto _p = (i64)composer->_pool.get<f64>(2.0).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
-        (std::vector<i64>{hlt, most, -8, mul_f64, -8, _p, -16, f64_to_f64, -24, -8, most, 16, ret}));
+        (std::vector<i64>{hlt, most, -8, mul_f64, -8, _p, -24, f64_to_f64, -32, -8, most, 8, ret}));
 }
 
 TEST(composer_unit, times_three_long_function) {
@@ -886,8 +889,7 @@ TEST(composer_unit, times_three_long_function) {
     composer->times();
     composer->assign();
     composer->end();
-
     auto _p = (i64)composer->_pool.get<f64>(3.0).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
-        (std::vector<i64>{hlt, most, -8, most, -8, mul_i64, -8, _p, -24, i64_to_i64, -16, -8, i64_to_i64, -32, -16, most, 24, ret}));
+        (std::vector<i64>{hlt, most, -8, most, -8, mul_i64, -8, _p, -32, i64_to_i64, -16, -8, i64_to_i64, -40, -16, most, 16, ret}));
 }

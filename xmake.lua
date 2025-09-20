@@ -20,7 +20,7 @@ target("tests")
     --"src/parser/*.cpp",
             "src/exceptions/*.cpp",
             "src/composer/vm/*.cpp",
-            "test/unit/*.cpp"
+            "test/*.cpp"
     )
 
 target("zen")

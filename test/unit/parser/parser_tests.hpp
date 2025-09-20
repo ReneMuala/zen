@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 #include "lexer/lexer.hpp"
 #include "parser/parser.hpp"
+
 inline void setup_parser_test(const std::string& code) {
     ILC::chain.clear();
     tokens.clear();
@@ -31,6 +32,7 @@ TEST(parser_unit, function)
         ILC::chain.push_back(token->type);
         tokens.emplace_back(token.value());
     }
+    ILC::chain_size = ILC::chain.size();
     EXPECT_TRUE(parse());
 }
 
