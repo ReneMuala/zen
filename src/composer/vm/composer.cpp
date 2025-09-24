@@ -533,9 +533,11 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
     void composer::vm::composer::ternary()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        if (_stack.size() < 3) throw std::logic_error(fmt::format(
-            "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected", __FUNCTION__,
-            _stack.size()));
+        if (_stack.size() < 3)
+            throw std::logic_error(fmt::format(
+                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
+                __FUNCTION__,
+                _stack.size()));
         const value scd = top();
         pop();
         const value fst = top();
@@ -545,10 +547,10 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
         push(fst.type);
         if (not condition.is("bool"))
             throw exceptions::semantic_error(fmt::format("cannot apply ternary to type \"{}\"", condition.type->name),
-                                              _ilc_offset, "please consider using type casting. Eg. bool(x)");
+                                             _ilc_offset, "please consider using type casting. Eg. bool(x)");
         if (not fst.has_same_type_as(scd))
             throw exceptions::semantic_error("ternary alternatives differ in type",
-                                              _ilc_offset);
+                                             _ilc_offset);
         label alt, end;
         code.push_back(go_if_not);
         code.push_back(condition.address(scope.stack_usage));
@@ -569,6 +571,173 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
         end.bind(code);
 
         push(dst);
+    }
+
+    void composer::vm::composer::begin_while()
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
+        scope.push(block_scope::__unsafely_make_while());
+        if (_stack.size() < 1)
+            throw std::logic_error(fmt::format(
+                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
+                __FUNCTION__,
+                _stack.size()));
+        const auto condition = top();
+        pop();
+        label begin, end;
+        begin.bind(code);
+        code.push_back(go_if_not);
+        code.push_back(condition.address(scope.stack_usage));
+        code.push_back(0);
+        end.use(code);
+        scope.labels.push(begin);
+        scope.labels.push(end);
+    }
+
+    void composer::vm::composer::end_while()
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_while);
+        if (_stack.size() < 2)
+            throw std::logic_error(fmt::format(
+                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
+                __FUNCTION__,
+                _stack.size()));
+        label end = scope.labels.top();
+        scope.labels.pop();
+        label begin = scope.labels.top();
+        scope.labels.pop();
+        code.push_back(go);
+        code.push_back(0);
+        begin.use(code);
+        end.bind(code);
+        scope.pop();
+    }
+
+#define KAIZEN_IF_PREINCREMENT_FOR(T, NT)\
+if (top().is(#T))\
+{\
+    auto it = top();\
+    push(it);\
+    zen::composer::composer::push<NT>(1, #T);\
+    _call_instruction(add_ ## NT, 3,3);\
+    push(it);\
+    return;\
+}
+
+
+    void composer::vm::composer::pre_increment()
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
+        if (_stack.size() < 1)
+            throw std::logic_error(fmt::format(
+                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
+                __FUNCTION__,
+                _stack.size()));
+        KAIZEN_IF_PREINCREMENT_FOR(byte, i8);
+        KAIZEN_IF_PREINCREMENT_FOR(short, i16);
+        KAIZEN_IF_PREINCREMENT_FOR(int, i32);
+        KAIZEN_IF_PREINCREMENT_FOR(long, i64);
+        KAIZEN_IF_PREINCREMENT_FOR(float, f32);
+        KAIZEN_IF_PREINCREMENT_FOR(double, f64);
+        throw exceptions::semantic_error(fmt::format("unsupported operation for type {}", top().type->name),
+                                         _ilc_offset);
+    }
+#define KAIZEN_IF_PREDECREMENT_FOR(T, NT)\
+if (top().is(#T))\
+{\
+    auto it = top();\
+    push(it);\
+    zen::composer::composer::push<NT>(1, #T);\
+    _call_instruction(sub_ ## NT, 3,3);\
+    push(it);\
+    return;\
+}
+
+
+    void composer::vm::composer::pre_decrement()
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
+        if (_stack.size() < 1)
+            throw std::logic_error(fmt::format(
+                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
+                __FUNCTION__,
+                _stack.size()));
+        KAIZEN_IF_PREDECREMENT_FOR(byte, i8);
+        KAIZEN_IF_PREDECREMENT_FOR(short, i16);
+        KAIZEN_IF_PREDECREMENT_FOR(int, i32);
+        KAIZEN_IF_PREDECREMENT_FOR(long, i64);
+        KAIZEN_IF_PREDECREMENT_FOR(float, f32);
+        KAIZEN_IF_PREDECREMENT_FOR(double, f64);
+        throw exceptions::semantic_error(fmt::format("unsupported operation for type {}", top().type->name),
+                                         _ilc_offset);
+    }
+
+#define KAIZEN_IF_POSTINCREMENT_FOR(T, NT)\
+    if (top().is(#T))\
+    {\
+        const auto it = top();\
+        push(it.type);\
+        value old = top();\
+        push(it);\
+        assign();\
+            \
+        push(it);\
+        zen::composer::composer::push<NT>(1, #T);\
+        _call_instruction(add_##NT, 3, 3);\
+        push(it);\
+        return;\
+    }
+
+    void composer::vm::composer::post_increment()
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
+        if (_stack.size() < 1)
+            throw std::logic_error(fmt::format(
+                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
+                __FUNCTION__,
+                _stack.size()));
+        KAIZEN_IF_POSTINCREMENT_FOR(byte, i8);
+        KAIZEN_IF_POSTINCREMENT_FOR(short, i16);
+        KAIZEN_IF_POSTINCREMENT_FOR(int, i32);
+        KAIZEN_IF_POSTINCREMENT_FOR(long, i64);
+        KAIZEN_IF_POSTINCREMENT_FOR(float, f32);
+        KAIZEN_IF_POSTINCREMENT_FOR(double, f64);
+        throw exceptions::semantic_error(fmt::format("unsupported operation for type {}", top().type->name),
+                                         _ilc_offset);
+    };
+
+    #define KAIZEN_IF_POSTDECREMENT_FOR(T, NT)\
+    if (top().is(#T))\
+    {\
+        const auto it = top();\
+        push(it.type);\
+        value old = top();\
+        push(it);\
+        assign();\
+            \
+        push(it);\
+        zen::composer::composer::push<NT>(1, #T);\
+        _call_instruction(sub_##NT, 3, 3);\
+        push(it);\
+        return;\
+    }
+
+    void composer::vm::composer::post_decrement()
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
+        if (_stack.size() < 1)
+            throw std::logic_error(fmt::format(
+                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
+                __FUNCTION__,
+                _stack.size()));
+        KAIZEN_IF_POSTDECREMENT_FOR(byte, i8);
+        KAIZEN_IF_POSTDECREMENT_FOR(short, i16);
+        KAIZEN_IF_POSTDECREMENT_FOR(int, i32);
+        KAIZEN_IF_POSTDECREMENT_FOR(long, i64);
+        KAIZEN_IF_POSTDECREMENT_FOR(float, f32);
+        KAIZEN_IF_POSTDECREMENT_FOR(double, f64);
+        throw exceptions::semantic_error(fmt::format("unsupported operation for type {}", top().type->name),
+                                         _ilc_offset);
     };
 
 #define KAIZEN_CASTER_MAP_FOR(T)\

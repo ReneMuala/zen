@@ -78,6 +78,13 @@ namespace zen::composer::vm
             it->type = type::in_else;
             return it;
         }
+
+        static block_scope* __unsafely_make_while()
+        {
+            const auto it = new block_scope;
+            it->type = type::in_while;
+            return it;
+        }
     };
 }
 

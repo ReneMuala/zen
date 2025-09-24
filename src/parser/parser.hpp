@@ -308,15 +308,18 @@ BEGIN_PRODUCTION(PRODUCTION_NFOR)
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NWHILE)
+    static auto composer = get_composer();
     REQUIRE_TERMINAL(TKEYWORD_WHILE)
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_OPEN, EXPECTED("("))
     REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
+    composer->begin_while();
     REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
     while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
     {
     }
     REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
+    composer->end_while();
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_PREFIX_VAL)
@@ -639,10 +642,25 @@ static zen::composer::composer* composer = get_composer();
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NSINGLE_VAL)
-    const bool pre_buffer = TRY_REQUIRE_TERMINAL(TPLUS_PLUS) or TRY_REQUIRE_TERMINAL(TMINUS_MINUS);
+    static auto composer = get_composer();
+    const bool pre_increment = TRY_REQUIRE_TERMINAL(TPLUS_PLUS);
+    const bool pre_decrement = pre_increment or TRY_REQUIRE_TERMINAL(TMINUS_MINUS);
+    bool post_increment = false;
+    bool post_decrement = false;
     REQUIRE_NON_TERMINAL(NSINGLE_VAL_PREDICATE)
-    if (not pre_buffer)
-        TRY_REQUIRE_TERMINAL(TPLUS_PLUS) or TRY_REQUIRE_TERMINAL(TMINUS_MINUS);
+    if (not (pre_increment or pre_decrement))
+    {
+        post_increment = TRY_REQUIRE_TERMINAL(TPLUS_PLUS);
+        post_decrement = post_increment or TRY_REQUIRE_TERMINAL(TMINUS_MINUS);
+    }
+    if (pre_increment)
+        composer->pre_increment();
+    else if (pre_decrement)
+        composer->pre_decrement();
+    else if (post_increment)
+        composer->post_increment();
+    else if (post_decrement)
+        composer->post_decrement();
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NID)

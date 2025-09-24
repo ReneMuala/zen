@@ -150,7 +150,7 @@ public:
     virtual void assign() = 0;
     virtual void push(const std::string & name) = 0;
     template <typename native>
-    void push(native && data, const std::string & type)
+    void push(const native && data, const std::string & type)
     {
         auto t = get_type(type);
         if constexpr (std::is_same_v<native, value>)
@@ -185,6 +185,11 @@ public:
     virtual void equal() = 0;
     virtual void not_equal() = 0;
     virtual void ternary() = 0;
+
+    virtual void pre_increment() = 0;
+    virtual void pre_decrement() = 0;
+    virtual void post_increment() = 0;
+    virtual void post_decrement() = 0;
     // //
     virtual void begin_if_then() = 0;
     virtual void else_if_then() = 0;
@@ -200,27 +205,15 @@ public:
     // virtual void set_for_stream(const symbol & iterator, const value & value) = 0;
     // virtual void end_for(const value & value) = 0;
     //
-    // virtual void begin_while(const value & condition) = 0;
-    // virtual void end_while() = 0;
+    virtual void begin_while() = 0;
+    virtual void end_while() = 0;
     //
-    // virtual void begin_function_call(const symbol & function) = 0;
-    // virtual void set_function_parameter(const symbol & parameter, const value & value) = 0;
-    // virtual void end_function_call(const symbol & destination) = 0;
-    // virtual void end_function_call() = 0;
 
     // virtual void begin_class(const std::string & name) = 0;
     // virtual void set_class_field(const std::string & name, const type & type) = 0;
     // virtual void symbol & get_class_field(const std::string & name) = 0;
     // virtual void symbol & get_class_method(const std::string & name) = 0;
     // virtual void end_class() = 0;
-
-    // virtual void begin_static_context() = 0;
-    // virtual void end_static_context() = 0;
-
-    // virtual symbol & get_static_field(const std::string & classname, const std::string & name) = 0;
-    // virtual symbol & get_static_method(const std::string & classname, const std::string & name) = 0;
-    // virtual const symbol & get_function(const std::string & name, const signature & signature) = 0;
-    // virtual const symbol & get_constructor(const type & name, const signature & signature) = 0;
 };
 
 }

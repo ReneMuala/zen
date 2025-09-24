@@ -70,6 +70,14 @@ public:
     void not_equal() override;
     void ternary() override;
 
+    void begin_while() override;
+    void end_while() override;
+
+    void pre_increment() override;
+    void pre_decrement() override;
+    void post_increment() override;
+    void post_decrement() override;
+
 protected:
     void push(const std::shared_ptr<const type>& type) override;
     i64 get_parameters_size(const signature& sig);
