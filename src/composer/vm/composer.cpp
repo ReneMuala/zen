@@ -98,7 +98,8 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
         const auto type = get_type(name);
         if (type->get_size() != 0)
         {
-            scope.return_data.value.emplace(value(type, scope.stack_usage - /* jump callee IP */static_cast<i64>(sizeof(i64))));
+            scope.return_data.value.emplace(
+                value(type, scope.stack_usage - /* jump callee IP */static_cast<i64>(sizeof(i64))));
             scope.stack_usage += type->get_size();
         }
         std::get<signature>(functions.at(scope.name)).type = type;
@@ -144,8 +145,12 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
         {
             push(scope.return_data.name.value());
             return_value();
-        } else if (scope.get_return_status() != block_scope::concise_return and not scope.return_data.value->is("unit"))
-            throw exceptions::semantic_error("missing return value", _ilc_offset, fmt::format("please use a named return or ensure that all control paths return a value of type {}", scope.return_data.value->type->name));
+        }
+        else if (scope.get_return_status() != block_scope::concise_return and not scope.return_data.value->is("unit"))
+            throw exceptions::semantic_error("missing return value", _ilc_offset,
+                                             fmt::format(
+                                                 "please use a named return or ensure that all control paths return a value of type {}",
+                                                 scope.return_data.value->type->name));
         const auto sig = std::get<signature>(functions.at(scope.name));
         const auto sizes = get_return_size(sig) + get_parameters_size(sig);
         if (const auto most_delta = scope.stack_usage - sizes; most_delta > 0)
@@ -273,11 +278,11 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
         pop();
         const value lhs = top();
         pop();
-        if (lhs.kind == value::constant or lhs.kind == value::temporary)
+        if (lhs.kind == value::constant)
         {
-            throw exceptions::semantic_error("cannot assign value to a constant or temporary value", _ilc_offset,
+            throw exceptions::semantic_error("cannot assign value to constant", _ilc_offset,
                                              rhs.kind == value::variable
-                                                 ? "please consider changing operands order from x = y to y = x"
+                                                 ? "please consider changing operands order from x = y to y = x if applicable"
                                                  : "");
         }
 
@@ -407,173 +412,164 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
     else if (lhs.is("long"))\
     code.push_back(zen::F##_i64);
 
-    void composer::vm::composer::plus()
-    {
-        KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        if (_stack.size() < 2)
-            throw std::logic_error(fmt::format(
-                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
-                __FUNCTION__, _stack.size()));
-        const value rhs = top();
-        pop();
-        const value lhs = top();
-        pop();
-        push(lhs.type);
-        if (lhs.has_same_type_as(rhs))
-        {
-            KAIZEN_IF_ARITHMETICS_CHAIN(add)
-            else
-                throw exceptions::semantic_error(fmt::format(
-                                                     "cannot sum type \"{}\"", lhs.type->name), _ilc_offset);
-        }
-        else
-        {
-            throw exceptions::semantic_error(fmt::format(
-                                                 "cannot sum {} with {}", lhs.type->name,
-                                                 rhs.type->name), _ilc_offset,
-                                             fmt::format(
-                                                 "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
-                                                 lhs.type->name, rhs.type->name));
-        }
-        code.push_back(top().address(scope.stack_usage));
-        code.push_back(lhs.address(scope.stack_usage));
-        code.push_back(rhs.address(scope.stack_usage));
+#define KAIZEN_DEFINE_ARITH_COMPOSITION(N, A, IP, CG)\
+    void composer::vm::composer::N()\
+    {\
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);\
+        if (_stack.size() < 2)\
+            throw std::logic_error(fmt::format(\
+                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",\
+                __FUNCTION__, _stack.size()));\
+        const value rhs = top();\
+        pop();\
+        const value lhs = top();\
+        pop();\
+        push(lhs.type);\
+        if (lhs.has_same_type_as(rhs))\
+        {\
+            CG(IP)\
+            else\
+                throw exceptions::semantic_error(fmt::format(\
+                                                     "cannot "#A" type \"{}\"", lhs.type->name), _ilc_offset);\
+        }\
+        else\
+        {\
+            throw exceptions::semantic_error(fmt::format(\
+                                                 "cannot "#A" {} with {}", lhs.type->name,\
+                                                 rhs.type->name), _ilc_offset,\
+                                             fmt::format(\
+                                                 "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",\
+                                                 lhs.type->name, rhs.type->name));\
+        }\
+        code.push_back(top().address(scope.stack_usage));\
+        code.push_back(lhs.address(scope.stack_usage));\
+        code.push_back(rhs.address(scope.stack_usage));\
     }
 
-    void composer::vm::composer::minus()
-    {
-        KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        if (_stack.size() < 2)
-            throw std::logic_error(fmt::format(
-                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
-                __FUNCTION__, _stack.size()));
-        const value rhs = top();
-        pop();
-        const value lhs = top();
-        pop();
-        push(lhs.type);
-        if (lhs.has_same_type_as(rhs))
-        {
-            KAIZEN_IF_ARITHMETICS_CHAIN(sub)
-            else
-                throw exceptions::semantic_error(fmt::format(
-                                                     "cannot subtract type \"{}\"", lhs.type->name), _ilc_offset);
-        }
-        else
-        {
-            throw exceptions::semantic_error(fmt::format(
-                                                 "cannot subtract {} with {}", lhs.type->name,
-                                                 rhs.type->name), _ilc_offset,
-                                             fmt::format(
-                                                 "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
-                                                 lhs.type->name, rhs.type->name));
-        }
-        code.push_back(top().address(scope.stack_usage));
-        code.push_back(lhs.address(scope.stack_usage));
-        code.push_back(rhs.address(scope.stack_usage));
+
+#define KAIZEN_DEFINE_LOGIC_COMPOSITION(N, I)\
+    void composer::vm::composer::N()\
+    {\
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);\
+        if (_stack.size() < 1)\
+            throw std::logic_error(fmt::format(\
+                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",\
+                __FUNCTION__, _stack.size()));\
+        const value val = top();\
+        pop();\
+        push("<bool>");\
+        if (val.is("bool")) \
+                code.push_back(zen::boolean_##I);\
+            else\
+                throw exceptions::semantic_error(fmt::format(\
+                                                     "cannot apply "#I" to type \"{}\"", val.type->name), _ilc_offset, "please consider using type casting. Eg. bool(x)");\
+        code.push_back(val.address(scope.stack_usage));\
     }
 
-    void composer::vm::composer::times()
-    {
-        KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        if (_stack.size() < 2)
-            throw std::logic_error(fmt::format(
-                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
-                __FUNCTION__, _stack.size()));
-        const value rhs = top();
-        pop();
-        const value lhs = top();
-        pop();
-        push(lhs.type);
-        if (lhs.has_same_type_as(rhs))
-        {
-            KAIZEN_IF_ARITHMETICS_CHAIN(mul)
-            else
-                throw exceptions::semantic_error(fmt::format(
-                                                     "cannot multiply type \"{}\"", lhs.type->name), _ilc_offset);
-        }
-        else
-        {
-            throw exceptions::semantic_error(fmt::format(
-                                                 "cannot multiply {} with {}", lhs.type->name,
-                                                 rhs.type->name), _ilc_offset,
-                                             fmt::format(
-                                                 "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
-                                                 lhs.type->name, rhs.type->name));
-        }
-        code.push_back(top().address(scope.stack_usage));
-        code.push_back(lhs.address(scope.stack_usage));
-        code.push_back(rhs.address(scope.stack_usage));
+#define KAIZEN_IF_RELATIONAL_CHAIN(F)\
+    if (rhs.is("byte")) \
+        code.push_back(zen::F##_i8);\
+    else if (lhs.is("short"))\
+        code.push_back(zen::F##_i16);\
+    else if (lhs.is("int"))\
+        code.push_back(zen::F##_i32);\
+    else if (lhs.is("long"))\
+        code.push_back(zen::F##_i64);\
+    else if (rhs.is("float")) \
+        code.push_back(zen::F##_f32); \
+    else if (rhs.is("double")) \
+        code.push_back(zen::F##_f64);
+
+#define KAIZEN_DEFINE_RELATIONAL_COMPOSITION(N, A, I)\
+    void composer::vm::composer::N()\
+    {\
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);\
+        if (_stack.size() < 2)\
+            throw std::logic_error(fmt::format(\
+                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",\
+                __FUNCTION__, _stack.size()));\
+        const value rhs = top();\
+        pop();\
+        const value lhs = top();\
+        pop();\
+        push("<bool>");\
+        if (lhs.has_same_type_as(rhs))\
+        {\
+            KAIZEN_IF_RELATIONAL_CHAIN(I)\
+            else\
+                throw exceptions::semantic_error(fmt::format(\
+                                                     "cannot compare ("#A") type \"{}\"", lhs.type->name), _ilc_offset);\
+        }\
+        else\
+        {\
+            throw exceptions::semantic_error(fmt::format(\
+                                                 "cannot compare ("#A") {} with {}", lhs.type->name,\
+                                                 rhs.type->name), _ilc_offset,\
+                                             fmt::format(\
+                                                 "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",\
+                                                 lhs.type->name, rhs.type->name));\
+        }\
+        code.push_back(top().address(scope.stack_usage));\
+        code.push_back(lhs.address(scope.stack_usage));\
+        code.push_back(rhs.address(scope.stack_usage));\
     }
 
-    void composer::vm::composer::slash()
+
+    KAIZEN_DEFINE_ARITH_COMPOSITION(plus, sum, add, KAIZEN_IF_ARITHMETICS_CHAIN);
+    KAIZEN_DEFINE_ARITH_COMPOSITION(minus, subtract, sub, KAIZEN_IF_ARITHMETICS_CHAIN);
+    KAIZEN_DEFINE_ARITH_COMPOSITION(times, multiply, mul, KAIZEN_IF_ARITHMETICS_CHAIN);
+    KAIZEN_DEFINE_ARITH_COMPOSITION(slash, divide, div, KAIZEN_IF_ARITHMETICS_CHAIN);
+    KAIZEN_DEFINE_ARITH_COMPOSITION(modulo, compute modulo, mod, KAIZEN_IF_ARITHMETICS_CHAIN_FLOAT);
+    KAIZEN_DEFINE_LOGIC_COMPOSITION(and_, and);
+    KAIZEN_DEFINE_LOGIC_COMPOSITION(or_, or);
+    KAIZEN_DEFINE_LOGIC_COMPOSITION(not_, not);
+    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(greater, >, gt);
+    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(greater_or_equal, >=, gte);
+    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(lower, <, lt);
+    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(lower_or_equal, <=, lte);
+    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(equal, ==, eq);
+    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(not_equal, !=, neq)
+
+    void composer::vm::composer::ternary()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        if (_stack.size() < 2)
-            throw std::logic_error(fmt::format(
-                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
-                __FUNCTION__, _stack.size()));
-        const value rhs = top();
+        if (_stack.size() < 3) throw std::logic_error(fmt::format(
+            "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected", __FUNCTION__,
+            _stack.size()));
+        const value scd = top();
         pop();
-        const value lhs = top();
+        const value fst = top();
         pop();
-        push(lhs.type);
-        if (lhs.has_same_type_as(rhs))
-        {
-            KAIZEN_IF_ARITHMETICS_CHAIN(div)
-            else
-                throw exceptions::semantic_error(fmt::format(
-                                                     "cannot divide type \"{}\"", lhs.type->name), _ilc_offset);
-        }
-        else
-        {
-            throw exceptions::semantic_error(fmt::format(
-                                                 "cannot divide {} with {}", lhs.type->name,
-                                                 rhs.type->name), _ilc_offset,
-                                             fmt::format(
-                                                 "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
-                                                 lhs.type->name, rhs.type->name));
-        }
-        code.push_back(top().address(scope.stack_usage));
-        code.push_back(lhs.address(scope.stack_usage));
-        code.push_back(rhs.address(scope.stack_usage));
-    }
+        const value condition = top();
+        pop();
+        push(fst.type);
+        if (not condition.is("bool"))
+            throw exceptions::semantic_error(fmt::format("cannot apply ternary to type \"{}\"", condition.type->name),
+                                              _ilc_offset, "please consider using type casting. Eg. bool(x)");
+        if (not fst.has_same_type_as(scd))
+            throw exceptions::semantic_error("ternary alternatives differ in type",
+                                              _ilc_offset);
+        label alt, end;
+        code.push_back(go_if_not);
+        code.push_back(condition.address(scope.stack_usage));
+        code.push_back(0);
+        alt.use(code);
 
-    void composer::vm::composer::modulo()
-    {
-        KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        if (_stack.size() < 2)
-            throw std::logic_error(fmt::format(
-                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
-                __FUNCTION__, _stack.size()));
-        const value rhs = top();
-        pop();
-        const value lhs = top();
-        pop();
-        push(lhs.type);
-        if (lhs.has_same_type_as(rhs))
-        {
-            KAIZEN_IF_ARITHMETICS_CHAIN_FLOAT(mod)
-            else
-                throw exceptions::semantic_error(fmt::format(
-                                                     "cannot compute modulo type \"{}\"", lhs.type->name,
-                                                     "please consider casting operands to integers (byte, short, int, long) if applicable"),
-                                                 _ilc_offset);
-        }
-        else
-        {
-            throw exceptions::semantic_error(fmt::format(
-                                                 "cannot compute modulo of {} with {}", lhs.type->name,
-                                                 rhs.type->name), _ilc_offset,
-                                             fmt::format(
-                                                 "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
-                                                 lhs.type->name, rhs.type->name));
-        }
-        code.push_back(top().address(scope.stack_usage));
-        code.push_back(lhs.address(scope.stack_usage));
-        code.push_back(rhs.address(scope.stack_usage));
-    }
+        const auto dst = top();
+        push(fst);
+        assign();
+        code.push_back(go);
+        code.push_back(0);
+        end.use(code);
 
+        alt.bind(code);
+        push(dst);
+        push(scd);
+        assign();
+        end.bind(code);
+
+        push(dst);
+    };
 
 #define KAIZEN_CASTER_MAP_FOR(T)\
         {\
@@ -883,7 +879,7 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
         scope.push(block_scope::__unsafely_make_if());
-        _begin_if_then( false);
+        _begin_if_then(false);
     }
 
     void composer::vm::composer::_begin_if_then(const bool nested)
@@ -891,17 +887,19 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
         KAIZEN_REQUIRE_SCOPE(scope::in_if);
         if (_stack.empty())
         {
-            throw exceptions::semantic_error(fmt::format(R"(cannot use 'if' or 'else if' without providing a value)"), _ilc_offset);
+            throw exceptions::semantic_error(fmt::format(R"(cannot use 'if' or 'else if' without providing a value)"),
+                                             _ilc_offset);
         }
         code.push_back(zen::instruction::go_if_not);
         const value condition = top();
         pop();
         if (not condition.is("bool"))
         {
-            throw exceptions::semantic_error("if condition must be bool", _ilc_offset, "please use type casting if applicable.");
+            throw exceptions::semantic_error("if condition must be bool", _ilc_offset,
+                                             "please use type casting if applicable.");
         }
         label else_label;
-        if(not nested)
+        if (not nested)
             scope.labels.emplace();
         else
         {
@@ -932,12 +930,12 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
             throw exceptions::semantic_error(fmt::format("cannot use else if without a prior if"), _ilc_offset);
 
         // if (scope.return_status != first_branched_return)
-            // scope.return_status = no_return;
+        // scope.return_status = no_return;
 
         label else_label = scope.labels.top();
         scope.labels.pop();
 
-        label & end_label = scope.labels.top();
+        label& end_label = scope.labels.top();
         code.push_back(zen::instruction::go);
         code.push_back(0);
         end_label.use(code);

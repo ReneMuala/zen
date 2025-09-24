@@ -174,18 +174,18 @@ public:
     // PUSH(TS % TS+1)
     virtual void modulo() = 0;
 
-    // virtual void operation_logic_and(const symbol & destination, const value & first, const value & second) = 0;
-    // virtual void operation_logic_or(const symbol & destination, const value & first, const value & second) = 0;
-    // virtual void operation_logic_not(const symbol & destination, const value & value) = 0;
+    virtual void and_() = 0;
+    virtual void or_() = 0;
+    virtual void not_() = 0;
     // virtual void operation_logic_extract(const symbol & destination, const value & value) = 0;
-    //
-    // virtual void operation_rel_g(const symbol & destination, const value & first, const value & second) = 0;
-    // virtual void operation_rel_ge(const symbol & destination, const value & first, const value & second) = 0;
-    // virtual void operation_rel_l(const symbol & destination, const value & first, const value & second) = 0;
-    // virtual void operation_rel_le(const symbol & destination, const value & first, const value & second) = 0;
-    // virtual void operation_rel_eq(const symbol & destination, const value & first, const value & second) = 0;
-    // virtual void operation_rel_neq(const symbol & destination, const value & first, const value & second) = 0;
-    //
+    virtual void greater() = 0;
+    virtual void greater_or_equal() = 0;
+    virtual void lower() = 0;
+    virtual void lower_or_equal() = 0;
+    virtual void equal() = 0;
+    virtual void not_equal() = 0;
+    virtual void ternary() = 0;
+    // //
     virtual void begin_if_then() = 0;
     virtual void else_if_then() = 0;
     virtual void else_then() = 0;

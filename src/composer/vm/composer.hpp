@@ -59,6 +59,16 @@ public:
     call_result _call_instruction_write_str(const std::string& name, const i8& args_count);
     call_result _call_instruction(const zen::instruction & insn, const i8& args_count, const i8& expected_args_count);
     call_result call(const std::string& name, const i8& args_count) override;
+    void and_() override;
+    void or_() override;
+    void not_() override;
+    void greater() override;
+    void greater_or_equal() override;
+    void lower() override;
+    void lower_or_equal() override;
+    void equal() override;
+    void not_equal() override;
+    void ternary() override;
 
 protected:
     void push(const std::shared_ptr<const type>& type) override;

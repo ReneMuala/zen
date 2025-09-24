@@ -137,7 +137,7 @@ TEST(parser_unit, complex_expression_with_parenthesis)
 
 TEST(parser_unit, chained_comparison_operators)
 {
-    setup_parser_test("my_func = { if (a > 10 && b < 20) {} }");
+    setup_parser_test("my_func(a: int, b: int) = { if (a > 10 && b < 20) {} }");
     EXPECT_TRUE(parse());
 }
 

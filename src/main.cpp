@@ -395,6 +395,18 @@ return 0;
     {
         zen::composer::composer* composer = get_composer();
 
+        composer->begin("ternary_a_or_b");
+        composer->set_return_type("int");
+        composer->set_parameter("a", "int");
+        composer->set_parameter("b", "int");
+        composer->set_parameter("c", "bool");
+        composer->push("c");
+        composer->push("a");
+        composer->push("b");
+        composer->ternary();
+        composer->return_value();
+        composer->end();
+
         composer->begin("x_if_cond_or_y");
         composer->set_return_type("int");
         composer->set_parameter("cond", "bool");
@@ -409,10 +421,6 @@ return 0;
         composer->return_value();
         composer->end_if();
         composer->end();
-
-
-        composer->bake();
-        return 0;
 
         composer->begin("write_string");
         composer->set_parameter("fd", "long");
