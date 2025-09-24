@@ -35,7 +35,7 @@ TEST(integration, add_numbers)
     EXPECT_EQ(composer->code, (std::vector<i64>{hlt, most, -4, add_i32, -4, -20, -16, most, -4, add_i32, -4, -28, -8, i32_to_i32, -32, -4, most, 8, ret,}));
     zen::vm::stack stack;
     stack.push<i32>(0); // return value
-    i32 a = 1, b = 2, c = 3;
+    i32 a = 100, b = 200, c = 300;
     stack.push<i32>(a); // a
     stack.push<i32>(b); // b
     stack.push<i32>(c); // c

@@ -9,37 +9,19 @@
 #include "../composer.hpp"
 #include <vm/vm.hpp>
 
+#include "function_scope.hpp"
 #include "utils/utils.hpp"
+#include "label.hpp"
 
 namespace zen::composer::vm {
 class composer : public zen::composer::composer
 {
 public:
-    std::shared_ptr<const type>& get_type(const std::string& name) override;
-    std::unordered_map<std::string,std::tuple<signature, i64>> functions;
+    function_scope scope;
     std::vector<i64> code;
+    std::unordered_map<std::string,std::tuple<signature, i64>> functions;
     std::unordered_map<std::string, std::shared_ptr<const type>> types;
-    struct scope_data
-    {
-        std::string function_name;
-        i64 st_point{};
-        std::map<std::string, symbol> locals;
-        std::optional<value> return_value;
-        std::optional<std::string> return_name;
-
-        scope_data()
-        {
-            clear();
-        }
-
-        void clear()
-        {
-            st_point = 0;
-            locals.clear();
-            return_value = std::nullopt;
-            return_name = std::nullopt;
-        }
-    } scope;
+    std::shared_ptr<const type>& get_type(const std::string& name) override;
     value top();
     void push(const value&);
     void reset() override;
@@ -60,13 +42,18 @@ public:
     void _push_temporary_value(const std::string& type_name);
     void push(const std::string& name) override;
     void pop() override;
+    void begin_if_then() override;
+    void _begin_if_then(bool nested);
+    void else_if_then() override;
+    void else_then() override;
+    void end_if() override;
     void plus() override;
     void minus() override;
     void times() override;
     void slash() override;
     void modulo() override;
-    std::optional<value> _push_calle_return_value(const signature& sig);
-    void _push_calle_arguments(const signature& sig, const i8& args_count);
+    std::optional<value> _push_callee_return_value(const signature& sig);
+    void _push_callee_arguments(const signature& sig, const i8& args_count);
     call_result _call_caster(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::unordered_map<std::string, i64>>::iterator & caster_set);
     call_result _call_function(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::tuple<signature, long long>>::iterator &func_it);
     call_result _call_instruction_write_str(const std::string& name, const i8& args_count);

@@ -7,6 +7,7 @@
 #include "composer/composer.hpp"
 #include "composer/vm/composer.hpp"
 #include "types/stack.hpp"
+
 TEST(composer_unit, write_string)
 {
     using namespace zen;
@@ -893,3 +894,60 @@ TEST(composer_unit, times_three_long_function) {
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
         (std::vector<i64>{hlt, most, -8, most, -8, mul_i64, -8, _p, -32, i64_to_i64, -16, -8, i64_to_i64, -40, -16, most, 16, ret}));
 }
+
+/**
+ * todo: add scope tests just to ensure that conditional returning it ok
+ */
+/*
+       zen::composer::vm::block_scope scope;
+        zen::composer::vm::function_scope fs;
+        scope = zen::composer::vm::block_scope();
+        fs = zen::composer::vm::function_scope();
+        scope.push(zen::composer::vm::block_scope::__unsafely_make_if());
+        scope.set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope.pop();
+        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+
+        scope.push(zen::composer::vm::block_scope::__unsafely_make_else());
+        scope.set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope.pop();
+        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+
+        scope.push(zen::composer::vm::block_scope::__unsafely_make_if());
+        scope.set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope.pop();
+        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+
+        scope.push(zen::composer::vm::block_scope::__unsafely_make_if());
+        scope.set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope.pop();
+        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+
+        scope.push(zen::composer::vm::block_scope::__unsafely_make_if());
+        // scope.set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope.pop();
+        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+
+        scope.push(zen::composer::vm::block_scope::__unsafely_make_else());
+        scope.set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope.pop();
+        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+
+        scope.push(zen::composer::vm::block_scope::__unsafely_make_else());
+        scope.set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope.pop();
+        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+
+        scope.push(zen::composer::vm::block_scope::__unsafely_make_if());
+        // scope.set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope.pop();
+        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+
+        scope.push(zen::composer::vm::block_scope::__unsafely_make_else());
+        scope.set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope.pop();
+        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+
+        scope.set_return_status(zen::composer::vm::block_scope::concise_return);
+        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+        */

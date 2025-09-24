@@ -258,10 +258,10 @@ TEST(vm_unit, go_test)
 
 TEST(vm_unit, go_if_true_test)
 {
-    boolean condition = true;
+    boolean condition = false;
     i64 result = 0, value1 = 1, value2 = 42;
     std::vector<i64> code {
-        go_if, vm::ref(condition), 5,                   // Jump if true
+        go_if_not, vm::ref(condition), 5,                   // Jump if false
         i64_to_i64, vm::ref(result), vm::ref(value1),        // Skip this
         i64_to_i64, vm::ref(result), vm::ref(value2),        // Execute this
         hlt
@@ -274,10 +274,10 @@ TEST(vm_unit, go_if_true_test)
 
 TEST(vm_unit, go_if_false_test)
 {
-    boolean condition = false;
+    boolean condition = true;
     i64 result = 0, value1 = 42, value2 = 1;
     std::vector<i64> code {
-        go_if, vm::ref(condition), 3,                   // Don't jump
+        go_if_not, vm::ref(condition), 3,                   // Don't jump
         i64_to_i64, vm::ref(result), vm::ref(value1),        // Execute this
         i64_to_i64, vm::ref(result), vm::ref(value2),        // And this
         hlt

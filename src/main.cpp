@@ -1,5 +1,7 @@
 
 #include <iostream>
+#include <memory>
+#include <optional>
 #include "lexer/lexer.hpp"
 #include "parser/parser.hpp"
 
@@ -362,6 +364,28 @@ void print_zen_string(void * str)
     // printf("(%d bytes)", len);
 }
 
+// struct return_data
+// {
+//     std::optional<zen::composer::value> value = std::nullopt;
+//     std::optional<std::string> name = std::nullopt;
+// } ;
+struct function_scope1 : public zen::composer::vm::block_scope
+{
+    // return_data return_data = {};
+    std::stack<zen::composer::vm::label> labels = {};
+    // std::string name = {};
+    // zen::i64 stack_usage = {};
+    // std::map<std::string, zen::composer::symbol> locals = {};
+
+    [[nodiscard]] bool is(const enum type& t) const override
+    {
+        return t & type::in_function;
+    }
+
+    ~function_scope1() override = default;
+};
+
+
 int main(int argc, char** argv) try
 {
 #ifdef KAIZEN_WASM
@@ -370,6 +394,26 @@ return 0;
     if (true)
     {
         zen::composer::composer* composer = get_composer();
+
+        composer->begin("x_if_cond_or_y");
+        composer->set_return_type("int");
+        composer->set_parameter("cond", "bool");
+        composer->set_parameter("x", "int");
+        composer->set_parameter("y", "int");
+        composer->push("cond");
+        composer->begin_if_then();
+        composer->push("x");
+        composer->return_value();
+        composer->else_then();
+        composer->push("y");
+        composer->return_value();
+        composer->end_if();
+        composer->end();
+
+
+        composer->bake();
+        return 0;
+
         composer->begin("write_string");
         composer->set_parameter("fd", "long");
         composer->set_parameter("str", "string");

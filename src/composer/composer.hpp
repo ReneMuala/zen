@@ -97,7 +97,7 @@ namespace zen::composer
         {
         }
 
-        const i64 _address;
+        i64 _address;
     };
 
     struct symbol : value
@@ -186,10 +186,10 @@ public:
     // virtual void operation_rel_eq(const symbol & destination, const value & first, const value & second) = 0;
     // virtual void operation_rel_neq(const symbol & destination, const value & first, const value & second) = 0;
     //
-    // virtual void begin_if_then(const value & value) = 0;
-    // virtual void else_if_then(const value & value) = 0;
-    // virtual void else_then() = 0;
-    // virtual void end_if() = 0;
+    virtual void begin_if_then() = 0;
+    virtual void else_if_then() = 0;
+    virtual void else_then() = 0;
+    virtual void end_if() = 0;
     //
     // virtual void begin_for() = 0;
     // virtual void set_for_iterator(const symbol & iterator) = 0;

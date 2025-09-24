@@ -127,9 +127,7 @@ namespace zen
         // modify stack
         most,
         go,
-        go_if,
-        jump,
-        jump_if,
+        go_if_not,
         call,
         // ffi_call,
         // fetch_i8,

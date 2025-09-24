@@ -280,18 +280,9 @@ void zen::vm::run(stack& stack, const i64& entry_point)
         case go:
             i += this->code[i + 1];
             break;
-        case jump:
-            i += *address<i64>(this->code[i + 1], stack);
-            break;
-        case go_if:
-            if (*address<boolean>(this->code[i + 1], stack))
+        case go_if_not:
+            if (not *address<boolean>(this->code[i + 1], stack))
                 i += this->code[i + 2];
-            else
-                i += 2;
-            break;
-        case jump_if:
-            if (*address<boolean>(this->code[i + 1], stack))
-                i += *address<i64>(this->code[i + 2], stack);
             else
                 i += 2;
             break;

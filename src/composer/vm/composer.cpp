@@ -66,46 +66,55 @@ namespace zen
 
     void composer::vm::composer::begin(std::string name)
     {
-        scope.clear();
-        scope.function_name = name;
+        scope = function_scope();
+        scope.name = name;
         functions.emplace(std::move(name), std::make_tuple<signature, size_t>(
                               signature{
                                   .type = get_type("unit")
                               }, code.size()));
-        scope.return_value.emplace(value(get_type("unit"), 0));
+        scope.return_data.value.emplace(value(get_type("unit"), 0));
     }
 
     void composer::vm::composer::set_parameter(std::string name, const std::string& type)
     {
-        std::get<signature>(functions.at(scope.function_name)).parameters.emplace_back(get_type(type));
+        std::get<signature>(functions.at(scope.name)).parameters.emplace_back(get_type(type));
         const auto& t = get_type(type);
-        const i64 address = scope.st_point - /* jump callee IP */static_cast<i64>(sizeof(i64));
-        scope.st_point += t->get_size();
+        const i64 address = scope.stack_usage - /* jump callee IP */static_cast<i64>(sizeof(i64));
+        scope.stack_usage += t->get_size();
         scope.locals.emplace(name, symbol(name, t, address));
     }
 
+
+#define KAIZEN_REQUIRE_SCOPE(S)\
+if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize of {} scope", __FUNCTION__, #S))
+
     void composer::vm::composer::set_return_type(const std::string& name)
     {
-        if (scope.st_point)
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
+        if (scope.stack_usage)
         {
-            throw std::logic_error("Function returned more than once or return is being set after parameters");
+            throw std::logic_error("return type cannot be set after params");
         }
         const auto type = get_type(name);
         if (type->get_size() != 0)
         {
-            scope.return_value.emplace(value(type, scope.st_point - /* jump callee IP */static_cast<i64>(sizeof(i64))));
-            scope.st_point += type->get_size();
+            scope.return_data.value.emplace(value(type, scope.stack_usage - /* jump callee IP */static_cast<i64>(sizeof(i64))));
+            scope.stack_usage += type->get_size();
         }
-        std::get<signature>(functions.at(scope.function_name)).type = type;
+        std::get<signature>(functions.at(scope.name)).type = type;
     }
 
     void composer::vm::composer::return_value()
     {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
+        if (scope.get_return_status() == block_scope::concise_return)
+            throw exceptions::semantic_error("cannot return values more than once", _ilc_offset);
+        scope.set_return_status(block_scope::concise_return);
         const value rhs = top();
         pop();
-        if (not scope.return_value->is("unit"))
+        if (not scope.return_data.value->is("unit"))
         {
-            push(scope.return_value.value());
+            push(scope.return_data.value.value());
             push(rhs);
             assign();
         }
@@ -113,35 +122,38 @@ namespace zen
 
     void composer::vm::composer::set_return_name(const std::string& name)
     {
-        scope.return_name = name;
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
+        scope.return_data.name = name;
     }
 
     void composer::vm::composer::set_local(std::string name, const std::string& type)
     {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
         const auto& t = get_type(type);
-        const i64 address = scope.st_point;
+        const i64 address = scope.stack_usage;
         code.push_back(zen::most);
         code.push_back(-t->get_size());
-        scope.st_point += t->get_size();
+        scope.stack_usage += t->get_size();
         scope.locals.emplace(name, symbol(name, t, address));
     }
 
     void composer::vm::composer::end()
     {
-        if (scope.return_name)
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
+        if (scope.return_data.name)
         {
-            push(scope.return_name.value());
+            push(scope.return_data.name.value());
             return_value();
-        }
-        const auto sig = std::get<signature>(functions.at(scope.function_name));
+        } else if (scope.get_return_status() != block_scope::concise_return and not scope.return_data.value->is("unit"))
+            throw exceptions::semantic_error("missing return value", _ilc_offset, fmt::format("please use a named return or ensure that all control paths return a value of type {}", scope.return_data.value->type->name));
+        const auto sig = std::get<signature>(functions.at(scope.name));
         const auto sizes = get_return_size(sig) + get_parameters_size(sig);
-        if (const auto most_delta = scope.st_point - sizes; most_delta > 0)
+        if (const auto most_delta = scope.stack_usage - sizes; most_delta > 0)
         {
             code.push_back(zen::most);
             code.push_back(most_delta);
         }
         code.push_back(zen::ret);
-        scope.clear();
     }
 
     std::shared_ptr<const composer::type>& composer::vm::composer::get_type(const std::string& name)
@@ -216,6 +228,16 @@ namespace zen
                     fmt::print("write, {}, {}, ", code[i + 1], code[i + 2]);
                     i += 2;
                 }
+                else if (_code == go_if_not)
+                {
+                    fmt::print("go_if_not, {}, {}, ", code[i + 1], code[i + 2]);
+                    i += 2;
+                }
+                else if (_code == go)
+                {
+                    fmt::print("go, {}, ", code[i + 1]);
+                    i += 1;
+                }
                 else if (_code >= write_i8 && _code <= write_f64)
                 {
                     fmt::print("write, {}, ", code[i + 1]);
@@ -240,6 +262,7 @@ namespace zen
 
     void composer::vm::composer::assign()
     {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
         if (_stack.size() < 2)
         {
             throw exceptions::semantic_error(fmt::format(
@@ -262,7 +285,7 @@ namespace zen
         {
             throw exceptions::semantic_error("cannot return values from unit function", _ilc_offset,
                                              fmt::format("please consider changing the return type of \"{}\" to {}",
-                                                         scope.function_name, rhs.type->name));
+                                                         scope.name, rhs.type->name));
         }
 
         if (rhs.is("short") and rhs.has_same_type_as(lhs))
@@ -286,8 +309,8 @@ namespace zen
                                              fmt::format(
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
-        code.push_back(lhs.address(scope.st_point));
-        code.push_back(rhs.address(scope.st_point));
+        code.push_back(lhs.address(scope.stack_usage));
+        code.push_back(rhs.address(scope.stack_usage));
     }
 
     std::vector<std::string> split_name(const std::string& name)
@@ -329,7 +352,7 @@ namespace zen
 
     void composer::vm::composer::_push_return_value()
     {
-        push(scope.return_value.value());
+        push(scope.return_data.value.value());
     }
 
     void composer::vm::composer::_push_temporary_value(const std::string& type_name)
@@ -339,6 +362,7 @@ namespace zen
 
     void composer::vm::composer::push(const std::string& name)
     {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
         std::vector<std::string> tokens = split_name(name);
         if (tokens.empty())
             throw exceptions::semantic_error(fmt::format("invalid name '{}'", name), _ilc_offset);
@@ -347,7 +371,7 @@ namespace zen
             _push_variable(tokens, location);
         else if (const auto function = functions.find(tokens.front()); function != functions.end())
             _push_function(function);
-        else if (name == "<return>" && scope.return_value)
+        else if (name == "<return>" && scope.return_data.value)
             _push_return_value();
         else if (name.starts_with("<") and name.ends_with(">"))
             _push_temporary_value(name);
@@ -385,6 +409,7 @@ namespace zen
 
     void composer::vm::composer::plus()
     {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
         if (_stack.size() < 2)
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
@@ -410,13 +435,14 @@ namespace zen
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
         }
-        code.push_back(top().address(scope.st_point));
-        code.push_back(lhs.address(scope.st_point));
-        code.push_back(rhs.address(scope.st_point));
+        code.push_back(top().address(scope.stack_usage));
+        code.push_back(lhs.address(scope.stack_usage));
+        code.push_back(rhs.address(scope.stack_usage));
     }
 
     void composer::vm::composer::minus()
     {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
         if (_stack.size() < 2)
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
@@ -442,13 +468,14 @@ namespace zen
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
         }
-        code.push_back(top().address(scope.st_point));
-        code.push_back(lhs.address(scope.st_point));
-        code.push_back(rhs.address(scope.st_point));
+        code.push_back(top().address(scope.stack_usage));
+        code.push_back(lhs.address(scope.stack_usage));
+        code.push_back(rhs.address(scope.stack_usage));
     }
 
     void composer::vm::composer::times()
     {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
         if (_stack.size() < 2)
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
@@ -474,13 +501,14 @@ namespace zen
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
         }
-        code.push_back(top().address(scope.st_point));
-        code.push_back(lhs.address(scope.st_point));
-        code.push_back(rhs.address(scope.st_point));
+        code.push_back(top().address(scope.stack_usage));
+        code.push_back(lhs.address(scope.stack_usage));
+        code.push_back(rhs.address(scope.stack_usage));
     }
 
     void composer::vm::composer::slash()
     {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
         if (_stack.size() < 2)
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
@@ -506,13 +534,14 @@ namespace zen
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
         }
-        code.push_back(top().address(scope.st_point));
-        code.push_back(lhs.address(scope.st_point));
-        code.push_back(rhs.address(scope.st_point));
+        code.push_back(top().address(scope.stack_usage));
+        code.push_back(lhs.address(scope.stack_usage));
+        code.push_back(rhs.address(scope.stack_usage));
     }
 
     void composer::vm::composer::modulo()
     {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
         if (_stack.size() < 2)
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
@@ -540,9 +569,9 @@ namespace zen
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
         }
-        code.push_back(top().address(scope.st_point));
-        code.push_back(lhs.address(scope.st_point));
-        code.push_back(rhs.address(scope.st_point));
+        code.push_back(top().address(scope.stack_usage));
+        code.push_back(lhs.address(scope.stack_usage));
+        code.push_back(rhs.address(scope.stack_usage));
     }
 
 
@@ -557,21 +586,21 @@ namespace zen
         {"double", f64_to_##T},\
         }
 
-    std::optional<composer::value> composer::vm::composer::_push_calle_return_value(const signature& sig)
+    std::optional<composer::value> composer::vm::composer::_push_callee_return_value(const signature& sig)
     {
         std::optional<value> result;
         if (sig.type->get_size())
         {
-            const i64 address = scope.st_point;
+            const i64 address = scope.stack_usage;
             code.push_back(zen::most);
             code.push_back(-sig.type->get_size());
-            scope.st_point += sig.type->get_size();
+            scope.stack_usage += sig.type->get_size();
             return value(sig.type, address, value::temporary);
         }
         return std::nullopt;
     }
 
-    void composer::vm::composer::_push_calle_arguments(const signature& sig, const i8& args_count)
+    void composer::vm::composer::_push_callee_arguments(const signature& sig, const i8& args_count)
     {
         std::deque<value> values;
         for (int i = 0; i < args_count; i++)
@@ -616,7 +645,7 @@ namespace zen
                 {
                     code.push_back(zen::push_i64);
                 }
-                code.push_back(value.address(scope.st_point));
+                code.push_back(value.address(scope.stack_usage));
             }
             else
             {
@@ -675,8 +704,8 @@ namespace zen
             if (const auto caster = (*caster_set).second.find(rhs.type->name); caster != caster_set->second.end())
             {
                 code.push_back((*caster).second);
-                code.push_back(lhs.address(scope.st_point));
-                code.push_back(rhs.address(scope.st_point));
+                code.push_back(lhs.address(scope.stack_usage));
+                code.push_back(rhs.address(scope.stack_usage));
                 if (args_count == -1)
                 {
                     push(lhs);
@@ -715,9 +744,9 @@ namespace zen
         }
         // if (args_count < 0) // when assigning, copy the value directly to lhs
         // {
-        auto returned = _push_calle_return_value(sig);
+        auto returned = _push_callee_return_value(sig);
         // }
-        _push_calle_arguments(sig, abs_args_count);
+        _push_callee_arguments(sig, abs_args_count);
         if (top().is("function"))
         {
             pop(); // pop the function itself from composer's stack
@@ -751,13 +780,13 @@ namespace zen
         {
             value v = top();
             pop();
-            v.prepare(code, scope.st_point);
+            v.prepare(code, scope.stack_usage);
             args.push(v);
         }
         code.push_back(zen::write_str);
         for (int i = 0; i < args_count; i++)
         {
-            code.push_back(args.top().address(scope.st_point));
+            code.push_back(args.top().address(scope.stack_usage));
             args.pop();
         }
         return call_result::result;
@@ -777,13 +806,13 @@ namespace zen
         {
             value v = top();
             pop();
-            v.prepare(code, scope.st_point);
+            v.prepare(code, scope.stack_usage);
             args.push(v);
         }
         code.push_back(name);
         for (int i = 0; i < args_count; i++)
         {
-            code.push_back(args.top().address(scope.st_point));
+            code.push_back(args.top().address(scope.stack_usage));
             args.pop();
         }
         return call_result::result;
@@ -791,6 +820,7 @@ namespace zen
 
     composer::call_result composer::vm::composer::call(const std::string& name, const i8& args_count)
     {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
         static std::unordered_map<std::string, std::unordered_map<std::string, i64>> casters{
             {"bool", KAIZEN_CASTER_MAP_FOR(i8)},
             {"byte", KAIZEN_CASTER_MAP_FOR(i8)},
@@ -823,10 +853,10 @@ namespace zen
 
     void composer::vm::composer::push(const std::shared_ptr<const type>& type)
     {
-        _stack.emplace(type, scope.st_point, value::temporary);
+        _stack.emplace(type, scope.stack_usage, value::temporary);
         code.push_back(most);
         code.push_back(-type->get_size());
-        scope.st_point += type->get_size();
+        scope.stack_usage += type->get_size();
     }
 
     i64 composer::vm::composer::get_parameters_size(const signature& sig)
@@ -847,5 +877,88 @@ namespace zen
     void composer::vm::composer::pop()
     {
         _stack.pop();
+    }
+
+    void composer::vm::composer::begin_if_then()
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
+        scope.push(block_scope::__unsafely_make_if());
+        _begin_if_then( false);
+    }
+
+    void composer::vm::composer::_begin_if_then(const bool nested)
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_if);
+        if (_stack.empty())
+        {
+            throw exceptions::semantic_error(fmt::format(R"(cannot use 'if' or 'else if' without providing a value)"), _ilc_offset);
+        }
+        code.push_back(zen::instruction::go_if_not);
+        const value condition = top();
+        pop();
+        if (not condition.is("bool"))
+        {
+            throw exceptions::semantic_error("if condition must be bool", _ilc_offset, "please use type casting if applicable.");
+        }
+        label else_label;
+        if(not nested)
+            scope.labels.emplace();
+        else
+        {
+            else_label = scope.labels.top();
+            scope.labels.pop();
+        }
+
+        code.push_back(condition.address(scope.stack_usage));
+        code.push_back(0);
+        else_label.use(code);
+
+        scope.labels.push(else_label);
+    }
+
+    void composer::vm::composer::else_if_then()
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_if);
+        else_then();
+        _begin_if_then(true);
+    }
+
+    void composer::vm::composer::else_then()
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_if);
+        scope.pop();
+        scope.push(block_scope::__unsafely_make_else());
+        if (scope.labels.size() < 2)
+            throw exceptions::semantic_error(fmt::format("cannot use else if without a prior if"), _ilc_offset);
+
+        // if (scope.return_status != first_branched_return)
+            // scope.return_status = no_return;
+
+        label else_label = scope.labels.top();
+        scope.labels.pop();
+
+        label & end_label = scope.labels.top();
+        code.push_back(zen::instruction::go);
+        code.push_back(0);
+        end_label.use(code);
+        else_label.bind(code);
+
+        scope.labels.emplace();
+    }
+
+    void composer::vm::composer::end_if()
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_if);
+        scope.pop();
+        if (scope.labels.size() < 2)
+            throw exceptions::semantic_error(fmt::format("cannot end if without a prior if"), _ilc_offset);
+
+        label else_label = scope.labels.top();
+        scope.labels.pop();
+        label end_label = scope.labels.top();
+        scope.labels.pop();
+
+        else_label.bind(code);
+        end_label.bind(code);
     }
 } // zen
