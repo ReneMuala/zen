@@ -239,12 +239,14 @@ TEST(parser_unit, nested_if_statements)
     EXPECT_TRUE(parse());
 }
 
+/* disable extract for now
+
 TEST(parser_unit, if_with_pattern_matching)
 {
     setup_parser_test("getValue() = int(0) test_func = { x: int = 1 if (x: int = getValue() && x > 0) { x = x * 2 } }");
     EXPECT_TRUE(parse());
 }
-
+*/
 TEST(parser_unit, invalid_if_missing_condition)
 {
     setup_parser_test("test_func = { if () {} }");

@@ -93,22 +93,31 @@ BEGIN_PRODUCTION(PRODUCTION_NCLASS)
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NIF)
+    static auto composer = get_composer();
     REQUIRE_TERMINAL(TKEYWORD_IF)
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_OPEN, EXPECTED("("))
-    bool first = true;
-    do
+   // bool first = true;
+    /* disable extract for now
+     *do
     {
         REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
         if (ILC::chain[ILC::offset - 1] == TID and (ILC::chain[ILC::offset - 2] == TPARENTHESIS_OPEN or not first) and
             TRY_REQUIRE_TERMINAL(TCOLON))
         {
-            first = false;
             REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
             REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
             REQUIRE_NON_TERMINAL_CALLBACK(NSINGLE_VAL, EXPECTED("VALUE"))
         }
+        if (not first)
+        {
+            composer->and_();
+        }
+        first = false;
     }
     while (TRY_REQUIRE_TERMINAL(TAND));
+    */
+    REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
+    composer->begin_if_then();
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
     REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
     while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
@@ -120,6 +129,8 @@ BEGIN_PRODUCTION(PRODUCTION_NIF)
         if (TRY_REQUIRE_TERMINAL(TKEYWORD_IF))
         {
             REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_OPEN, EXPECTED("("))
+            /* disable extract for now
+
             first = true;
             do
             {
@@ -134,6 +145,9 @@ BEGIN_PRODUCTION(PRODUCTION_NIF)
                 }
             }
             while (TRY_REQUIRE_TERMINAL(TAND));
+            */
+            REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
+            composer->else_if_then();
             REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
             REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
             while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
@@ -143,6 +157,7 @@ BEGIN_PRODUCTION(PRODUCTION_NIF)
         }
         else
         {
+            composer->else_then();
             REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
             while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
             {
@@ -151,6 +166,7 @@ BEGIN_PRODUCTION(PRODUCTION_NIF)
             break;
         }
     }
+    composer->end_if();
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
