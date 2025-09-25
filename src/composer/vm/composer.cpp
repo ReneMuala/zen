@@ -8,6 +8,7 @@
 #include <queue>
 #include <sstream>
 
+#include "for_scope.hpp"
 #include "exceptions/semantic_error.hpp"
 
 namespace zen
@@ -574,7 +575,7 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
     void composer::vm::composer::begin_while()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        scope.push(block_scope::__unsafely_make_while_prologue());
+        scope.push(block_scope::__unsafely_make(scope::in_while_prologue));
         label begin;
         begin.bind(code);
         scope.labels.push(begin);
@@ -583,7 +584,7 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
     void composer::vm::composer::set_while_condition()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_while_prologue);
-        scope.push(block_scope::__unsafely_make_while_body());
+        scope.push(block_scope::__unsafely_make(scope::in_while_body));
         if (_stack.size() < 1)
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
@@ -648,6 +649,7 @@ if (top().is(#T))\
         throw exceptions::semantic_error(fmt::format("unsupported operation for type {}", top().type->name),
                                          _ilc_offset);
     }
+
 #define KAIZEN_IF_PREDECREMENT_FOR(T, NT)\
 if (top().is(#T))\
 {\
@@ -712,7 +714,7 @@ if (top().is(#T))\
                                          _ilc_offset);
     };
 
-    #define KAIZEN_IF_POSTDECREMENT_FOR(T, NT)\
+#define KAIZEN_IF_POSTDECREMENT_FOR(T, NT)\
     if (top().is(#T))\
     {\
         const auto it = top();\
@@ -744,6 +746,95 @@ if (top().is(#T))\
         KAIZEN_IF_POSTDECREMENT_FOR(double, f64);
         throw exceptions::semantic_error(fmt::format("unsupported operation for type {}", top().type->name),
                                          _ilc_offset);
+    }
+
+    void composer::vm::composer::begin_for()
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
+        scope.push(block_scope::__unsafely_make(scope::in_for));
+    }
+
+    void composer::vm::composer::set_for_iterator()
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_for);
+        throw exceptions::semantic_error("iterator based for is not supported yet", _ilc_offset);
+    }
+
+    void composer::vm::composer::set_for_begin_end()
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_for);
+        if (_stack.size() < 2)
+            throw std::logic_error(fmt::format(
+                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
+                __FUNCTION__,
+                _stack.size()));
+        const value last = top();
+        pop();
+        const value first = top();
+        pop();
+        const value iterator = top();
+        pop();
+
+        push(iterator);
+        push(first);
+        assign();
+
+        label begin, end;
+        begin.bind(code);
+        push(iterator);
+        post_increment();
+        push(last);
+        lower_or_equal();
+        code.push_back(go_if_not);
+        code.push_back(top().address(scope.stack_usage));
+        pop();
+        code.push_back(0);
+        end.use(code);
+
+        scope.labels.push(begin);
+        scope.labels.push(end);
+        scope.current<for_scope>(scope::in_for)->nested_iterators_count++;
+    }
+
+    void composer::vm::composer::set_for_begin_end_step()
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_for);
+        if (_stack.size() < 2)
+            throw std::logic_error(fmt::format(
+                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
+                __FUNCTION__,
+                _stack.size()));
+        const value step = top();
+        pop();
+        const value last = top();
+        pop();
+        const value first = top();
+        pop();
+        const value iterator = top();
+        pop();
+
+        push(iterator);
+        push(first);
+        assign();
+
+        label begin, end;
+        begin.bind(code);
+        push(iterator);
+        push(iterator);
+        push(step);
+        plus();
+        push(last);
+        lower_or_equal();
+        code.push_back(go_if_not);
+        code.push_back(top().address(scope.stack_usage));
+        pop();
+        code.push_back(0);
+        end.use(code);
+
+        scope.labels.push(begin);
+        scope.labels.push(end);
+        scope.current<for_scope>(scope::in_for)->nested_iterators_count++;
+        // todo: test for implementation
     };
 
 #define KAIZEN_CASTER_MAP_FOR(T)\
@@ -1015,6 +1106,28 @@ if (top().is(#T))\
         throw exceptions::semantic_error(fmt::format("function \"{}\" was not found", name), _ilc_offset);
     }
 
+    void composer::vm::composer::end_for()
+    {
+
+        KAIZEN_REQUIRE_SCOPE(scope::in_for);
+        const auto current = scope.current<for_scope>(scope::in_for);
+        if (current->nested_iterators_count * 2 < scope.labels.size())
+        {
+            throw exceptions::semantic_error("cannot finish inconsistent for loop.", _ilc_offset);
+        }
+        for (int i = 0; i < current->nested_iterators_count; i++)
+        {
+            label end = scope.labels.top();
+            scope.labels.pop();
+            label begin = scope.labels.top();
+            scope.labels.pop();
+            code.push_back(go);
+            code.push_back(0);
+            begin.use(code);
+            end.bind(code);
+        }
+    }
+
     void composer::vm::composer::push(const std::shared_ptr<const type>& type)
     {
         _stack.emplace(type, scope.stack_usage, value::temporary);
@@ -1046,7 +1159,7 @@ if (top().is(#T))\
     void composer::vm::composer::begin_if_then()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        scope.push(block_scope::__unsafely_make_if());
+        scope.push(block_scope::__unsafely_make(scope::in_if));
         _begin_if_then(false);
     }
 
@@ -1093,7 +1206,7 @@ if (top().is(#T))\
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_if);
         scope.pop();
-        scope.push(block_scope::__unsafely_make_else());
+        scope.push(block_scope::__unsafely_make(scope::in_else));
         if (scope.labels.size() < 2)
             throw exceptions::semantic_error(fmt::format("cannot use else if without a prior if"), _ilc_offset);
 

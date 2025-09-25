@@ -79,10 +79,17 @@ public:
     void post_increment() override;
     void post_decrement() override;
 
+    void begin_for() override;
+    void set_for_iterator() override;
+    void set_for_begin_end() override;
+    void set_for_begin_end_step() override;
+    void end_for() override;
+
 protected:
     void push(const std::shared_ptr<const type>& type) override;
     i64 get_parameters_size(const signature& sig);
     i64 get_return_size(const signature& sig);
+
 };
 
 } // zen

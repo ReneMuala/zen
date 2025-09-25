@@ -28,6 +28,8 @@ namespace zen::composer::vm
             return t & type::in_function;
         }
 
+
+
         ~function_scope() override = default;
     };
 }

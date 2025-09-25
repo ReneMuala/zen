@@ -195,15 +195,13 @@ public:
     virtual void else_if_then() = 0;
     virtual void else_then() = 0;
     virtual void end_if() = 0;
-    //
-    // virtual void begin_for() = 0;
-    // virtual void set_for_iterator(const symbol & iterator) = 0;
-    // virtual void set_for_begin(const symbol & iterator, const value & value) = 0;
-    // virtual void set_for_end(const symbol & iterator, const value & value) = 0;
-    // virtual void set_for_step(const symbol & iterator, const value & value) = 0;
-    // virtual void set_for_collection(const symbol & iterator, const value & value) = 0;
-    // virtual void set_for_stream(const symbol & iterator, const value & value) = 0;
-    // virtual void end_for(const value & value) = 0;
+    /// todo: implement this
+    virtual void begin_for() = 0;
+    /// in case of collections or streams
+    virtual void set_for_iterator() = 0;
+    virtual void set_for_begin_end();
+    virtual void set_for_begin_end_step() = 0;
+    virtual void end_for() = 0;
     //
     virtual void begin_while() = 0;
     virtual void set_while_condition() = 0;

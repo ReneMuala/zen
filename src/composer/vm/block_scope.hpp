@@ -62,36 +62,19 @@ namespace zen::composer::vm
 
         [[nodiscard]] bool is(const enum type& t) const override
         {
-            return t & type::in_block;
+            return t & this->type == t;
         }
 
-        static block_scope* __unsafely_make_if()
+        template<typename T>
+        T * current(const enum type type)
         {
-            const auto it = new block_scope;
-            it->type = type::in_if;
-            return it;
+            if (not nested_scope) return nullptr;
+            if (nested_scope->nested_scope)
+                return nested_scope->current<T>(type);
+            return nested_scope->type == type ? static_cast<T*>(nested_scope) : nullptr;
         }
 
-        static block_scope* __unsafely_make_else()
-        {
-            const auto it = new block_scope;
-            it->type = type::in_else;
-            return it;
-        }
-
-        static block_scope* __unsafely_make_while_prologue()
-        {
-            const auto it = new block_scope;
-            it->type = type::in_while_prologue;
-            return it;
-        }
-
-        static block_scope* __unsafely_make_while_body()
-        {
-            const auto it = new block_scope;
-            it->type = type::in_while_body;
-            return it;
-        }
+        static block_scope* __unsafely_make(const enum type type);
     };
 }
 
