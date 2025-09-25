@@ -90,15 +90,14 @@ TEST(composer_unit, sum_ints_as_doubles)
     composer->set_return_type("double");
     composer->set_parameter("x", "int");
     composer->set_parameter("y", "int");
-    composer->push("<double>");
     composer->push("x");
     composer->call("double", -1);
-    composer->push("<double>");
     composer->push("y");
     composer->call("double", -1);
     composer->plus();
     composer->return_value();
     composer->end();
+    composer->bake();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,most, -8, i32_to_f64, -8, -24, most, -8, i32_to_f64, -8, -28, most, -8, add_f64, -8, -24, -16, f64_to_f64, -48, -8, most, 24, ret,}));
 }
 

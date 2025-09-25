@@ -206,6 +206,7 @@ public:
     // virtual void end_for(const value & value) = 0;
     //
     virtual void begin_while() = 0;
+    virtual void set_while_condition() = 0;
     virtual void end_while() = 0;
     //
 

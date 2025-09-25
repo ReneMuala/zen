@@ -395,6 +395,28 @@ return 0;
     {
         zen::composer::composer* composer = get_composer();
 
+        composer->begin("sum_using_while");
+        composer->set_return_type("int");
+        composer->set_return_name("result");
+        composer->set_parameter("begin", "int");
+        composer->set_parameter("end", "int");
+        composer->set_local("result", "int");
+        composer->push("result");
+        composer->push<zen::i32>(0, "int");
+        composer->assign();
+        composer->begin_while();
+        composer->push("begin");
+        composer->push("end");
+        composer->lower_or_equal();
+        composer->set_while_condition();
+        composer->push("result");
+        composer->push("result");
+        composer->push("begin");
+        composer->post_increment();
+        composer->plus();
+        composer->end_while();
+        composer->end();
+
         composer->begin("ternary_a_or_b");
         composer->set_return_type("int");
         composer->set_parameter("a", "int");
@@ -449,10 +471,13 @@ return 0;
         composer->set_return_type("double");
         composer->set_parameter("x", "double");
         composer->push("x");
+        composer->return_value();
         composer->end();
+
         composer->begin("internal::0_param_test");
         composer->set_return_type("double");
         composer->push<double>(0.0, "double");
+        composer->return_value();
         composer->end();
 
         composer->begin("internal::call_test");
@@ -471,9 +496,9 @@ return 0;
         composer->begin("internal::float_to_int");
         composer->set_return_type("int");
         composer->set_parameter("x", "float");
-        composer->push("<return>");
         composer->push("x");
-        composer->call("int", 1);
+        composer->call("int", -1);
+        composer->return_value();
         composer->end();
 
         composer->begin("internal::sum_ints_as_doubles");

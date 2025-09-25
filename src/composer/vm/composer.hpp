@@ -71,6 +71,7 @@ public:
     void ternary() override;
 
     void begin_while() override;
+    void set_while_condition() override;
     void end_while() override;
 
     void pre_increment() override;

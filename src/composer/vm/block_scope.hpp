@@ -79,10 +79,17 @@ namespace zen::composer::vm
             return it;
         }
 
-        static block_scope* __unsafely_make_while()
+        static block_scope* __unsafely_make_while_prologue()
         {
             const auto it = new block_scope;
-            it->type = type::in_while;
+            it->type = type::in_while_prologue;
+            return it;
+        }
+
+        static block_scope* __unsafely_make_while_body()
+        {
+            const auto it = new block_scope;
+            it->type = type::in_while_body;
             return it;
         }
     };

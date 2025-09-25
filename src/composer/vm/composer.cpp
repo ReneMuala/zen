@@ -16,9 +16,7 @@ namespace zen
     {
         if (_stack.empty())
         {
-            throw exceptions::semantic_error(fmt::format(
-                                                 "value expected",
-                                                 __FUNCTION__, _stack.size()), _ilc_offset);
+            return value(get_type("unit"), 0);
         }
         return _stack.top();
     }
@@ -576,7 +574,16 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
     void composer::vm::composer::begin_while()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        scope.push(block_scope::__unsafely_make_while());
+        scope.push(block_scope::__unsafely_make_while_prologue());
+        label begin;
+        begin.bind(code);
+        scope.labels.push(begin);
+    }
+
+    void composer::vm::composer::set_while_condition()
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_while_prologue);
+        scope.push(block_scope::__unsafely_make_while_body());
         if (_stack.size() < 1)
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
@@ -584,19 +591,17 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
                 _stack.size()));
         const auto condition = top();
         pop();
-        label begin, end;
-        begin.bind(code);
+        label end;
         code.push_back(go_if_not);
         code.push_back(condition.address(scope.stack_usage));
         code.push_back(0);
         end.use(code);
-        scope.labels.push(begin);
         scope.labels.push(end);
     }
 
     void composer::vm::composer::end_while()
     {
-        KAIZEN_REQUIRE_SCOPE(scope::in_while);
+        KAIZEN_REQUIRE_SCOPE(scope::in_while_body);
         if (_stack.size() < 2)
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
@@ -610,7 +615,8 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
         code.push_back(0);
         begin.use(code);
         end.bind(code);
-        scope.pop();
+        scope.pop(); // in_while_body
+        scope.pop(); // in_while_prologue
     }
 
 #define KAIZEN_IF_PREINCREMENT_FOR(T, NT)\
@@ -830,7 +836,7 @@ if (top().is(#T))\
                                                                    std::string, std::unordered_map<
                                                                        std::string, i64>>::iterator& caster_set)
     {
-        if (_stack.size() < 2)
+        if (_stack.size() < 1)
         {
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
@@ -848,22 +854,15 @@ if (top().is(#T))\
         const value rhs = top();
         pop();
         if (top().is("function"))
-        {
             pop(); // pop the caster itself from composer's stack
-            if (args_count < 0)
-            {
-                push(get_type(name));
-            }
-            else if (_stack.empty())
-            {
-                throw exceptions::semantic_error(fmt::format(
-                                                     "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
-                                                     __FUNCTION__, _stack.size()), _ilc_offset);
-            }
-        }
+        if (args_count < 0)
+            push(get_type(name));
+        else if (_stack.empty())
+            throw exceptions::semantic_error(fmt::format(
+                                                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
+                                                 __FUNCTION__, _stack.size()), _ilc_offset);
         const value lhs = top();
         pop();
-
         if (lhs.is(name))
         {
             if (const auto caster = (*caster_set).second.find(rhs.type->name); caster != caster_set->second.end())
@@ -902,14 +901,14 @@ if (top().is(#T))\
         const i8 abs_args_count = abs(args_count);
         const i64& addr = std::get<i64>(func_it->second);
         const signature& sig = std::get<signature>(func_it->second);
-        if (_stack.size() < abs_args_count + 1 || abs_args_count != sig.parameters.size())
+        if (abs_args_count != sig.parameters.size() || _stack.size() < abs_args_count + 1)
         {
             throw exceptions::semantic_error(fmt::format(
                                                  "wrong number of arguments for \"{}\"", name), _ilc_offset);
         }
         // if (args_count < 0) // when assigning, copy the value directly to lhs
         // {
-        auto returned = _push_callee_return_value(sig);
+        const auto returned = _push_callee_return_value(sig);
         // }
         _push_callee_arguments(sig, abs_args_count);
         if (top().is("function"))
