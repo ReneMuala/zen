@@ -3,12 +3,7 @@
 //
 
 #pragma once
-#include <optional>
-
-#include "scope.hpp"
 #include "block_scope.hpp"
-#include "label.hpp"
-#include "composer/composer.hpp"
 namespace zen::composer::vm
 {
     struct for_scope : public block_scope
