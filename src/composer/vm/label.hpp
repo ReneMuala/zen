@@ -17,7 +17,7 @@ class label {
       if (code.empty())
          throw std::invalid_argument("cannot bind label in empty code");
       if (bind_address)
-         code[code.size() - 1] = bind_address.value();
+         code[code.size() - 1] = bind_address.value() - code.size() + 3;
       else
          indexes.emplace_back(code.size() - 1);
    }
@@ -26,7 +26,7 @@ class label {
    {
       for (const auto & index : indexes)
       {
-         code[index] = static_cast<i64>(code.size());
+         code[index] = static_cast<i64>(code.size()) - index - 1;
       }
       bind_address = code.size();
    }
