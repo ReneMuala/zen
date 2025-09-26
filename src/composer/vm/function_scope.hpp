@@ -20,15 +20,6 @@ namespace zen::composer::vm
         } return_data = {};
         std::stack<label> labels = {};
         std::string name = {};
-        i64 stack_usage = {};
-        std::map<std::string, symbol> locals = {};
-
-        [[nodiscard]] bool is(const enum type& t) const override
-        {
-            return t & type::in_function;
-        }
-
-
 
         ~function_scope() override = default;
     };
