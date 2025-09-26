@@ -245,7 +245,7 @@ TEST(vm_unit, go_test)
 {
     i64 result = 0, value1 = 1, value2 = 42;
     std::vector<i64> code {
-        go, 4,                                    // Jump over next instruction
+        go, 3,                                    // Jump over next instruction
         i64_to_i64, vm::ref(result), vm::ref(value1),  // This should be skipped
         i64_to_i64, vm::ref(result), vm::ref(value2),  // This should execute
         hlt
@@ -261,7 +261,7 @@ TEST(vm_unit, go_if_true_test)
     boolean condition = false;
     i64 result = 0, value1 = 1, value2 = 42;
     std::vector<i64> code {
-        go_if_not, vm::ref(condition), 5,                   // Jump if false
+        go_if_not, vm::ref(condition), 3,                   // Jump if false
         i64_to_i64, vm::ref(result), vm::ref(value1),        // Skip this
         i64_to_i64, vm::ref(result), vm::ref(value2),        // Execute this
         hlt
