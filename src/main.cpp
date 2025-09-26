@@ -364,28 +364,6 @@ void print_zen_string(void * str)
     // printf("(%d bytes)", len);
 }
 
-// struct return_data
-// {
-//     std::optional<zen::composer::value> value = std::nullopt;
-//     std::optional<std::string> name = std::nullopt;
-// } ;
-struct function_scope1 : public zen::composer::vm::block_scope
-{
-    // return_data return_data = {};
-    std::stack<zen::composer::vm::label> labels = {};
-    // std::string name = {};
-    // zen::i64 stack_usage = {};
-    // std::map<std::string, zen::composer::symbol> locals = {};
-
-    [[nodiscard]] bool is(const enum type& t) const override
-    {
-        return t & type::in_function;
-    }
-
-    ~function_scope1() override = default;
-};
-
-
 int main(int argc, char** argv) try
 {
 #ifdef KAIZEN_WASM
@@ -394,6 +372,79 @@ return 0;
     if (true)
     {
         zen::composer::composer* composer = get_composer();
+
+        composer->begin("scope_test");
+        composer->set_local("result", "int");
+        composer->set_local("x", "int");
+        composer->set_local("y", "int");
+        composer->begin_while();
+        composer->push<zen::boolean>(true, "bool");
+        composer->set_while_condition();
+        composer->set_local("result", "int");
+        composer->set_local("x", "int");
+        composer->set_local("y", "int");
+        composer->push("result");
+        composer->push("x");
+        composer->push("y");
+        composer->plus();
+        composer->assign();
+        composer->end_while();
+        composer->push("result");
+        composer->push("x");
+        composer->push("y");
+        composer->plus();
+        composer->assign();
+        composer->end();
+        composer->bake();
+
+        composer->begin("sum_using_reverse");
+        composer->set_return_type("int");
+        composer->set_return_name("result");
+        composer->set_parameter("begin", "int");
+        composer->set_parameter("end", "int");
+        composer->set_local("result", "int");
+        composer->push("result");
+        composer->push<zen::i32>(0, "int");
+        composer->assign();
+        composer->begin_for();
+        composer->set_local("i", "int");
+        composer->push("i");
+        composer->push("end");
+        composer->push("begin");
+        composer->push<zen::i32>(-1, "int");
+        composer->set_for_begin_end_step();
+        composer->push("result");
+        composer->push("result");
+        composer->push("i");
+        composer->plus();
+        composer->assign();
+        composer->end_for();
+        composer->end();
+        composer->bake();
+
+        composer->begin("sum_using_for");
+        composer->set_return_type("int");
+        composer->set_return_name("result");
+        composer->set_parameter("begin", "int");
+        composer->set_parameter("end", "int");
+        composer->set_local("result", "int");
+        composer->push("result");
+        composer->push<zen::i32>(0, "int");
+        composer->assign();
+        composer->begin_for();
+        composer->set_local("i", "int");
+        composer->push("i");
+        composer->push("begin");
+        composer->push("end");
+        composer->set_for_begin_end();
+        composer->push("result");
+        composer->push("result");
+        composer->push("i");
+        composer->plus();
+        composer->assign();
+        composer->end_for();
+        composer->end();
+        composer->bake();
 
         composer->begin("sum_using_while");
         composer->set_return_type("int");

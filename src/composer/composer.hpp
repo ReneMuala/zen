@@ -102,7 +102,7 @@ namespace zen::composer
 
     struct symbol : value
     {
-        const std::string name;
+        std::string name;
         symbol(std::string  name, const std::shared_ptr<const composer::type> & type, const i64 & address) : value(type, address), name(std::move(name)) {}
     };
 
@@ -199,7 +199,7 @@ public:
     virtual void begin_for() = 0;
     /// in case of collections or streams
     virtual void set_for_iterator() = 0;
-    virtual void set_for_begin_end();
+    virtual void set_for_begin_end() = 0;
     virtual void set_for_begin_end_step() = 0;
     virtual void end_for() = 0;
     //

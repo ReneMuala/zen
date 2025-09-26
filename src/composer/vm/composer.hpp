@@ -36,7 +36,7 @@ public:
     void end() override;
     void bake() override;
     void assign() override;
-    void _push_variable(const std::vector<std::string> & tokens, const std::map<std::string, symbol>::iterator& location);
+    void _push_variable(const std::vector<std::string> & tokens, const symbol& location);
     void _push_function(const std::unordered_map<std::string, std::tuple<signature, long long>>::iterator& function);
     void _push_return_value();
     void _push_temporary_value(const std::string& type_name);

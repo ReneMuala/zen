@@ -11,6 +11,15 @@
 #include "for_scope.hpp"
 #include "exceptions/semantic_error.hpp"
 
+#define KAIZEN_IF_SCOPE_OPENNING(T)\
+    scope.__dncd__push(block_scope::__unsafely_make(T));
+#define KAIZEN_IF_SCOPE_CLOSURE()\
+    if (const i64 size = scope.__dncd__pop())\
+    {\
+        code.push_back(most);\
+        code.push_back(size);\
+    }
+
 namespace zen
 {
     composer::value composer::vm::composer::top()
@@ -66,6 +75,7 @@ namespace zen
     void composer::vm::composer::begin(std::string name)
     {
         scope = function_scope();
+        scope.type = scope::in_function;
         scope.name = name;
         functions.emplace(std::move(name), std::make_tuple<signature, size_t>(
                               signature{
@@ -85,7 +95,7 @@ namespace zen
 
 
 #define KAIZEN_REQUIRE_SCOPE(S)\
-if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize of {} scope", __FUNCTION__, #S))
+if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize of {}", __FUNCTION__, #S))
 
     void composer::vm::composer::set_return_type(const std::string& name)
     {
@@ -130,11 +140,11 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
         const auto& t = get_type(type);
-        const i64 address = scope.stack_usage;
+        scope.set_local(name, t);
+        // scope.locals.emplace(name, symbol(name, t, scope.stack_usage));
+        // scope.stack_usage += t->get_size();
         code.push_back(zen::most);
         code.push_back(-t->get_size());
-        scope.stack_usage += t->get_size();
-        scope.locals.emplace(name, symbol(name, t, address));
     }
 
     void composer::vm::composer::end()
@@ -226,6 +236,12 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
                 {
                     fmt::print("cp, {}, {}, ", code[i + 1], code[i + 2]);
                     i += 2;
+                }
+
+                else if (_code >= gt_i8 && _code <= neq_f64)
+                {
+                    fmt::print("cmp, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
+                    i += 3;
                 }
                 else if (_code == write_str)
                 {
@@ -331,9 +347,9 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
     }
 
     void composer::vm::composer::_push_variable(const std::vector<std::string>& tokens,
-                                                const std::map<std::string, symbol>::iterator& location)
+                                                const symbol& location)
     {
-        value val = location->second;
+        value val = location;
         std::pair<i64, std::shared_ptr<const type>> item = {0, val.type};
         for (int i = 1; i < tokens.size(); ++i)
         {
@@ -371,8 +387,8 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
         if (tokens.empty())
             throw exceptions::semantic_error(fmt::format("invalid name '{}'", name), _ilc_offset);
 
-        if (const auto location = scope.locals.find(tokens.front()); location != scope.locals.end())
-            _push_variable(tokens, location);
+        if (const auto location = scope.get_local(tokens.front()))
+            _push_variable(tokens, *location);
         else if (const auto function = functions.find(tokens.front()); function != functions.end())
             _push_function(function);
         else if (name == "<return>" && scope.return_data.value)
@@ -575,7 +591,7 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
     void composer::vm::composer::begin_while()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        scope.push(block_scope::__unsafely_make(scope::in_while_prologue));
+        KAIZEN_IF_SCOPE_OPENNING(scope::in_while_prologue);
         label begin;
         begin.bind(code);
         scope.labels.push(begin);
@@ -584,7 +600,7 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
     void composer::vm::composer::set_while_condition()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_while_prologue);
-        scope.push(block_scope::__unsafely_make(scope::in_while_body));
+        KAIZEN_IF_SCOPE_OPENNING(scope::in_while_body);
         if (_stack.size() < 1)
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
@@ -603,21 +619,21 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
     void composer::vm::composer::end_while()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_while_body);
-        if (_stack.size() < 2)
+        if (scope.labels.size() < 2)
             throw std::logic_error(fmt::format(
-                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
+                "[Error: Invalid state] Cannot compose operation {} because scope labels size {} is below expected",
                 __FUNCTION__,
-                _stack.size()));
+                scope.labels.size()));
         label end = scope.labels.top();
         scope.labels.pop();
         label begin = scope.labels.top();
         scope.labels.pop();
+        KAIZEN_IF_SCOPE_CLOSURE(); // in_while_body
+        KAIZEN_IF_SCOPE_CLOSURE(); // in_while_prologue
         code.push_back(go);
         code.push_back(0);
         begin.use(code);
         end.bind(code);
-        scope.pop(); // in_while_body
-        scope.pop(); // in_while_prologue
     }
 
 #define KAIZEN_IF_PREINCREMENT_FOR(T, NT)\
@@ -751,7 +767,7 @@ if (top().is(#T))\
     void composer::vm::composer::begin_for()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        scope.push(block_scope::__unsafely_make(scope::in_for));
+        KAIZEN_IF_SCOPE_OPENNING(scope::in_for);
     }
 
     void composer::vm::composer::set_for_iterator()
@@ -1159,7 +1175,7 @@ if (top().is(#T))\
     void composer::vm::composer::begin_if_then()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        scope.push(block_scope::__unsafely_make(scope::in_if));
+        KAIZEN_IF_SCOPE_OPENNING(scope::in_if);
         _begin_if_then(false);
     }
 
@@ -1205,8 +1221,8 @@ if (top().is(#T))\
     void composer::vm::composer::else_then()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_if);
-        scope.pop();
-        scope.push(block_scope::__unsafely_make(scope::in_else));
+        KAIZEN_IF_SCOPE_CLOSURE();
+        KAIZEN_IF_SCOPE_OPENNING(scope::in_else);
         if (scope.labels.size() < 2)
             throw exceptions::semantic_error(fmt::format("cannot use else if without a prior if"), _ilc_offset);
 
@@ -1228,7 +1244,8 @@ if (top().is(#T))\
     void composer::vm::composer::end_if()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_if);
-        scope.pop();
+        KAIZEN_IF_SCOPE_CLOSURE();
+
         if (scope.labels.size() < 2)
             throw exceptions::semantic_error(fmt::format("cannot end if without a prior if"), _ilc_offset);
 
