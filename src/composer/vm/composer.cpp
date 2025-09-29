@@ -12,9 +12,9 @@
 #include "exceptions/semantic_error.hpp"
 
 #define KAIZEN_IF_SCOPE_OPENNING(T)\
-    scope.__dncd__push(block_scope::__unsafely_make(T));
+    scope->__dncd__push(block_scope::__unsafely_make(T));
 #define KAIZEN_IF_SCOPE_CLOSURE()\
-    if (const i64 size = scope.__dncd__pop())\
+    if (const i64 size = scope->__dncd__pop())\
     {\
         code.push_back(most);\
         code.push_back(size);\
@@ -41,13 +41,13 @@ namespace zen
         zen::composer::composer::reset();
         code = {hlt};
         functions = {
-            {"int", {signature{}, 0}},
-            {"long", {signature{}, 0}},
-            {"short", {signature{}, 0}},
-            {"float", {signature{}, 0}},
-            {"double", {signature{}, 0}},
-            {"bool", {signature{}, 0}},
-            {"byte", {signature{}, 0}}
+            {"int", {{signature{}, 0}}},
+            {"long", {{signature{}, 0}}},
+            {"short", {{signature{}, 0}}},
+            {"float", {{signature{}, 0}}},
+            {"double", {{signature{}, 0}}},
+            {"bool", {{signature{}, 0}}},
+            {"byte", {{signature{}, 0}}}
         };
         auto string_type = std::make_shared<type>("string", 0, type::kind::heap);
         types = {
@@ -74,57 +74,57 @@ namespace zen
 
     void composer::vm::composer::begin(std::string name)
     {
-        scope = function_scope();
-        scope.type = scope::in_function;
-        scope.name = name;
-        functions.emplace(std::move(name), std::make_tuple<signature, size_t>(
-                              signature{
-                                  .type = get_type("unit")
-                              }, code.size()));
-        scope.return_data.value.emplace(value(get_type("unit"), 0));
+        const auto definition = std::ref(functions[name].emplace_back(
+            signature{
+                .type = get_type("unit")
+            }, code.size()));
+        scope = std::make_unique<function_scope>(definition);
+        scope->type = scope::in_function;
+        scope->name = name;
+        scope->return_data.value.emplace(value(get_type("unit"), 0));
     }
 
     void composer::vm::composer::set_parameter(std::string name, const std::string& type)
     {
-        std::get<signature>(functions.at(scope.name)).parameters.emplace_back(get_type(type));
+        std::get<signature>(scope->definition.get()).parameters.emplace_back(get_type(type));
         const auto& t = get_type(type);
-        const i64 address = scope.stack_usage - /* jump callee IP */static_cast<i64>(sizeof(i64));
-        scope.stack_usage += t->get_size();
-        scope.locals.emplace(name, symbol(name, t, address));
+        const i64 address = scope->stack_usage - /* jump callee IP */static_cast<i64>(sizeof(i64));
+        scope->stack_usage += t->get_size();
+        scope->locals.emplace(name, symbol(name, t, address));
     }
 
 
 #define KAIZEN_REQUIRE_SCOPE(S)\
-if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize of {}", __FUNCTION__, #S))
+if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize of {}", __FUNCTION__, #S))
 
     void composer::vm::composer::set_return_type(const std::string& name)
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        if (scope.stack_usage)
+        if (scope->stack_usage)
         {
             throw std::logic_error("return type cannot be set after params");
         }
         const auto type = get_type(name);
         if (type->get_size() != 0)
         {
-            scope.return_data.value.emplace(
-                value(type, scope.stack_usage - /* jump callee IP */static_cast<i64>(sizeof(i64))));
-            scope.stack_usage += type->get_size();
+            scope->return_data.value.emplace(
+                value(type, scope->stack_usage - /* jump callee IP */static_cast<i64>(sizeof(i64))));
+            scope->stack_usage += type->get_size();
         }
-        std::get<signature>(functions.at(scope.name)).type = type;
+        std::get<signature>(scope->definition.get()).type = type;
     }
 
     void composer::vm::composer::return_value()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        if (scope.get_return_status() == block_scope::concise_return)
+        if (scope->get_return_status() == block_scope::concise_return)
             throw exceptions::semantic_error("cannot return values more than once", _ilc_offset);
-        scope.set_return_status(block_scope::concise_return);
+        scope->set_return_status(block_scope::concise_return);
         const value rhs = top();
         pop();
-        if (not scope.return_data.value->is("unit"))
+        if (not scope->return_data.value->is("unit"))
         {
-            push(scope.return_data.value.value());
+            push(scope->return_data.value.value());
             push(rhs);
             assign();
         }
@@ -133,16 +133,16 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
     void composer::vm::composer::set_return_name(const std::string& name)
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        scope.return_data.name = name;
+        scope->return_data.name = name;
     }
 
     void composer::vm::composer::set_local(std::string name, const std::string& type)
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
         const auto& t = get_type(type);
-        scope.set_local(name, t);
-        // scope.locals.emplace(name, symbol(name, t, scope.stack_usage));
-        // scope.stack_usage += t->get_size();
+        scope->set_local(name, t);
+        // scope->locals.emplace(name, symbol(name, t, scope->stack_usage));
+        // scope->stack_usage += t->get_size();
         code.push_back(zen::most);
         code.push_back(-t->get_size());
     }
@@ -150,19 +150,19 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
     void composer::vm::composer::end()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        if (scope.return_data.name)
+        if (scope->return_data.name)
         {
-            push(scope.return_data.name.value());
+            push(scope->return_data.name.value());
             return_value();
         }
-        else if (scope.get_return_status() != block_scope::concise_return and not scope.return_data.value->is("unit"))
+        else if (scope->get_return_status() != block_scope::concise_return and not scope->return_data.value->is("unit"))
             throw exceptions::semantic_error("missing return value", _ilc_offset,
                                              fmt::format(
                                                  "please use a named return or ensure that all control paths return a value of type {}",
-                                                 scope.return_data.value->type->name));
-        const auto sig = std::get<signature>(functions.at(scope.name));
+                                                 scope->return_data.value->type->name));
+        const auto sig = std::get<signature>(scope->definition.get());
         const auto sizes = get_return_size(sig) + get_parameters_size(sig);
-        if (const auto most_delta = scope.stack_usage - sizes; most_delta > 0)
+        if (const auto most_delta = scope->stack_usage - sizes; most_delta > 0)
         {
             code.push_back(zen::most);
             code.push_back(most_delta);
@@ -184,99 +184,102 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
     {
         for (const auto& function : functions)
         {
-            std::cout << function.first << std::endl;
-            for (i64 i = std::get<1>(function.second); i < code.size(); i++)
+            for (const auto& overload : function.second)
             {
-                const auto& _code = code[i];
-                if (_code == most)
+                std::cout << function.first << std::endl;
+                for (i64 i = overload.second; i < code.size(); i++)
                 {
-                    fmt::print("most, {}, ", code[i + 1]);
-                    i += 1;
-                }
-                else if (_code == walk)
-                {
-                    fmt::print("modify, {}, {}, ", code[i + 1], code[i + 2]);
-                    i += 2;
-                }
-                else if (_code == zen::call)
-                {
-                    fmt::print("call, {}, ", code[i + 1]);
-                    i += 1;
-                }
-                else if (_code == add_i32 || _code == add_i64 || _code == add_f64 || _code == add_i8 || _code ==
-                    add_i16)
-                {
-                    fmt::print("add, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
-                    i += 3;
-                }
-                else if (_code == sub_i64 || _code == sub_i32 || _code == sub_f64 || _code == sub_i8 || _code ==
-                    sub_i16)
-                {
-                    fmt::print("sub, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
-                    i += 3;
-                }
-                else if (_code == mul_i32 || _code == mul_i64 || _code == mul_f64 || _code == mul_i8 || _code ==
-                    mul_i16)
-                {
-                    fmt::print("mul, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
-                    i += 3;
-                }
-                else if (_code == div_i32 || _code == div_i64 || _code == div_f64 || _code == div_i8 || _code ==
-                    div_i16)
-                {
-                    fmt::print("div, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
-                    i += 3;
-                }
-                else if (_code >= push_i8 && _code <= push_boolean)
-                {
-                    fmt::print("push, {}, ", code[i + 1]);
-                    i += 1;
-                }
-                else if (_code >= i8_to_i64 && _code <= f64_to_boolean)
-                {
-                    fmt::print("cp, {}, {}, ", code[i + 1], code[i + 2]);
-                    i += 2;
-                }
+                    const auto& _code = code[i];
+                    if (_code == most)
+                    {
+                        fmt::print("most, {}, ", code[i + 1]);
+                        i += 1;
+                    }
+                    else if (_code == walk)
+                    {
+                        fmt::print("modify, {}, {}, ", code[i + 1], code[i + 2]);
+                        i += 2;
+                    }
+                    else if (_code == zen::call)
+                    {
+                        fmt::print("call, {}, ", code[i + 1]);
+                        i += 1;
+                    }
+                    else if (_code == add_i32 || _code == add_i64 || _code == add_f64 || _code == add_i8 || _code ==
+                        add_i16)
+                    {
+                        fmt::print("add, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
+                        i += 3;
+                    }
+                    else if (_code == sub_i64 || _code == sub_i32 || _code == sub_f64 || _code == sub_i8 || _code ==
+                        sub_i16)
+                    {
+                        fmt::print("sub, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
+                        i += 3;
+                    }
+                    else if (_code == mul_i32 || _code == mul_i64 || _code == mul_f64 || _code == mul_i8 || _code ==
+                        mul_i16)
+                    {
+                        fmt::print("mul, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
+                        i += 3;
+                    }
+                    else if (_code == div_i32 || _code == div_i64 || _code == div_f64 || _code == div_i8 || _code ==
+                        div_i16)
+                    {
+                        fmt::print("div, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
+                        i += 3;
+                    }
+                    else if (_code >= push_i8 && _code <= push_boolean)
+                    {
+                        fmt::print("push, {}, ", code[i + 1]);
+                        i += 1;
+                    }
+                    else if (_code >= i8_to_i64 && _code <= f64_to_boolean)
+                    {
+                        fmt::print("cp, {}, {}, ", code[i + 1], code[i + 2]);
+                        i += 2;
+                    }
 
-                else if (_code >= gt_i8 && _code <= neq_f64)
-                {
-                    fmt::print("cmp, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
-                    i += 3;
+                    else if (_code >= gt_i8 && _code <= neq_f64)
+                    {
+                        fmt::print("cmp, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
+                        i += 3;
+                    }
+                    else if (_code == write_str)
+                    {
+                        fmt::print("write, {}, {}, ", code[i + 1], code[i + 2]);
+                        i += 2;
+                    }
+                    else if (_code == go_if_not)
+                    {
+                        fmt::print("go_if_not, {}, {}, ", code[i + 1], code[i + 2]);
+                        i += 2;
+                    }
+                    else if (_code == go)
+                    {
+                        fmt::print("go, {}, ", code[i + 1]);
+                        i += 1;
+                    }
+                    else if (_code >= write_i8 && _code <= write_f64)
+                    {
+                        fmt::print("write, {}, ", code[i + 1]);
+                        i += 1;
+                    }
+                    else if (_code >= read_i8 && _code <= read_f64)
+                    {
+                        fmt::print("read, {}, ", code[i + 1]);
+                        i += 1;
+                    }
+                    else if (_code == ret)
+                        fmt::print("ret, ");
+                    else if (_code == hlt)
+                        fmt::print("hlt, ");
+                    else
+                        std::cout << _code << ' ';
+                    if (_code == zen::ret || _code == zen::hlt) break;
                 }
-                else if (_code == write_str)
-                {
-                    fmt::print("write, {}, {}, ", code[i + 1], code[i + 2]);
-                    i += 2;
-                }
-                else if (_code == go_if_not)
-                {
-                    fmt::print("go_if_not, {}, {}, ", code[i + 1], code[i + 2]);
-                    i += 2;
-                }
-                else if (_code == go)
-                {
-                    fmt::print("go, {}, ", code[i + 1]);
-                    i += 1;
-                }
-                else if (_code >= write_i8 && _code <= write_f64)
-                {
-                    fmt::print("write, {}, ", code[i + 1]);
-                    i += 1;
-                }
-                else if (_code >= read_i8 && _code <= read_f64)
-                {
-                    fmt::print("read, {}, ", code[i + 1]);
-                    i += 1;
-                }
-                else if (_code == ret)
-                    fmt::print("ret, ");
-                else if (_code == hlt)
-                    fmt::print("hlt, ");
-                else
-                    std::cout << _code << ' ';
-                if (_code == zen::ret || _code == zen::hlt) break;
+                std::cout << std::endl;
             }
-            std::cout << std::endl;
         }
     }
 
@@ -305,7 +308,7 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
         {
             throw exceptions::semantic_error("cannot return values from unit function", _ilc_offset,
                                              fmt::format("please consider changing the return type of \"{}\" to {}",
-                                                         scope.name, rhs.type->name));
+                                                         scope->name, rhs.type->name));
         }
 
         if (rhs.is("short") and rhs.has_same_type_as(lhs))
@@ -329,8 +332,8 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
                                              fmt::format(
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
                                                  lhs.type->name, rhs.type->name));
-        code.push_back(lhs.address(scope.stack_usage));
-        code.push_back(rhs.address(scope.stack_usage));
+        code.push_back(lhs.address(scope->stack_usage));
+        code.push_back(rhs.address(scope->stack_usage));
     }
 
     std::vector<std::string> split_name(const std::string& name)
@@ -363,16 +366,14 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
         push(val);
     }
 
-    void composer::vm::composer::_push_function(
-        const std::unordered_map<std::string, std::tuple<signature, long long>>::iterator& function)
+    void composer::vm::composer::_push_function()
     {
-        long address = std::get<i64>(function->second);
-        zen::composer::composer::push(std::move(address), "function");
+        zen::composer::composer::push(0, "function");
     }
 
     void composer::vm::composer::_push_return_value()
     {
-        push(scope.return_data.value.value());
+        push(scope->return_data.value.value());
     }
 
     void composer::vm::composer::_push_temporary_value(const std::string& type_name)
@@ -387,11 +388,11 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
         if (tokens.empty())
             throw exceptions::semantic_error(fmt::format("invalid name '{}'", name), _ilc_offset);
 
-        if (const auto location = scope.get_local(tokens.front()))
+        if (const auto location = scope->get_local(tokens.front()))
             _push_variable(tokens, *location);
         else if (const auto function = functions.find(tokens.front()); function != functions.end())
-            _push_function(function);
-        else if (name == "<return>" && scope.return_data.value)
+            _push_function();
+        else if (name == "<return>" && scope->return_data.value)
             _push_return_value();
         else if (name.starts_with("<") and name.ends_with(">"))
             _push_temporary_value(name);
@@ -456,9 +457,9 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",\
                                                  lhs.type->name, rhs.type->name));\
         }\
-        code.push_back(top().address(scope.stack_usage));\
-        code.push_back(lhs.address(scope.stack_usage));\
-        code.push_back(rhs.address(scope.stack_usage));\
+        code.push_back(top().address(scope->stack_usage));\
+        code.push_back(lhs.address(scope->stack_usage));\
+        code.push_back(rhs.address(scope->stack_usage));\
     }
 
 
@@ -478,7 +479,7 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
             else\
                 throw exceptions::semantic_error(fmt::format(\
                                                      "cannot apply "#I" to type \"{}\"", val.type->name), _ilc_offset, "please consider using type casting. Eg. bool(x)");\
-        code.push_back(val.address(scope.stack_usage));\
+        code.push_back(val.address(scope->stack_usage));\
     }
 
 #define KAIZEN_IF_RELATIONAL_CHAIN(F)\
@@ -524,9 +525,9 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",\
                                                  lhs.type->name, rhs.type->name));\
         }\
-        code.push_back(top().address(scope.stack_usage));\
-        code.push_back(lhs.address(scope.stack_usage));\
-        code.push_back(rhs.address(scope.stack_usage));\
+        code.push_back(top().address(scope->stack_usage));\
+        code.push_back(lhs.address(scope->stack_usage));\
+        code.push_back(rhs.address(scope->stack_usage));\
     }
 
 
@@ -568,7 +569,7 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
                                              _ilc_offset);
         label alt, end;
         code.push_back(go_if_not);
-        code.push_back(condition.address(scope.stack_usage));
+        code.push_back(condition.address(scope->stack_usage));
         code.push_back(0);
         alt.use(code);
 
@@ -594,7 +595,7 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
         KAIZEN_IF_SCOPE_OPENNING(scope::in_while_prologue);
         label begin;
         begin.bind(code);
-        scope.labels.push(begin);
+        scope->labels.push(begin);
     }
 
     void composer::vm::composer::set_while_condition()
@@ -610,24 +611,24 @@ if (not scope.is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize
         pop();
         label end;
         code.push_back(go_if_not);
-        code.push_back(condition.address(scope.stack_usage));
+        code.push_back(condition.address(scope->stack_usage));
         code.push_back(0);
         end.use(code);
-        scope.labels.push(end);
+        scope->labels.push(end);
     }
 
     void composer::vm::composer::end_while()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_while_body);
-        if (scope.labels.size() < 2)
+        if (scope->labels.size() < 2)
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because scope labels size {} is below expected",
                 __FUNCTION__,
-                scope.labels.size()));
-        label end = scope.labels.top();
-        scope.labels.pop();
-        label begin = scope.labels.top();
-        scope.labels.pop();
+                scope->labels.size()));
+        label end = scope->labels.top();
+        scope->labels.pop();
+        label begin = scope->labels.top();
+        scope->labels.pop();
         KAIZEN_IF_SCOPE_CLOSURE(); // in_while_body
         KAIZEN_IF_SCOPE_CLOSURE(); // in_while_prologue
         code.push_back(go);
@@ -802,14 +803,14 @@ if (top().is(#T))\
         push(last);
         lower_or_equal();
         code.push_back(go_if_not);
-        code.push_back(top().address(scope.stack_usage));
+        code.push_back(top().address(scope->stack_usage));
         pop();
         code.push_back(0);
         end.use(code);
 
-        scope.labels.push(begin);
-        scope.labels.push(end);
-        scope.current<for_scope>(scope::in_for)->nested_iterators_count++;
+        scope->labels.push(begin);
+        scope->labels.push(end);
+        scope->current<for_scope>(scope::in_for)->nested_iterators_count++;
     }
 
     void composer::vm::composer::set_for_begin_end_step()
@@ -842,14 +843,14 @@ if (top().is(#T))\
         push(last);
         lower_or_equal();
         code.push_back(go_if_not);
-        code.push_back(top().address(scope.stack_usage));
+        code.push_back(top().address(scope->stack_usage));
         pop();
         code.push_back(0);
         end.use(code);
 
-        scope.labels.push(begin);
-        scope.labels.push(end);
-        scope.current<for_scope>(scope::in_for)->nested_iterators_count++;
+        scope->labels.push(begin);
+        scope->labels.push(end);
+        scope->current<for_scope>(scope::in_for)->nested_iterators_count++;
         // todo: test for implementation
     };
 
@@ -869,72 +870,34 @@ if (top().is(#T))\
         std::optional<value> result;
         if (sig.type->get_size())
         {
-            const i64 address = scope.stack_usage;
+            const i64 address = scope->stack_usage;
             code.push_back(zen::most);
             code.push_back(-sig.type->get_size());
-            scope.stack_usage += sig.type->get_size();
+            scope->stack_usage += sig.type->get_size();
             return value(sig.type, address, value::temporary);
         }
         return std::nullopt;
     }
 
-    void composer::vm::composer::_push_callee_arguments(const signature& sig, const i8& args_count)
+    void composer::vm::composer::_push_callee_arguments(std::deque<value>& arguments)
     {
-        std::deque<value> values;
-        for (int i = 0; i < args_count; i++)
+        for (const value& value : arguments)
         {
-            values.push_front(top());
-            pop();
-        }
-        for (int i = 0; i < args_count; i++)
-        {
-            value& value = values.at(i);
-            if (const auto& param_type = sig.parameters.at(i); value.is(param_type->name))
-            {
-                if (value.is("byte"))
-                {
-                    code.push_back(zen::push_i8);
-                }
-                else if (value.is("bool"))
-                {
-                    code.push_back(zen::push_boolean);
-                }
-                else if (value.is("short"))
-                {
-                    code.push_back(zen::push_i16);
-                }
-                else if (value.is("int"))
-                {
-                    code.push_back(zen::push_i32);
-                }
-                else if (value.is("long"))
-                {
-                    code.push_back(zen::push_i64);
-                }
-                else if (value.is("float"))
-                {
-                    code.push_back(zen::push_f32);
-                }
-                else if (value.is("double"))
-                {
-                    code.push_back(zen::push_f64);
-                }
-                else
-                {
-                    code.push_back(zen::push_i64);
-                }
-                code.push_back(value.address(scope.stack_usage));
-            }
-            else
-            {
-                throw exceptions::semantic_error(fmt::format(
-                                                     "cannot pass {} argument to {} parameter in {} place at call",
-                                                     value.type->name,
-                                                     param_type->name, i + 1), _ilc_offset,
-                                                 fmt::format(
-                                                     "please consider using type casting. Eg. {}(y) // with y: {}, if applicable.",
-                                                     param_type->name, value.type->name));
-            }
+            if (value.is("byte"))
+                code.push_back(zen::push_i8);
+            else if (value.is("bool"))
+                code.push_back(zen::push_boolean);
+            else if (value.is("short"))
+                code.push_back(zen::push_i16);
+            else if (value.is("int"))
+                code.push_back(zen::push_i32);
+            else if (value.is("float"))
+                code.push_back(zen::push_f32);
+            else if (value.is("double"))
+                code.push_back(zen::push_f64);
+            else // if (value.is("long") or true)
+                code.push_back(zen::push_i64);
+            code.push_back(value.address(scope->stack_usage));
         }
     }
 
@@ -975,8 +938,8 @@ if (top().is(#T))\
             if (const auto caster = (*caster_set).second.find(rhs.type->name); caster != caster_set->second.end())
             {
                 code.push_back((*caster).second);
-                code.push_back(lhs.address(scope.stack_usage));
-                code.push_back(rhs.address(scope.stack_usage));
+                code.push_back(lhs.address(scope->stack_usage));
+                code.push_back(rhs.address(scope->stack_usage));
                 if (args_count == -1)
                 {
                     push(lhs);
@@ -1002,26 +965,52 @@ if (top().is(#T))\
 
     composer::call_result composer::vm::composer::_call_function(const std::string& name, const i8& args_count,
                                                                  const std::unordered_map<
-                                                                     std::string, std::tuple<
-                                                                         signature, long long>>::iterator& func_it)
+                                                                     std::string, std::list<std::pair<
+                                                                         signature, long long>>>::
+                                                                 iterator& func_it)
     {
         const i8 abs_args_count = abs(args_count);
-        const i64& addr = std::get<i64>(func_it->second);
-        const signature& sig = std::get<signature>(func_it->second);
-        if (abs_args_count != sig.parameters.size() || _stack.size() < abs_args_count + 1)
-        {
-            throw exceptions::semantic_error(fmt::format(
-                                                 "wrong number of arguments for \"{}\"", name), _ilc_offset);
-        }
-        // if (args_count < 0) // when assigning, copy the value directly to lhs
-        // {
-        const auto returned = _push_callee_return_value(sig);
-        // }
-        _push_callee_arguments(sig, abs_args_count);
+        std::deque<value> arguments;
         if (top().is("function"))
         {
             pop(); // pop the function itself from composer's stack
         }
+        for (int i = 0; i < abs_args_count; i++)
+        {
+            arguments.push_front(top());
+            pop();
+        }
+
+        std::optional<std::reference_wrapper<const std::pair<signature, long long>>> candidate;
+        for (const auto& overload : func_it->second)
+        {
+            if (overload.first.parameters.size() != arguments.size()) continue;
+            if (arguments.empty())
+            {
+                candidate = overload;
+                break;
+            }
+            for (int i = 0; i < arguments.size(); i++)
+            {
+                if (overload.first.parameters.at(i) != arguments.at(i).type)
+                    break;
+                if (i + 1 == arguments.size())
+                    candidate = overload;
+            }
+            if (candidate)
+                break;
+        }
+
+        if (not candidate)
+            throw exceptions::semantic_error(fmt::format("no function overload matched for \'{}\'", name), _ilc_offset);
+        const i64& addr = candidate->get().second;
+        const signature& sig = candidate->get().first;
+        // if (args_count < 0) // when assigning, copy the value directly to lhs
+        // {
+        const auto returned = _push_callee_return_value(sig);
+        // }
+        _push_callee_arguments(arguments);
+
         if (returned)
         {
             push(returned.value());
@@ -1051,13 +1040,13 @@ if (top().is(#T))\
         {
             value v = top();
             pop();
-            v.prepare(code, scope.stack_usage);
+            v.prepare(code, scope->stack_usage);
             args.push(v);
         }
         code.push_back(zen::write_str);
         for (int i = 0; i < args_count; i++)
         {
-            code.push_back(args.top().address(scope.stack_usage));
+            code.push_back(args.top().address(scope->stack_usage));
             args.pop();
         }
         return call_result::result;
@@ -1077,13 +1066,13 @@ if (top().is(#T))\
         {
             value v = top();
             pop();
-            v.prepare(code, scope.stack_usage);
+            v.prepare(code, scope->stack_usage);
             args.push(v);
         }
         code.push_back(name);
         for (int i = 0; i < args_count; i++)
         {
-            code.push_back(args.top().address(scope.stack_usage));
+            code.push_back(args.top().address(scope->stack_usage));
             args.pop();
         }
         return call_result::result;
@@ -1124,19 +1113,18 @@ if (top().is(#T))\
 
     void composer::vm::composer::end_for()
     {
-
         KAIZEN_REQUIRE_SCOPE(scope::in_for);
-        const auto current = scope.current<for_scope>(scope::in_for);
-        if (current->nested_iterators_count * 2 < scope.labels.size())
+        const auto current = scope->current<for_scope>(scope::in_for);
+        if (current->nested_iterators_count * 2 < scope->labels.size())
         {
             throw exceptions::semantic_error("cannot finish inconsistent for loop.", _ilc_offset);
         }
         for (int i = 0; i < current->nested_iterators_count; i++)
         {
-            label end = scope.labels.top();
-            scope.labels.pop();
-            label begin = scope.labels.top();
-            scope.labels.pop();
+            label end = scope->labels.top();
+            scope->labels.pop();
+            label begin = scope->labels.top();
+            scope->labels.pop();
             code.push_back(go);
             code.push_back(0);
             begin.use(code);
@@ -1146,10 +1134,10 @@ if (top().is(#T))\
 
     void composer::vm::composer::push(const std::shared_ptr<const type>& type)
     {
-        _stack.emplace(type, scope.stack_usage, value::temporary);
+        _stack.emplace(type, scope->stack_usage, value::temporary);
         code.push_back(most);
         code.push_back(-type->get_size());
-        scope.stack_usage += type->get_size();
+        scope->stack_usage += type->get_size();
     }
 
     i64 composer::vm::composer::get_parameters_size(const signature& sig)
@@ -1197,18 +1185,18 @@ if (top().is(#T))\
         }
         label else_label;
         if (not nested)
-            scope.labels.emplace();
+            scope->labels.emplace();
         else
         {
-            else_label = scope.labels.top();
-            scope.labels.pop();
+            else_label = scope->labels.top();
+            scope->labels.pop();
         }
 
-        code.push_back(condition.address(scope.stack_usage));
+        code.push_back(condition.address(scope->stack_usage));
         code.push_back(0);
         else_label.use(code);
 
-        scope.labels.push(else_label);
+        scope->labels.push(else_label);
     }
 
     void composer::vm::composer::else_if_then()
@@ -1223,22 +1211,22 @@ if (top().is(#T))\
         KAIZEN_REQUIRE_SCOPE(scope::in_if);
         KAIZEN_IF_SCOPE_CLOSURE();
         KAIZEN_IF_SCOPE_OPENNING(scope::in_else);
-        if (scope.labels.size() < 2)
+        if (scope->labels.size() < 2)
             throw exceptions::semantic_error(fmt::format("cannot use else if without a prior if"), _ilc_offset);
 
-        // if (scope.return_status != first_branched_return)
-        // scope.return_status = no_return;
+        // if (scope->return_status != first_branched_return)
+        // scope->return_status = no_return;
 
-        label else_label = scope.labels.top();
-        scope.labels.pop();
+        label else_label = scope->labels.top();
+        scope->labels.pop();
 
-        label& end_label = scope.labels.top();
+        label& end_label = scope->labels.top();
         code.push_back(zen::instruction::go);
         code.push_back(0);
         end_label.use(code);
         else_label.bind(code);
 
-        scope.labels.emplace();
+        scope->labels.emplace();
     }
 
     void composer::vm::composer::end_if()
@@ -1246,13 +1234,13 @@ if (top().is(#T))\
         KAIZEN_REQUIRE_SCOPE(scope::in_if);
         KAIZEN_IF_SCOPE_CLOSURE();
 
-        if (scope.labels.size() < 2)
+        if (scope->labels.size() < 2)
             throw exceptions::semantic_error(fmt::format("cannot end if without a prior if"), _ilc_offset);
 
-        label else_label = scope.labels.top();
-        scope.labels.pop();
-        label end_label = scope.labels.top();
-        scope.labels.pop();
+        label else_label = scope->labels.top();
+        scope->labels.pop();
+        label end_label = scope->labels.top();
+        scope->labels.pop();
 
         else_label.bind(code);
         end_label.bind(code);

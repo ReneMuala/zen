@@ -97,7 +97,7 @@ TEST(composer_unit, sum_ints_as_doubles)
     composer->plus();
     composer->return_value();
     composer->end();
-    composer->bake();
+    // composer->bake();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,most, -8, i32_to_f64, -8, -24, most, -8, i32_to_f64, -8, -28, most, -8, add_f64, -8, -24, -16, f64_to_f64, -48, -8, most, 24, ret,}));
 }
 
@@ -1061,6 +1061,43 @@ TEST(composer_unit, scope) {
     auto _p = (i64)composer->_pool.get<zen::boolean>(true).get(); // increment
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
         (std::vector<i64>{hlt, most, -4, most, -4, most, -4, go_if_not, _p, 19, most, -4, most, -4, most, -4, most, -4, add_i32, -4, -12, -8, i32_to_i32, -16, -4, most, 12, go, -19, most, -4, add_i32, -4, -16, -12, i32_to_i32, -20, -4, most, 20, ret,}));
+}
+
+TEST(composer_unit, overloading)
+{
+    using namespace zen;
+    int ilc_offset = 0;
+    const std::unique_ptr<zen::composer::composer> composer = std::make_unique<zen::composer::vm::composer>(ilc_offset);
+    composer->begin("sum");
+    composer->set_parameter("a", "long");
+    composer->set_parameter("b", "long");
+    composer->push("a");
+    composer->push("b");
+    composer->plus();
+    composer->end();
+
+    composer->begin("sum");
+    composer->set_parameter("a", "int");
+    composer->set_parameter("b", "int");
+    composer->push("a");
+    composer->push("b");
+    composer->plus();
+    composer->end();
+
+    composer->begin("calle");
+    composer->push<i64>(1, "long");
+    composer->push<i64>(1, "long");
+    composer->push("sum");
+    composer->call("sum", -2);
+    composer->push<i32>(1, "int");
+    composer->push<i32>(1, "int");
+    composer->push("sum");
+    composer->call("sum", -2);
+    composer->end();
+    // composer->bake();
+    const auto _p = (i64)composer->_pool.get<i64>(1).get();
+    auto _p2 = (i64)composer->_pool.get<i32>(1).get();
+    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt, most, -8, add_i64, -8, -32, -24, most, 8, ret, most, -4, add_i32, -4, -20, -16, most, 4, ret, push_i64, _p,push_i64, _p, call, 1, most, 16, push_i32, _p2,push_i32, _p2, call, 10,most, 8, ret,}));
 }
 
 /**

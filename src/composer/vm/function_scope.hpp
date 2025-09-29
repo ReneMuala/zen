@@ -20,7 +20,8 @@ namespace zen::composer::vm
         } return_data = {};
         std::stack<label> labels = {};
         std::string name = {};
-
+        std::reference_wrapper<std::pair<signature, long long>> definition;
+        explicit function_scope(std::reference_wrapper<std::pair<signature, long long>> definition): definition(definition) {}
         ~function_scope() override = default;
     };
 }

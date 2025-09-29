@@ -110,6 +110,11 @@ namespace zen::composer
     {
         std::shared_ptr<const type> type;
         std::vector<std::shared_ptr<const composer::type>> parameters {};
+
+        bool operator==(const signature& other) const
+        {
+            return this->type == other.type and this->parameters == other.parameters;
+        }
     };
 
 class composer {
@@ -195,9 +200,8 @@ public:
     virtual void else_if_then() = 0;
     virtual void else_then() = 0;
     virtual void end_if() = 0;
-    /// todo: implement this
+
     virtual void begin_for() = 0;
-    /// in case of collections or streams
     virtual void set_for_iterator() = 0;
     virtual void set_for_begin_end() = 0;
     virtual void set_for_begin_end_step() = 0;

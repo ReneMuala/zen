@@ -129,29 +129,16 @@ namespace zen
         go,
         go_if_not,
         call,
-        // ffi_call,
-        // fetch_i8,
-        // fetch_i64,
-        // fetch_f64,
-        // fetch_boolean,
-        // send_i8,
-        // send_i64,
-        // send_f64,
-        // send_boolean,
-        // memory_of,
         /// allocate <pointer:i64> <n-bytes:i64>
         allocate,
         /// deallocate <pointer:i64>
         deallocate,
         /// reallocate <pointer:i64> <n-bytes:i64>
         reallocate,
-        /// shink <pointer:i64>
+        /// copy <destination:i64> <source:i64> <n-bytes:i64>
         copy,
         /// walk <pointer:i64> <offset:i64> # Modify Stack Top Pointer -> advance pointer in offset bytes.
         walk,
-        placeholder,
-        /// work on attribute fetching for struct fields
-        // <...>
     };
     class vm
     {
