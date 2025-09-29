@@ -45,6 +45,7 @@ namespace zen::composer
             return name == other.name && _size == other._size;
         }
         [[nodiscard]] i64 get_size() const { return kind == stack ? _size : static_cast<i64>(sizeof(i64)); }
+        [[nodiscard]] i64 get_full_size() const { return _size; }
     private:
         i64 _size;
     };

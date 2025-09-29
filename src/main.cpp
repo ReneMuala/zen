@@ -100,13 +100,64 @@ return 0;
     if (true)
     {
         zen::composer::composer* composer = get_composer();
+        composer->begin("zenCopy");
+        composer->set_parameter("to", "string");
+        composer->set_parameter("from", "string");
+        composer->push("to.data");
+        composer->call(std::to_string(zen::deallocate), 1);
 
-        composer->begin(".copy");
-        composer->set_parameter("destination", "string");
-        composer->set_parameter("origin", "string");
-        composer->push("destination.len");
+        composer->set_local("data", "long");
+        composer->push("data");
+        composer->push("from.len");
+        composer->call(std::to_string(zen::allocate), 2);
+
+        composer->push("data");
+        composer->push("from.data");
+        composer->push("from.len");
+        composer->call(std::to_string(zen::copy), 3);
+
+        composer->push("to.data");
+        composer->push("data");
+        composer->assign();
+
+        composer->push("to.len");
+        composer->push("from.len");
+        composer->assign();
         composer->end();
 
+        composer->begin("zenConstructor");
+        composer->set_return_type("string");
+        composer->set_local("ptr", "long");
+        composer->push("ptr");
+        composer->push<zen::i64>(composer->get_type("string")->get_full_size(), "long");
+        composer->call(std::to_string(zen::allocate), 2);
+        composer->set_local("new", "string");
+        composer->push("new");
+        composer->push("ptr");
+        composer->call(std::to_string(zen::i64_to_i64), 2);
+        composer->push("new");
+        composer->push<zen::types::heap::string*>(zen::types::heap::string::empty(), "string");
+        composer->assign();
+        composer->push("new");
+        composer->return_value();
+        composer->end();
+
+        composer->begin("zenDestructor");
+        composer->set_parameter("it", "string");
+        composer->push("it.data");
+        composer->push("bool");
+        composer->call("bool", -1);
+        composer->begin_if_then();
+        composer->push("it.data");
+        composer->call(std::to_string(zen::deallocate), 1);
+        composer->end_if();
+        composer->push("it");
+        composer->call(std::to_string(zen::deallocate), 1);
+        composer->end();
+
+
+        composer->bake();
+        return 0;
         composer->begin("scope_test");
         composer->set_local("result", "int");
         composer->set_local("x", "int");

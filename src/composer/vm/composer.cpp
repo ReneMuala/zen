@@ -40,15 +40,7 @@ namespace zen
     {
         zen::composer::composer::reset();
         code = {hlt};
-        functions = {
-            {"int", {{signature{}, 0}}},
-            {"long", {{signature{}, 0}}},
-            {"short", {{signature{}, 0}}},
-            {"float", {{signature{}, 0}}},
-            {"double", {{signature{}, 0}}},
-            {"bool", {{signature{}, 0}}},
-            {"byte", {{signature{}, 0}}}
-        };
+
         auto string_type = std::make_shared<type>("string", 0, type::kind::heap);
         types = {
             {"unit", std::make_shared<type>("unit", 0)},
@@ -64,6 +56,15 @@ namespace zen
         };
         string_type->add_field("len", get_type("long"));
         string_type->add_field("data", get_type("long"));
+        functions = {
+            {"int", {{signature{}, 0}}},
+            {"long", {{signature{}, 0}}},
+            {"short", {{signature{}, 0}}},
+            {"float", {{signature{}, 0}}},
+            {"double", {{signature{}, 0}}},
+            {"bool", {{signature{}, 0}}},
+            {"byte", {{signature{}, 0}}}
+        };
     }
 
     composer::vm::composer::composer(int& ilc_offset):
@@ -186,7 +187,12 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
         {
             for (const auto& overload : function.second)
             {
-                std::cout << function.first << std::endl;
+                std::string params = "";
+                for (const auto& param : overload.first.parameters)
+                {
+                    params += fmt::format("{}, ", param->name);
+                }
+                fmt::println("{}({}) = {}", function.first, params.empty() ? "" : params.substr(0, params.length()-2), overload.first.type ? overload.first.type->name : "*");
                 for (i64 i = overload.second; i < code.size(); i++)
                 {
                     const auto& _code = code[i];
@@ -199,6 +205,19 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
                     {
                         fmt::print("walk, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
                         i += 3;
+                    }
+                    else if (_code == copy)
+                    {
+                        fmt::print("copy, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
+                        i += 3;
+                    }else if (_code == allocate)
+                    {
+                        fmt::print("allocate, {}, {}, ", code[i + 1], code[i + 2]);
+                        i += 2;
+                    }else if (_code == deallocate)
+                    {
+                        fmt::print("deallocate, {}, ", code[i + 1]);
+                        i += 1;
                     }
                     else if (_code == zen::call)
                     {
@@ -328,15 +347,26 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
             code.push_back(zen::f64_to_f64);
         else if ((lhs.is("byte") or lhs.is("bool")) and rhs.has_same_type_as(lhs))
             code.push_back(zen::i8_to_i8);
-        else if (lhs.type->kind == type::heap and rhs.has_same_type_as(lhs))
-            code.push_back(zen::i64_to_i64);
+        // else if (lhs.type->kind == type::heap and rhs.has_same_type_as(lhs))
+            // code.push_back(zen::i64_to_i64);
         else
-            throw exceptions::semantic_error(fmt::format(
+        {
+            try
+            {
+                push(lhs);
+                push(rhs);
+                call("zenCopy", -2);
+                return;
+            } catch (std::exception & e)
+            {
+                throw exceptions::semantic_error(fmt::format(
                                                  "cannot assign {} to {}", rhs.type->name,
                                                  lhs.type->name), _ilc_offset,
                                              fmt::format(
-                                                 "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",
+                                                 "please consider using type casting. Eg. x = {}(y) or define a custom copy operator",
                                                  lhs.type->name, rhs.type->name));
+            }
+        }
         code.push_back(lhs.address(scope->stack_usage));
         code.push_back(rhs.address(scope->stack_usage));
     }
@@ -936,8 +966,6 @@ if (top().is(#T))\
         }
         const value rhs = top();
         pop();
-        if (top().is("function"))
-            pop(); // pop the caster itself from composer's stack
         if (args_count < 0)
             push(get_type(name));
         else if (_stack.empty())
@@ -984,10 +1012,6 @@ if (top().is(#T))\
     {
         const i8 abs_args_count = abs(args_count);
         std::deque<value> arguments;
-        if (top().is("function"))
-        {
-            pop(); // pop the function itself from composer's stack
-        }
         for (int i = 0; i < abs_args_count; i++)
         {
             arguments.push_front(top());
@@ -1071,8 +1095,8 @@ if (top().is(#T))\
         if (_stack.size() < expected_args_count or args_count != expected_args_count)
         {
             throw exceptions::semantic_error(fmt::format(
-                                                 "wrong number of arguments for <native>\"{}\" 3 expected",
-                                                 static_cast<i32>(name)), _ilc_offset);
+                                                 "wrong number of arguments for <native>\"{}\" ({} instead of {})",
+                                                 static_cast<i32>(name), args_count, expected_args_count), _ilc_offset);
         }
         std::stack<value> args;
         for (int i = 0; i < args_count; i++)
@@ -1102,6 +1126,8 @@ if (top().is(#T))\
             {"float", KAIZEN_CASTER_MAP_FOR(f32)},
             {"double", KAIZEN_CASTER_MAP_FOR(f64)}
         };
+        if (top().is("function"))
+            pop(); // pop the caster itself from composer's stack
         if (const auto caster_set = casters.find(name); caster_set != casters.end())
         {
             return _call_caster(name, args_count, caster_set);
@@ -1113,13 +1139,15 @@ if (top().is(#T))\
         }
         const int name_i32 = strtol(name.c_str(), nullptr, 10);
         if (name_i32 == write_str)
-        {
             return _call_instruction_write_str(name, args_count);
-        }
         if (name_i32 >= write_i8 and name_i32 <= write_f64)
-        {
             return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 1);
-        }
+        if (name_i32 == allocate || name_i32 == i64_to_i64)
+            return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 2);
+        if (name_i32 == deallocate)
+            return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 1);
+        if (name_i32 == copy)
+            return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 3);
         throw exceptions::semantic_error(fmt::format("function \"{}\" was not found", name), _ilc_offset);
     }
 

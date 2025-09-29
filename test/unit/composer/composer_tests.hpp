@@ -21,7 +21,6 @@ TEST(composer_unit, write_string)
     composer->push("fd");
     composer->call(std::to_string(write_str), 3);;
     composer->end();
-    composer->bake();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt,most, -8, walk, -8, -24, 8, write_str, -8, -24, -32, most, 8, ret,}));
 }
 
