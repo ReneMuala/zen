@@ -101,6 +101,12 @@ return 0;
     {
         zen::composer::composer* composer = get_composer();
 
+        composer->begin(".copy");
+        composer->set_parameter("destination", "string");
+        composer->set_parameter("origin", "string");
+        composer->push("destination.len");
+        composer->end();
+
         composer->begin("scope_test");
         composer->set_local("result", "int");
         composer->set_local("x", "int");

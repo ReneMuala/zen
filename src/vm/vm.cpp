@@ -319,9 +319,9 @@ void zen::vm::run(stack& stack, const i64& entry_point)
             break;
         case walk:
             *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(reinterpret_cast<char*>(*address<i64>(
-                    this->code[i + 1], stack))) +
-                static_cast<i64>(sizeof(this->code[i + 2]));
-            i += 2;
+                    this->code[i + 2], stack))) +
+                static_cast<i64>(sizeof(this->code[i + 3]));
+            i += 3;
             break;
         default:
             fmt::println(stderr, "fatal error: unsupported operation {} (zen vm halted at {})", this->code[i], i);

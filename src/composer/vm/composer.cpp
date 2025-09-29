@@ -197,8 +197,8 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
                     }
                     else if (_code == walk)
                     {
-                        fmt::print("modify, {}, {}, ", code[i + 1], code[i + 2]);
-                        i += 2;
+                        fmt::print("walk, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
+                        i += 3;
                     }
                     else if (_code == zen::call)
                     {
@@ -247,8 +247,13 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
                     }
                     else if (_code == write_str)
                     {
-                        fmt::print("write, {}, {}, ", code[i + 1], code[i + 2]);
-                        i += 2;
+                        fmt::print("write, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
+                        i += 3;
+                    }
+                    else if (_code == read_str)
+                    {
+                        fmt::print("read, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
+                        i += 3;
                     }
                     else if (_code == go_if_not)
                     {
@@ -262,13 +267,13 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
                     }
                     else if (_code >= write_i8 && _code <= write_f64)
                     {
-                        fmt::print("write, {}, ", code[i + 1]);
-                        i += 1;
+                        fmt::print("write, {}, {}, ", code[i + 1], code[i + 2]);
+                        i += 2;
                     }
                     else if (_code >= read_i8 && _code <= read_f64)
                     {
-                        fmt::print("read, {}, ", code[i + 1]);
-                        i += 1;
+                        fmt::print("read, {}, {}, ", code[i + 1], code[i + 2]);
+                        i += 2;
                     }
                     else if (_code == ret)
                         fmt::print("ret, ");
@@ -363,6 +368,14 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
         val.offset = item.first;
         val.type = item.second;
         // fmt::println("{}: {} [{}]", name, val.type->name, val.offset);
+        if (val.offset)
+        {
+            push(val.type);
+            code.push_back(walk);
+            code.push_back(top().address(scope->stack_usage));
+            code.push_back(location.address(scope->stack_usage));
+            code.push_back(val.offset);
+        } else
         push(val);
     }
 
@@ -1040,7 +1053,7 @@ if (top().is(#T))\
         {
             value v = top();
             pop();
-            v.prepare(code, scope->stack_usage);
+            // v.prepare(code, scope->stack_usage);
             args.push(v);
         }
         code.push_back(zen::write_str);
@@ -1066,7 +1079,6 @@ if (top().is(#T))\
         {
             value v = top();
             pop();
-            v.prepare(code, scope->stack_usage);
             args.push(v);
         }
         code.push_back(name);

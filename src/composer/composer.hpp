@@ -68,16 +68,6 @@ namespace zen::composer
         kind kind;
         i64 offset;
         std::shared_ptr<const type> type;
-        void prepare(std::vector<i64> & code, const i64 & most_size)
-        {
-            if (offset)
-            {
-                code.push_back(zen::walk);
-                code.push_back(address(most_size));
-                code.push_back(offset);
-                offset = 0;
-            }
-        }
 
         [[nodiscard]] bool is(const std::string & type_name) const
         {
