@@ -299,6 +299,10 @@ void zen::vm::run(stack& stack, const i64& entry_point)
         case allocate:
             *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(malloc(
                 *address<i64>(this->code[i + 2], stack)));
+            if (not *address<i64>(this->code[i + 1], stack))
+            {
+                throw std::runtime_error(fmt::format("fatal error: out of heap memory (zen vm halted at {})", i));
+            }
             i += 2;
             break;
         case deallocate:
@@ -309,6 +313,10 @@ void zen::vm::run(stack& stack, const i64& entry_point)
             *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(realloc(
                 reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)),
                 *address<i64>(this->code[i + 2], stack)));
+            if (not *address<i64>(this->code[i + 1], stack))
+            {
+                throw std::runtime_error(fmt::format("fatal error: out of heap memory (zen vm halted at {})", i));
+            }
             i += 2;
             break;
         case copy:
