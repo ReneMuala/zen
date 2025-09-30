@@ -53,28 +53,39 @@ namespace zen::composer::vm
                 nested_scope = scope;
             }
         }
-
-        /// do not call directly
-        i64 __dncd__pop()
+        decltype(locals)& ___dncd__deepest_locals()
         {
-            i64 nested_scope_usage = 0;
             if (nested_scope)
             {
                 if (nested_scope->nested_scope)
-                    return nested_scope->__dncd__pop();
-                if (nested_scope->type == in_if and nested_scope->return_status == concise_return)
-                    return_status = branched_return;
-                else if (nested_scope->type == in_else_if and nested_scope->return_status == concise_return)
-                    return_status = branched_return;
-                else if (nested_scope->type == in_else and nested_scope->return_status == concise_return and (return_status == branched_return or return_status == concise_return))
-                    return_status = concise_return;
-                else
-                    return_status = no_return;
-                nested_scope_usage = nested_scope->stack_usage;
-                delete nested_scope;
-                nested_scope = nullptr;
+                    return nested_scope->___dncd__deepest_locals();
+                // return nested_scope->___dncd__deepest_locals();
             }
-            return nested_scope_usage;
+            return locals;
+        }
+        /// do not call directly
+        i64 __dncd__pop(enum return_status & root_status)
+        {
+            if (nested_scope)
+            {
+                i64 nested_scope_usage = nested_scope->__dncd__pop(root_status);
+                if (nested_scope_usage > 0)
+                {
+                    delete nested_scope;
+                    nested_scope = nullptr;
+                    nested_scope_usage *= -1;
+                }
+                return nested_scope_usage;
+            }
+            if (type == in_if and return_status == concise_return)
+                root_status = branched_return;
+            else if (type == in_else_if and return_status == concise_return)
+                root_status = branched_return;
+            else if (type == in_else and return_status == concise_return and (root_status == branched_return or root_status == concise_return))
+                root_status = concise_return;
+            else
+                root_status = no_return;
+            return stack_usage;
         }
 
         enum return_status get_return_status() const
@@ -88,6 +99,15 @@ namespace zen::composer::vm
                 nested_scope->set_return_status(status);
             else
                 return_status = status;
+        }
+
+        i64 depth()
+        {
+            if (nested_scope)
+            {
+                return 1 + nested_scope->depth();
+            }
+            return 1;
         }
 
         template<typename T>
