@@ -11,13 +11,31 @@
 #include "for_scope.hpp"
 #include "exceptions/semantic_error.hpp"
 
-#define KAIZEN_IF_SCOPE_OPENNING(T)\
-    scope->__dncd__push(block_scope::__unsafely_make(T));
+#define KAIZEN_IF_SCOPE_OPENING(T)\
+    scope->__dncd__push(block_scope::__unsafely_make(T));\
+
+#define KAIZEN_IF_SCOPE_DESTROY_HEAP_LOCALS()\
+    for (const auto & local : scope->___dncd__deepest_locals())\
+        {\
+            if (local.second.type->kind == type::heap and not local.second.no_destructor)\
+            {\
+                try\
+                {/* fmt::println("calling destructor for {}", local.first);*/\
+                    push(local.second);\
+                    call("zenDestructor",-1);\
+                } catch (const std::exception & e)\
+                {\
+                    throw exceptions::semantic_error(fmt::format("missing destructor implementation for type {} ({})", local.second.type->name, e.what()), _ilc_offset);\
+                }\
+            }\
+        }\
+
 #define KAIZEN_IF_SCOPE_CLOSURE()\
-    if (const i64 size = scope->__dncd__pop())\
+    KAIZEN_IF_SCOPE_DESTROY_HEAP_LOCALS()\
+    if (const i64 size = scope->__dncd__pop(scope->return_status); std::abs(size) > 0)\
     {\
         code.push_back(most);\
-        code.push_back(size);\
+        code.push_back(std::abs(size));\
     }
 
 namespace zen
@@ -87,11 +105,16 @@ namespace zen
 
     void composer::vm::composer::set_parameter(std::string name, const std::string& type)
     {
-        std::get<signature>(scope->definition.get()).parameters.emplace_back(get_type(type));
-        const auto& t = get_type(type);
+        constexpr std::string no_destructor = "::noDestructor";
+        const bool no_destructor_mode = type.ends_with(no_destructor);
+        const auto final_type = no_destructor_mode ? type.substr(0, type.length() - no_destructor.size()) : type;
+        const auto t = get_type(final_type);
+        std::get<signature>(scope->definition.get()).parameters.emplace_back(get_type(final_type));
         const i64 address = scope->stack_usage - /* jump callee IP */static_cast<i64>(sizeof(i64));
         scope->stack_usage += t->get_size();
-        scope->locals.emplace(name, symbol(name, t, address));
+        auto sym = symbol(name, t, address);
+        sym.no_destructor = no_destructor_mode;
+        scope->locals.emplace(name, sym);
     }
 
 
@@ -140,12 +163,37 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
     void composer::vm::composer::set_local(std::string name, const std::string& type)
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        const auto& t = get_type(type);
+        constexpr std::string no_constructor = "::noConstructor";
+        std::shared_ptr<const zen::composer::type> t;
+        const bool no_construtor_mode = type.ends_with(no_constructor);
+        if (no_construtor_mode)
+            t = get_type(type.substr(0, type.length() - no_constructor.size()));
+        else
+            t = get_type(type);
         scope->set_local(name, t);
         // scope->locals.emplace(name, symbol(name, t, scope->stack_usage));
         // scope->stack_usage += t->get_size();
         code.push_back(zen::most);
         code.push_back(-t->get_size());
+        if (t->kind == type::heap and not no_construtor_mode)
+        {
+            if (const auto func_it = functions.find("zenConstructor"); func_it != functions.end())
+            {
+                for (const auto& zenConstructor : func_it->second)
+                {
+                    if (zenConstructor.first.type == t)
+                    {
+                        push(name);
+                        // will push 8 bytes (result of the call)
+                        _call_function_overload({}, zenConstructor.second, zenConstructor.first);
+                        _call_instruction(i64_to_i64, 2, 2);
+                    }
+                };
+            } else
+            {
+                throw exceptions::semantic_error(fmt::format("missing constructor implementation for type {}", type), _ilc_offset);
+            }
+        }
     }
 
     void composer::vm::composer::end()
@@ -161,6 +209,7 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
                                              fmt::format(
                                                  "please use a named return or ensure that all control paths return a value of type {}",
                                                  scope->return_data.value->type->name));
+        KAIZEN_IF_SCOPE_DESTROY_HEAP_LOCALS();
         const auto sig = std::get<signature>(scope->definition.get());
         const auto sizes = get_return_size(sig) + get_parameters_size(sig);
         if (const auto most_delta = scope->stack_usage - sizes; most_delta > 0)
@@ -635,7 +684,7 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
     void composer::vm::composer::begin_while()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        KAIZEN_IF_SCOPE_OPENNING(scope::in_while_prologue);
+        KAIZEN_IF_SCOPE_OPENING(scope::in_while_prologue);
         label begin;
         begin.bind(code);
         scope->labels.push(begin);
@@ -644,7 +693,7 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
     void composer::vm::composer::set_while_condition()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_while_prologue);
-        KAIZEN_IF_SCOPE_OPENNING(scope::in_while_body);
+        KAIZEN_IF_SCOPE_OPENING(scope::in_while_body);
         if (_stack.size() < 1)
             throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
@@ -811,7 +860,7 @@ if (top().is(#T))\
     void composer::vm::composer::begin_for()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        KAIZEN_IF_SCOPE_OPENNING(scope::in_for);
+        KAIZEN_IF_SCOPE_OPENING(scope::in_for);
     }
 
     void composer::vm::composer::set_for_iterator()
@@ -922,7 +971,7 @@ if (top().is(#T))\
         return std::nullopt;
     }
 
-    void composer::vm::composer::_push_callee_arguments(std::deque<value>& arguments)
+    void composer::vm::composer::_push_callee_arguments(const std::deque<value>& arguments)
     {
         for (const value& value : arguments)
         {
@@ -1004,6 +1053,27 @@ if (top().is(#T))\
         }
     }
 
+    composer::call_result composer::vm::composer::_call_function_overload(const std::deque<value>& arguments, const i64& addr, const signature& sig)
+    {
+        const auto returned = _push_callee_return_value(sig);
+        // }
+        _push_callee_arguments(arguments);
+
+        if (returned)
+        {
+            push(returned.value());
+        }
+        code.push_back(zen::call);
+        code.push_back(addr);
+        if (const i64 call_params_cost = get_parameters_size(sig))
+        {
+            code.push_back(zen::most);
+            code.push_back(call_params_cost);
+            scope->stack_usage -= call_params_cost;
+        }
+        return call_result::result;
+    }
+
     composer::call_result composer::vm::composer::_call_function(const std::string& name, const i8& args_count,
                                                                  const std::unordered_map<
                                                                      std::string, std::list<std::pair<
@@ -1044,23 +1114,7 @@ if (top().is(#T))\
         const signature& sig = candidate->get().first;
         // if (args_count < 0) // when assigning, copy the value directly to lhs
         // {
-        const auto returned = _push_callee_return_value(sig);
-        // }
-        _push_callee_arguments(arguments);
-
-        if (returned)
-        {
-            push(returned.value());
-        }
-        code.push_back(zen::call);
-        code.push_back(addr);
-        const i64 call_cost = get_parameters_size(sig) + get_return_size(sig);
-        if (call_cost)
-        {
-            code.push_back(zen::most);
-            code.push_back(call_cost);
-        }
-        return call_result::result;
+        return _call_function_overload(arguments, addr, sig);
     }
 
     composer::call_result composer::vm::composer::_call_instruction_write_str(
@@ -1203,7 +1257,7 @@ if (top().is(#T))\
     void composer::vm::composer::begin_if_then()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        KAIZEN_IF_SCOPE_OPENNING(scope::in_if);
+        KAIZEN_IF_SCOPE_OPENING(scope::in_if);
         _begin_if_then(false);
     }
 
@@ -1250,7 +1304,7 @@ if (top().is(#T))\
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_if);
         KAIZEN_IF_SCOPE_CLOSURE();
-        KAIZEN_IF_SCOPE_OPENNING(scope::in_else);
+        KAIZEN_IF_SCOPE_OPENING(scope::in_else);
         if (scope->labels.size() < 2)
             throw exceptions::semantic_error(fmt::format("cannot use else if without a prior if"), _ilc_offset);
 

@@ -53,10 +53,11 @@ public:
     void slash() override;
     void modulo() override;
     std::optional<value> _push_callee_return_value(const signature& sig);
-    void _push_callee_arguments(std::deque<value>& arguments);
+    void _push_callee_arguments(const std::deque<value>& arguments);
     call_result _call_caster(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::unordered_map<std::string, i64>>::iterator & caster_set);
+    call_result _call_function_overload(const std::deque<value>& arguments, const i64& addr, const signature& sig);
     call_result _call_function(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::list<std::pair<signature,
-                               long long>>>::iterator&
+                                       long long>>>::iterator&
                                func_it);
     call_result _call_instruction_write_str(const std::string& name, const i8& args_count);
     call_result _call_instruction(const zen::instruction & insn, const i8& args_count, const i8& expected_args_count);

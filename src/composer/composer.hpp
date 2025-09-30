@@ -94,6 +94,7 @@ namespace zen::composer
     struct symbol : value
     {
         std::string name;
+        bool no_destructor = false;
         symbol(std::string  name, const std::shared_ptr<const composer::type> & type, const i64 & address) : value(type, address), name(std::move(name)) {}
     };
 
