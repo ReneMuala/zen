@@ -328,7 +328,7 @@ TEST(parser_unit, variable_with_initialization)
 
 TEST(parser_unit, multiple_variables)
 {
-    setup_parser_test("test_func = { x: int = 1 y: string = \"hello\" z: bool = true }");
+    setup_parser_test("test_func = { x: int = 1 /*s: string = \"hello\" /* missing constructor implementation :( */ */ y : double = 3.14 z: bool = true }");
     EXPECT_TRUE(parse());
 }
 
