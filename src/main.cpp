@@ -106,7 +106,7 @@ return 0;
         composer->set_parameter("it", "string");
         composer->push("it.data");
         composer->push("bool");
-        composer->call("bool", -1);
+        composer->call("bool", 1, false);
         composer->begin_if_then();
         composer->push("it.data");
         composer->call(std::to_string(zen::deallocate), 1);
@@ -121,7 +121,7 @@ return 0;
 
         composer->push("to.data");
         composer->push("bool");
-        composer->call("bool", -1);
+        composer->call("bool", 1, false);
         composer->begin_if_then();
         composer->push("to.data");
         composer->call(std::to_string(zen::deallocate), 1);
@@ -166,9 +166,9 @@ return 0;
         composer->begin("stringTest");
         composer->set_local("name", "string");
         composer->set_local("count", "short");
-        // composer->push("name");
-        // composer->push<zen::types::heap::string*>(zen::types::heap::string::from_string("zen"), "string");
-        // composer->assign();
+        composer->push("name");
+        composer->push<zen::types::heap::string*>(zen::types::heap::string::from_string("zen"), "string");
+        composer->assign();
         composer->end();
 
         composer->begin("stringTest2");
@@ -179,8 +179,19 @@ return 0;
         composer->assign();
         composer->end();
 
-        composer->bake();
+        composer->begin("stringTest3");
+        composer->set_return_type("string");
+        composer->push<zen::types::heap::string*>(zen::types::heap::string::empty(), "string");
+        composer->return_value();
+        composer->end();
 
+        composer->begin("stringTest4");
+        composer->set_local("name", "string");
+        composer->push("stringTest3");
+        composer->call("stringTest3", 0);
+        composer->end();
+
+        composer->bake();
         return 0;
         composer->begin("scope_test");
         composer->set_local("result", "int");

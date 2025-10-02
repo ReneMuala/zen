@@ -12,8 +12,7 @@
 #include "exceptions/semantic_error.hpp"
 
 #define KAIZEN_IF_SCOPE_OPENING(T)\
-    scope->__dncd__push(block_scope::__unsafely_make(T));\
-
+    scope->__dncd__push(block_scope::__unsafely_make(T));
 #define KAIZEN_IF_SCOPE_DESTROY_HEAP_LOCALS()\
     for (const auto & local_set : scope->___dncd__deepest_locals())\
         {\
@@ -25,15 +24,14 @@
                     {\
                         fmt::println("[zenDestructor]({})", local->label);\
                         push(local);\
-                        call("[zenDestructor]",-1);\
+                        call("[zenDestructor]",1, false);\
                     } catch (const std::exception & e)\
                     {\
                         throw exceptions::semantic_error(fmt::format("missing destructor implementation for type {}", local->type->name), _ilc_offset);\
                     }\
                 }\
             }\
-        }\
-
+        }
 #define KAIZEN_IF_SCOPE_CLOSURE()\
     KAIZEN_IF_SCOPE_DESTROY_HEAP_LOCALS()\
     if (const i64 size = scope->__dncd__pop(scope->return_status); std::abs(size) > 0)\
@@ -192,13 +190,15 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
                     {
                         push(name);
                         // will push 8 bytes (result of the call)
-                        _call_function_overload({}, zen_allocator.second, zen_allocator.first);
+                        _call_function_overload({}, zen_allocator.second, zen_allocator.first, false);
                         _call_instruction(i64_to_i64, 2, 2);
                     }
                 };
-            } else
+            }
+            else
             {
-                throw exceptions::semantic_error(fmt::format("missing construtor implementation for type {}", type), _ilc_offset);
+                throw exceptions::semantic_error(fmt::format("missing construtor implementation for type {}", type),
+                                                 _ilc_offset);
             }
         }
     }
@@ -248,7 +248,8 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
                 {
                     params += fmt::format("{}, ", param->name);
                 }
-                fmt::println("{}({}) = {}", function.first, params.empty() ? "" : params.substr(0, params.length()-2), overload.first.type ? overload.first.type->name : "*");
+                fmt::println("{}({}) = {}", function.first, params.empty() ? "" : params.substr(0, params.length() - 2),
+                             overload.first.type ? overload.first.type->name : "*");
                 for (i64 i = overload.second; i < code.size(); i++)
                 {
                     const auto& _code = code[i];
@@ -266,11 +267,13 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
                     {
                         fmt::print("copy, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
                         i += 3;
-                    }else if (_code == allocate)
+                    }
+                    else if (_code == allocate)
                     {
                         fmt::print("allocate, {}, {}, ", code[i + 1], code[i + 2]);
                         i += 2;
-                    }else if (_code == deallocate)
+                    }
+                    else if (_code == deallocate)
                     {
                         fmt::print("deallocate, {}, ", code[i + 1]);
                         i += 1;
@@ -411,23 +414,24 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
         else if ((lhs->is("byte") or lhs->is("bool")) and rhs->has_same_type_as(*lhs))
             code.push_back(zen::i8_to_i8);
         // else if (lhs->type->kind == type::heap and rhs->has_same_type_as(*lhs))
-            // code.push_back(zen::i64_to_i64);
+        // code.push_back(zen::i64_to_i64);
         else
         {
             try
             {
                 push(lhs);
                 push(rhs);
-                call("zenCopy", -2);
+                call("zenCopy", 2, false);
                 return;
-            } catch (std::exception & _)
+            }
+            catch (std::exception& _)
             {
                 throw exceptions::semantic_error(fmt::format(
-                                                 "cannot assign {} to {}", rhs->type->name,
-                                                 lhs->type->name), _ilc_offset,
-                                             fmt::format(
-                                                 "please consider using type casting. Eg. x = {}(y) or define a custom copy operator",
-                                                 lhs->type->name, rhs->type->name));
+                                                     "cannot assign {} to {}", rhs->type->name,
+                                                     lhs->type->name), _ilc_offset,
+                                                 fmt::format(
+                                                     "please consider using type casting. Eg. x = {}(y) or define a custom copy operator",
+                                                     lhs->type->name, rhs->type->name));
             }
         }
         code.push_back(lhs->address(scope->stack_usage));
@@ -469,8 +473,9 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
             code.push_back(top()->address(scope->stack_usage));
             code.push_back(location->address(scope->stack_usage));
             code.push_back(val->offset);
-        } else
-        push(val);
+        }
+        else
+            push(val);
     }
 
     void composer::vm::composer::_push_function()
@@ -966,11 +971,33 @@ if (top()->is(#T))\
         {"double", f64_to_##T},\
         }
 
-    std::shared_ptr<composer::value> composer::vm::composer::_push_callee_return_value(const signature& sig)
+    std::shared_ptr<composer::value> composer::vm::composer::_push_callee_return_value(
+        const signature& sig, bool assigment_call)
     {
         std::optional<value> result;
         if (sig.type->get_size())
         {
+            if (assigment_call)
+            {
+                if (_stack.empty())
+                    throw exceptions::semantic_error("cannot proceed assignment call without stack elements to",
+                                                     _ilc_offset);
+                fmt::println("assignment call in {} as {} = ...()", scope->name, top()->label);
+                const auto r = top();
+                if (r->type != sig.type)
+                    throw exceptions::semantic_error(fmt::format("cannot assign {} to {}", sig.type->name, r->type->name),
+                                                     _ilc_offset);
+                if (r->type->kind == type::heap)
+                {
+                    fmt::println("assigment call succeeded");
+                    code.push_back(push_i64);
+                    code.push_back(r->address(scope->stack_usage));
+                    pop();
+                    return r;
+                }
+                fmt::println("assigment call failed");
+                pop();
+            }
             const i64 address = scope->stack_usage;
             code.push_back(zen::most);
             code.push_back(-sig.type->get_size());
@@ -1005,7 +1032,7 @@ if (top()->is(#T))\
     composer::call_result composer::vm::composer::_call_caster(const std::string& name, const i8& args_count,
                                                                const std::unordered_map<
                                                                    std::string, std::unordered_map<
-                                                                       std::string, i64>>::iterator& caster_set)
+                                                                       std::string, i64>>::iterator& caster_set, const bool assigment_call)
     {
         if (_stack.empty())
         {
@@ -1014,7 +1041,7 @@ if (top()->is(#T))\
                 __FUNCTION__, _stack.size()));
         }
 
-        if (args_count != 1 and args_count != -1)
+        if (args_count != 1)
         {
             throw exceptions::semantic_error(fmt::format(
                                                  "wrong number of arguments for caster of {}", name), _ilc_offset,
@@ -1024,7 +1051,7 @@ if (top()->is(#T))\
         }
         const auto rhs = top();
         pop();
-        if (args_count < 0)
+        if (not assigment_call)
             push(get_type(name));
         else if (_stack.empty())
             throw exceptions::semantic_error(fmt::format(
@@ -1039,11 +1066,11 @@ if (top()->is(#T))\
                 code.push_back(caster->second);
                 code.push_back(lhs->address(scope->stack_usage));
                 code.push_back(rhs->address(scope->stack_usage));
-                if (args_count == -1)
+                if (not assigment_call)
                 {
                     push(lhs);
                 }
-                return call_result::casting;
+                return call_result::forwarding;
             }
             else
             {
@@ -1062,9 +1089,10 @@ if (top()->is(#T))\
         }
     }
 
-    composer::call_result composer::vm::composer::_call_function_overload(const std::deque<std::shared_ptr<value>>& arguments, const i64& addr, const signature& sig)
+    composer::call_result composer::vm::composer::_call_function_overload(
+        const std::deque<std::shared_ptr<value>>& arguments, const i64& addr, const signature& sig, bool assignment_call)
     {
-        const auto returned = _push_callee_return_value(sig);
+        const auto returned = _push_callee_return_value(sig, assignment_call);
         // }
         _push_callee_arguments(arguments);
 
@@ -1079,18 +1107,17 @@ if (top()->is(#T))\
             code.push_back(zen::most);
             code.push_back(call_params_cost);
         }
-        return call_result::result;
+        return  assignment_call ? call_result::forwarding : call_result::result;
     }
 
     composer::call_result composer::vm::composer::_call_function(const std::string& name, const i8& args_count,
                                                                  const std::unordered_map<
                                                                      std::string, std::list<std::pair<
                                                                          signature, long long>>>::
-                                                                 iterator& func_it)
+                                                                 iterator& func_it, bool assigment_call)
     {
-        const i8 abs_args_count = static_cast<i8>(std::abs(args_count));
         std::deque<std::shared_ptr<value>> arguments;
-        for (int i = 0; i < abs_args_count; i++)
+        for (int i = 0; i < args_count; i++)
         {
             arguments.push_front(top());
             pop();
@@ -1122,7 +1149,7 @@ if (top()->is(#T))\
         const signature& sig = candidate->get().first;
         // if (args_count < 0) // when assigning, copy the value directly to lhs
         // {
-        return _call_function_overload(arguments, addr, sig);
+        return _call_function_overload(arguments, addr, sig, assigment_call);
     }
 
     composer::call_result composer::vm::composer::_call_instruction_write_str(
@@ -1176,7 +1203,7 @@ if (top()->is(#T))\
         return call_result::result;
     }
 
-    composer::call_result composer::vm::composer::call(const std::string& name, const i8& args_count)
+    composer::call_result composer::vm::composer::call(const std::string& name, const i8& args_count, const bool assigment_call)
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
         static std::unordered_map<std::string, std::unordered_map<std::string, i64>> casters{
@@ -1192,12 +1219,12 @@ if (top()->is(#T))\
             pop(); // pop the caster itself from composer's stack
         if (const auto caster_set = casters.find(name); caster_set != casters.end())
         {
-            return _call_caster(name, args_count, caster_set);
+            return _call_caster(name, args_count, caster_set, assigment_call);
         }
 
         if (const auto func_it = functions.find(name); func_it != functions.end())
         {
-            return _call_function(name, args_count, func_it);
+            return _call_function(name, args_count, func_it, assigment_call);
         }
         const int name_i32 = strtol(name.c_str(), nullptr, 10);
         if (name_i32 == write_str)

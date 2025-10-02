@@ -52,16 +52,18 @@ public:
     void times() override;
     void slash() override;
     void modulo() override;
-    std::shared_ptr<value> _push_callee_return_value(const signature& sig);
+    std::shared_ptr<value> _push_callee_return_value(const signature& sig, bool assigment_call = false);
     void _push_callee_arguments(const std::deque<std::shared_ptr<value>>& arguments);
-    call_result _call_caster(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::unordered_map<std::string, i64>>::iterator & caster_set);
-    call_result _call_function_overload(const std::deque<std::shared_ptr<value>>& arguments, const i64& addr, const signature& sig);
+    call_result _call_caster(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::unordered_map<std::string,
+                             i64>>::iterator&
+                             caster_set, bool assigment_call);
+    call_result _call_function_overload(const std::deque<std::shared_ptr<value>>& arguments, const i64& addr, const signature& sig, bool assignment_call = false);
     call_result _call_function(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::list<std::pair<signature,
-                                       long long>>>::iterator&
-                               func_it);
+                               long long>>>::iterator&
+                               func_it, bool assigment_call = false);
     call_result _call_instruction_write_str(const std::string& name, const i8& args_count);
     call_result _call_instruction(const zen::instruction & instruction, const i8& args_count, const i8& expected_args_count);
-    call_result call(const std::string& name, const i8& args_count) override;
+    call_result call(const std::string& name, const i8& args_count, bool assigment_call) override;
     void and_() override;
     void or_() override;
     void not_() override;

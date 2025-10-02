@@ -91,9 +91,9 @@ TEST(composer_unit, sum_ints_as_doubles)
     composer->set_parameter("x", "int");
     composer->set_parameter("y", "int");
     composer->push("x");
-    composer->call("double", -1);
+    composer->call("double", 1, false);
     composer->push("y");
-    composer->call("double", -1);
+    composer->call("double", 1, false);
     composer->plus();
     composer->return_value();
     composer->end();
@@ -138,7 +138,7 @@ TEST(composer_unit, cast_int_to_double)
     composer->set_local("x", "double");
     composer->push("x");
     composer->push<i32>(20, "int");
-    composer->call("double", 1);
+    composer->call("double", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<i32>(20).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code, (std::vector<i64>{hlt, most, -8, i32_to_f64, -8, _p, most, 8, ret,}));
@@ -153,7 +153,7 @@ TEST(composer_cast, cast_byte_to_byte) {
     composer->set_local("x", "byte");
     composer->push("x");
     composer->push<zen::i8>(42, "byte");
-    composer->call("byte", 1);
+    composer->call("byte", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i8>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -167,7 +167,7 @@ TEST(composer_cast, cast_byte_to_bool) {
     composer->set_local("x", "bool");
     composer->push("x");
     composer->push<zen::i8>(1, "byte");
-    composer->call("bool", 1);
+    composer->call("bool", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i8>(1).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -181,7 +181,7 @@ TEST(composer_cast, cast_byte_to_short) {
     composer->set_local("x", "short");
     composer->push("x");
     composer->push<zen::i8>(42, "byte");
-    composer->call("short", 1);
+    composer->call("short", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i8>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -195,7 +195,7 @@ TEST(composer_cast, cast_byte_to_int) {
     composer->set_local("x", "int");
     composer->push("x");
     composer->push<zen::i8>(42, "byte");
-    composer->call("int", 1);
+    composer->call("int", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i8>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -209,7 +209,7 @@ TEST(composer_cast, cast_byte_to_long) {
     composer->set_local("x", "long");
     composer->push("x");
     composer->push<zen::i8>(42, "byte");
-    composer->call("long", 1);
+    composer->call("long", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i8>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -223,7 +223,7 @@ TEST(composer_cast, cast_byte_to_float) {
     composer->set_local("x", "float");
     composer->push("x");
     composer->push<zen::i8>(42, "byte");
-    composer->call("float", 1);
+    composer->call("float", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i8>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -237,7 +237,7 @@ TEST(composer_cast, cast_byte_to_double) {
     composer->set_local("x", "double");
     composer->push("x");
     composer->push<zen::i8>(42, "byte");
-    composer->call("double", 1);
+    composer->call("double", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i8>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -252,7 +252,7 @@ TEST(composer_cast, cast_bool_to_byte) {
     composer->set_local("x", "byte");
     composer->push("x");
     composer->push<zen::i8>(1, "bool");
-    composer->call("byte", 1);
+    composer->call("byte", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i8>(1).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -266,7 +266,7 @@ TEST(composer_cast, cast_bool_to_bool) {
     composer->set_local("x", "bool");
     composer->push("x");
     composer->push<zen::i8>(1, "bool");
-    composer->call("bool", 1);
+    composer->call("bool", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i8>(1).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -280,7 +280,7 @@ TEST(composer_cast, cast_bool_to_short) {
     composer->set_local("x", "short");
     composer->push("x");
     composer->push<zen::i8>(1, "bool");
-    composer->call("short", 1);
+    composer->call("short", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i8>(1).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -294,7 +294,7 @@ TEST(composer_cast, cast_bool_to_int) {
     composer->set_local("x", "int");
     composer->push("x");
     composer->push<zen::i8>(1, "bool");
-    composer->call("int", 1);
+    composer->call("int", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i8>(1).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -308,7 +308,7 @@ TEST(composer_cast, cast_bool_to_long) {
     composer->set_local("x", "long");
     composer->push("x");
     composer->push<zen::i8>(1, "bool");
-    composer->call("long", 1);
+    composer->call("long", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i8>(1).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -322,7 +322,7 @@ TEST(composer_cast, cast_bool_to_float) {
     composer->set_local("x", "float");
     composer->push("x");
     composer->push<zen::i8>(1, "bool");
-    composer->call("float", 1);
+    composer->call("float", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i8>(1).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -336,7 +336,7 @@ TEST(composer_cast, cast_bool_to_double) {
     composer->set_local("x", "double");
     composer->push("x");
     composer->push<zen::i8>(1, "bool");
-    composer->call("double", 1);
+    composer->call("double", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i8>(1).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -351,7 +351,7 @@ TEST(composer_cast, cast_short_to_byte) {
     composer->set_local("x", "byte");
     composer->push("x");
     composer->push<zen::i16>(42, "short");
-    composer->call("byte", 1);
+    composer->call("byte", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i16>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -365,7 +365,7 @@ TEST(composer_cast, cast_short_to_bool) {
     composer->set_local("x", "bool");
     composer->push("x");
     composer->push<zen::i16>(1, "short");
-    composer->call("bool", 1);
+    composer->call("bool", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i16>(1).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -379,7 +379,7 @@ TEST(composer_cast, cast_short_to_short) {
     composer->set_local("x", "short");
     composer->push("x");
     composer->push<zen::i16>(42, "short");
-    composer->call("short", 1);
+    composer->call("short", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i16>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -393,7 +393,7 @@ TEST(composer_cast, cast_short_to_int) {
     composer->set_local("x", "int");
     composer->push("x");
     composer->push<zen::i16>(42, "short");
-    composer->call("int", 1);
+    composer->call("int", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i16>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -407,7 +407,7 @@ TEST(composer_cast, cast_short_to_long) {
     composer->set_local("x", "long");
     composer->push("x");
     composer->push<zen::i16>(42, "short");
-    composer->call("long", 1);
+    composer->call("long", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i16>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -421,7 +421,7 @@ TEST(composer_cast, cast_short_to_float) {
     composer->set_local("x", "float");
     composer->push("x");
     composer->push<zen::i16>(42, "short");
-    composer->call("float", 1);
+    composer->call("float", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i16>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -435,7 +435,7 @@ TEST(composer_cast, cast_short_to_double) {
     composer->set_local("x", "double");
     composer->push("x");
     composer->push<zen::i16>(42, "short");
-    composer->call("double", 1);
+    composer->call("double", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i16>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -450,7 +450,7 @@ TEST(composer_cast, cast_int_to_byte) {
     composer->set_local("x", "byte");
     composer->push("x");
     composer->push<zen::i32>(42, "int");
-    composer->call("byte", 1);
+    composer->call("byte", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i32>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -464,7 +464,7 @@ TEST(composer_cast, cast_int_to_bool) {
     composer->set_local("x", "bool");
     composer->push("x");
     composer->push<zen::i32>(1, "int");
-    composer->call("bool", 1);
+    composer->call("bool", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i32>(1).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -478,7 +478,7 @@ TEST(composer_cast, cast_int_to_short) {
     composer->set_local("x", "short");
     composer->push("x");
     composer->push<zen::i32>(42, "int");
-    composer->call("short", 1);
+    composer->call("short", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i32>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -492,7 +492,7 @@ TEST(composer_cast, cast_int_to_int) {
     composer->set_local("x", "int");
     composer->push("x");
     composer->push<zen::i32>(42, "int");
-    composer->call("int", 1);
+    composer->call("int", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i32>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -506,7 +506,7 @@ TEST(composer_cast, cast_int_to_long) {
     composer->set_local("x", "long");
     composer->push("x");
     composer->push<zen::i32>(42, "int");
-    composer->call("long", 1);
+    composer->call("long", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i32>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -520,7 +520,7 @@ TEST(composer_cast, cast_int_to_float) {
     composer->set_local("x", "float");
     composer->push("x");
     composer->push<zen::i32>(42, "int");
-    composer->call("float", 1);
+    composer->call("float", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i32>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -534,7 +534,7 @@ TEST(composer_cast, cast_int_to_double) {
     composer->set_local("x", "double");
     composer->push("x");
     composer->push<zen::i32>(20, "int");
-    composer->call("double", 1);
+    composer->call("double", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i32>(20).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -549,7 +549,7 @@ TEST(composer_cast, cast_long_to_byte) {
     composer->set_local("x", "byte");
     composer->push("x");
     composer->push<zen::i64>(42, "long");
-    composer->call("byte", 1);
+    composer->call("byte", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i64>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -563,7 +563,7 @@ TEST(composer_cast, cast_long_to_bool) {
     composer->set_local("x", "bool");
     composer->push("x");
     composer->push<zen::i64>(1, "long");
-    composer->call("bool", 1);
+    composer->call("bool", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i64>(1).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -577,7 +577,7 @@ TEST(composer_cast, cast_long_to_short) {
     composer->set_local("x", "short");
     composer->push("x");
     composer->push<zen::i64>(42, "long");
-    composer->call("short", 1);
+    composer->call("short", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i64>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -591,7 +591,7 @@ TEST(composer_cast, cast_long_to_int) {
     composer->set_local("x", "int");
     composer->push("x");
     composer->push<zen::i64>(42, "long");
-    composer->call("int", 1);
+    composer->call("int", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i64>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -605,7 +605,7 @@ TEST(composer_cast, cast_long_to_long) {
     composer->set_local("x", "long");
     composer->push("x");
     composer->push<zen::i64>(42, "long");
-    composer->call("long", 1);
+    composer->call("long", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i64>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -619,7 +619,7 @@ TEST(composer_cast, cast_long_to_float) {
     composer->set_local("x", "float");
     composer->push("x");
     composer->push<zen::i64>(42, "long");
-    composer->call("float", 1);
+    composer->call("float", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i64>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -633,7 +633,7 @@ TEST(composer_cast, cast_long_to_double) {
     composer->set_local("x", "double");
     composer->push("x");
     composer->push<zen::i64>(42, "long");
-    composer->call("double", 1);
+    composer->call("double", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<zen::i64>(42).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -648,7 +648,7 @@ TEST(composer_cast, cast_float_to_byte) {
     composer->set_local("x", "byte");
     composer->push("x");
     composer->push<float>(42.5f, "float");
-    composer->call("byte", 1);
+    composer->call("byte", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<float>(42.5f).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -662,7 +662,7 @@ TEST(composer_cast, cast_float_to_bool) {
     composer->set_local("x", "bool");
     composer->push("x");
     composer->push<float>(1.0f, "float");
-    composer->call("bool", 1);
+    composer->call("bool", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<float>(1.0f).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -676,7 +676,7 @@ TEST(composer_cast, cast_float_to_short) {
     composer->set_local("x", "short");
     composer->push("x");
     composer->push<float>(42.5f, "float");
-    composer->call("short", 1);
+    composer->call("short", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<float>(42.5f).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -690,7 +690,7 @@ TEST(composer_cast, cast_float_to_int) {
     composer->set_local("x", "int");
     composer->push("x");
     composer->push<float>(42.5f, "float");
-    composer->call("int", 1);
+    composer->call("int", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<float>(42.5f).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -704,7 +704,7 @@ TEST(composer_cast, cast_float_to_long) {
     composer->set_local("x", "long");
     composer->push("x");
     composer->push<float>(42.5f, "float");
-    composer->call("long", 1);
+    composer->call("long", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<float>(42.5f).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -718,7 +718,7 @@ TEST(composer_cast, cast_float_to_float) {
     composer->set_local("x", "float");
     composer->push("x");
     composer->push<float>(42.5f, "float");
-    composer->call("float", 1);
+    composer->call("float", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<float>(42.5f).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -732,7 +732,7 @@ TEST(composer_cast, cast_float_to_double) {
     composer->set_local("x", "double");
     composer->push("x");
     composer->push<float>(42.5f, "float");
-    composer->call("double", 1);
+    composer->call("double", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<float>(42.5f).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -747,7 +747,7 @@ TEST(composer_cast, cast_double_to_byte) {
     composer->set_local("x", "byte");
     composer->push("x");
     composer->push<double>(42.5, "double");
-    composer->call("byte", 1);
+    composer->call("byte", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<double>(42.5).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -761,7 +761,7 @@ TEST(composer_cast, cast_double_to_bool) {
     composer->set_local("x", "bool");
     composer->push("x");
     composer->push<double>(1.0, "double");
-    composer->call("bool", 1);
+    composer->call("bool", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<double>(1.0).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -775,7 +775,7 @@ TEST(composer_cast, cast_double_to_short) {
     composer->set_local("x", "short");
     composer->push("x");
     composer->push<double>(42.5, "double");
-    composer->call("short", 1);
+    composer->call("short", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<double>(42.5).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -789,7 +789,7 @@ TEST(composer_cast, cast_double_to_int) {
     composer->set_local("x", "int");
     composer->push("x");
     composer->push<double>(42.5, "double");
-    composer->call("int", 1);
+    composer->call("int", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<double>(42.5).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -803,7 +803,7 @@ TEST(composer_cast, cast_double_to_long) {
     composer->set_local("x", "long");
     composer->push("x");
     composer->push<double>(42.5, "double");
-    composer->call("long", 1);
+    composer->call("long", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<double>(42.5).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -817,7 +817,7 @@ TEST(composer_cast, cast_double_to_float) {
     composer->set_local("x", "float");
     composer->push("x");
     composer->push<double>(42.5, "double");
-    composer->call("float", 1);
+    composer->call("float", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<double>(42.5).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -831,7 +831,7 @@ TEST(composer_cast, cast_double_to_double) {
     composer->set_local("x", "double");
     composer->push("x");
     composer->push<double>(42.5, "double");
-    composer->call("double", 1);
+    composer->call("double", 1, true);
     composer->end();
     auto _p = (i64)composer->_pool.get<double>(42.5).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
@@ -1084,15 +1084,15 @@ TEST(composer_unit, overloading)
     composer->plus();
     composer->end();
 
-    composer->begin("calle");
+    composer->begin("callee");
     composer->push<i64>(1, "long");
     composer->push<i64>(1, "long");
     composer->push("sum");
-    composer->call("sum", -2);
+    composer->call("sum", 2, false);
     composer->push<i32>(1, "int");
     composer->push<i32>(1, "int");
     composer->push("sum");
-    composer->call("sum", -2);
+    composer->call("sum", 2, false);
     composer->end();
     // composer->bake();
     const auto _p = (i64)composer->_pool.get<i64>(1).get();

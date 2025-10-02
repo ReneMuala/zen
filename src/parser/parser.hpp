@@ -171,7 +171,7 @@ END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
     auto composer = get_composer();
-    bool assignment_call = ILC::offset > 2 && ILC::chain[ILC::offset - 2] == TEQU;
+    bool assignment_call = ILC::offset > 0 and ILC::offset < ILC::chain_size and ILC::chain[ILC::offset - 1] == TEQU;
     const std::string name = parser::id;
     if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
     {
@@ -189,7 +189,7 @@ BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
     }
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
     pragma_skip_assignment_because_of_conversion_special_call = composer->call(
-        name, assignment_call ? param_count : -param_count) == zen::composer::call_result::casting && assignment_call;
+        name,param_count, assignment_call) == zen::composer::call_result::forwarding && assignment_call;
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
