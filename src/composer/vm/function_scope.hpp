@@ -15,7 +15,7 @@ namespace zen::composer::vm
     {
         struct return_data
         {
-            std::optional<value> value = std::nullopt;
+            std::shared_ptr<value> value = {};
             std::optional<std::string> name = std::nullopt;
         } return_data = {};
         std::stack<label> labels = {};

@@ -102,8 +102,8 @@ return 0;
 
         zen::composer::composer* composer = get_composer();
 
-        composer->begin("zenDestructor");
-        composer->set_parameter("it", "string::noDestructor");
+        composer->begin("[zenDestructor]");
+        composer->set_parameter("it", "string");
         composer->push("it.data");
         composer->push("bool");
         composer->call("bool", -1);
@@ -146,23 +146,21 @@ return 0;
         composer->assign();
         composer->end();
 
-        composer->begin("zenConstructor");
+        composer->begin("[zenConstructor]");
         composer->set_return_type("string");
-        composer->set_local("new", "string::noConstructor");
-        composer->push("new");
+        composer->push("<return>");
         composer->push<zen::i64>(composer->get_type("string")->get_full_size(), "long");
         composer->call(std::to_string(zen::allocate), 2);
-        composer->push("new");
+        composer->push("<return>");
         composer->push<zen::types::heap::string*>(zen::types::heap::string::empty(), "string");
         composer->assign();
-        composer->push("new.len");
+        composer->push("<return>.len");
         composer->push<zen::i64>(0, "long");
         composer->assign();
-        composer->push("new.data");
+        composer->push("<return>.data");
         composer->push<zen::i64>(0, "long");
         composer->assign();
-        composer->push("new");
-        composer->return_value();
+        composer->assume_returned();
         composer->end();
 
         composer->begin("stringTest");
@@ -172,7 +170,17 @@ return 0;
         // composer->push<zen::types::heap::string*>(zen::types::heap::string::from_string("zen"), "string");
         // composer->assign();
         composer->end();
+
+        composer->begin("stringTest2");
+        composer->set_parameter("it", "string");
+        composer->set_local("name", "string");
+        composer->push("it");
+        composer->push("name");
+        composer->assign();
+        composer->end();
+
         composer->bake();
+
         return 0;
         composer->begin("scope_test");
         composer->set_local("result", "int");

@@ -39,7 +39,7 @@ namespace zen::composer
             fields.emplace_back(name, type);
         }
         explicit operator const std::string&() const { return name; }
-        explicit type(std::string  name, const i64 size, enum kind kind = stack) : name(std::move(name)), _size(size), kind(kind) {}
+        explicit type(std::string  name, const i64 size, enum kind kind = stack) : kind(kind), name(std::move(name)), _size(size) {}
         bool operator==(const type& other) const
         {
             return name == other.name && _size == other._size;
@@ -69,6 +69,8 @@ namespace zen::composer
         kind kind;
         i64 offset;
         std::shared_ptr<const type> type;
+        bool no_destructor = false;
+        std::string label;
 
         [[nodiscard]] bool is(const std::string & type_name) const
         {
@@ -84,18 +86,16 @@ namespace zen::composer
             return  _address - st_point;
         }
         explicit value(const std::shared_ptr<const composer::type> & type, const i64 & address, const enum kind & kind = variable) :
-            type(type), kind(kind), offset(0), _address(address)
+            kind(kind), offset(0), type(type), _address(address)
         {
         }
 
-        i64 _address;
-    };
+        explicit  value(const std::string& label, const std::shared_ptr<const composer::type> & type, const i64 & address) : value(type, address)
+        {
+            this->label = label;
+        }
 
-    struct symbol : value
-    {
-        std::string name;
-        bool no_destructor = false;
-        symbol(std::string  name, const std::shared_ptr<const composer::type> & type, const i64 & address) : value(type, address), name(std::move(name)) {}
+        i64 _address;
     };
 
     struct signature
@@ -113,7 +113,7 @@ class composer {
 public:
     int & _ilc_offset;
     utils::constant_pool _pool;
-    std::stack<value> _stack;
+    std::stack<std::shared_ptr<value>> _stack;
     virtual std::shared_ptr<const type>& get_type(const std::string& name) = 0;
     virtual void push(const std::shared_ptr<const type>& type) = 0;
 
@@ -137,6 +137,7 @@ public:
     virtual void set_parameter(std::string name, const std::string & type) = 0;
     virtual void set_return_type(const std::string & name) = 0;
     virtual void return_value() = 0;
+    virtual void assume_returned() = 0;
     virtual void set_return_name(const std::string & name) = 0;
     virtual void set_local(std::string name, const std::string & type) = 0;
     virtual void end() = 0;
@@ -154,8 +155,8 @@ public:
             _stack.push(value(t, data.address));
         else
         {
-            const i64 address = (i64)(_pool.get<native>(data).get());
-            _stack.emplace(t, address, value::constant);
+            const i64 address = (i64)_pool.get<native>(data).get();
+            _stack.emplace(std::make_shared<value>(t, address, value::constant));
         }
     }
 

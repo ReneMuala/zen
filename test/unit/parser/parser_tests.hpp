@@ -38,7 +38,7 @@ TEST(parser_unit, function)
 
 TEST(parser_unit, function_with_single_int_parameter)
 {
-    setup_parser_test("greet(name: string) = {}");
+    setup_parser_test("test(a: int) = {}");
     EXPECT_TRUE(parse());
 }
 
@@ -62,7 +62,7 @@ TEST(parser_unit, function_with_different_parameter_types)
 
 TEST(parser_unit, function_with_parameter_list_in_class)
 {
-    setup_parser_test("class Player { set_name(new_name: string) = {} }");
+    setup_parser_test("class Player { set_age(age: short) = {} }");
     EXPECT_TRUE(parse());
 }
 

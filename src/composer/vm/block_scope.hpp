@@ -10,7 +10,7 @@ namespace zen::composer::vm
 {
     struct block_scope : public scope
     {
-        std::map<std::string, symbol> locals = {};
+        std::unordered_map<std::string, std::deque<std::shared_ptr<value>>> locals = {};
         i64 stack_usage = {};
         enum return_status
         {
@@ -18,15 +18,15 @@ namespace zen::composer::vm
             branched_return = 1,
             concise_return = 1 << 3,
         } return_status = {no_return};
-        std::optional<symbol> get_local(const std::string& name)
+        std::shared_ptr<value> get_local(const std::string& name)
         {
-            std::optional<symbol> target;
+            std::shared_ptr<value> target;
             if (nested_scope)
                 target = nested_scope->get_local(name);
             if (not target)
             {
                 if (const auto it = locals.find(name); it != locals.end())
-                    target = it->second;
+                    target = it->second.back();
             }
             return target;
         }
@@ -37,7 +37,7 @@ namespace zen::composer::vm
                 nested_scope->set_local(name, t);
             } else
             {
-                locals.emplace(name, symbol(name, t, stack_usage));
+                locals[name].push_back(std::make_shared<value>(name, t, stack_usage));
                 stack_usage += t->get_size();
             }
         }
@@ -101,7 +101,7 @@ namespace zen::composer::vm
                 return_status = status;
         }
 
-        i64 depth()
+        i64 depth() const
         {
             if (nested_scope)
             {
@@ -124,7 +124,6 @@ namespace zen::composer::vm
         [[nodiscard]] bool is(const enum type &t) const
         {
             if (nested_scope) return nested_scope->is(t);
-            // fmt::println("bs {} & {} = {}", int(type), int(t), int(type & t));
             return (type & t)  == t;
         }
     };

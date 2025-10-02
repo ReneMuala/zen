@@ -22,23 +22,23 @@ public:
     std::unordered_map<std::string, std::list<std::pair<signature, i64>>> functions;
     std::unordered_map<std::string, std::shared_ptr<const type>> types;
     std::shared_ptr<const type>& get_type(const std::string& name) override;
-    value top();
-    void push(const value&);
+    std::shared_ptr<value> top();
+    void push(const std::shared_ptr<value>&);
     void reset() override;
-    composer(int & ilc_offset);
+    explicit composer(int & ilc_offset);
     ~composer() override = default;
     void begin(std::string name) override;
     void set_parameter(std::string name, const std::string& type) override;
     void set_return_type(const std::string& name) override;
     void return_value() override;
+    void assume_returned() override;
     void set_return_name(const std::string& name) override;
     void set_local(std::string name, const std::string& type) override;
     void end() override;
     void bake() override;
     void assign() override;
-    void _push_variable(const std::vector<std::string> & tokens, const symbol& location);
+    void _push_variable(const std::vector<std::string> & tokens, const std::shared_ptr<value>& location);
     void _push_function();
-    void _push_return_value();
     void _push_temporary_value(const std::string& type_name);
     void push(const std::string& name) override;
     void pop() override;
@@ -52,15 +52,15 @@ public:
     void times() override;
     void slash() override;
     void modulo() override;
-    std::optional<value> _push_callee_return_value(const signature& sig);
-    void _push_callee_arguments(const std::deque<value>& arguments);
+    std::shared_ptr<value> _push_callee_return_value(const signature& sig);
+    void _push_callee_arguments(const std::deque<std::shared_ptr<value>>& arguments);
     call_result _call_caster(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::unordered_map<std::string, i64>>::iterator & caster_set);
-    call_result _call_function_overload(const std::deque<value>& arguments, const i64& addr, const signature& sig);
+    call_result _call_function_overload(const std::deque<std::shared_ptr<value>>& arguments, const i64& addr, const signature& sig);
     call_result _call_function(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::list<std::pair<signature,
                                        long long>>>::iterator&
                                func_it);
     call_result _call_instruction_write_str(const std::string& name, const i8& args_count);
-    call_result _call_instruction(const zen::instruction & insn, const i8& args_count, const i8& expected_args_count);
+    call_result _call_instruction(const zen::instruction & instruction, const i8& args_count, const i8& expected_args_count);
     call_result call(const std::string& name, const i8& args_count) override;
     void and_() override;
     void or_() override;
@@ -90,8 +90,8 @@ public:
 
 protected:
     void push(const std::shared_ptr<const type>& type) override;
-    i64 get_parameters_size(const signature& sig);
-    i64 get_return_size(const signature& sig);
+    static i64 get_parameters_size(const signature& sig);
+    static i64 get_return_size(const signature& sig);
 
 };
 
