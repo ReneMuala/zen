@@ -90,12 +90,15 @@ public:
     void set_for_begin_end_step() override;
     void end_for() override;
     void using_(const std::string& alias_function, const std::string& original_function) override;
+    void _link_string_constructor();
+    void _link_string_destructor();
+    void _link_string_copy();
+    void link() override;
 
 protected:
     void push(const std::shared_ptr<const type>& type) override;
     static i64 get_parameters_size(const signature& sig);
     static i64 get_return_size(const signature& sig);
-
 };
 
 } // zen

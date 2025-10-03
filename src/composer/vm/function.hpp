@@ -11,6 +11,7 @@ namespace zen::composer::vm
     {
         signature signature;
         i64 address;
+        bool defined = true;
         std::vector<label> labels;
     };
 }

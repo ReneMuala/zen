@@ -102,83 +102,54 @@ return 0;
 
         zen::composer::composer* composer = get_composer();
 
-        composer->begin("[zenDestructor]");
-        composer->set_parameter("it", "string");
-        composer->push("it.data");
-        composer->push("bool");
-        composer->call("bool", 1, zen::composer::call_result::pushed);
-        composer->begin_if_then();
-        composer->push("it.data");
-        composer->call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
-        composer->end_if();
-        composer->push("it");
-        composer->call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
-        composer->end();
+        // composer->begin("[zenDestructor]");
+        // composer->set_parameter("it", "string");
+        // composer->push("it.data");
+        // composer->push("bool");
+        // composer->call("bool", 1, zen::composer::call_result::pushed);
+        // composer->begin_if_then();
+        // composer->push("it.data");
+        // composer->call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
+        // composer->end_if();
+        // composer->push("it");
+        // composer->call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
+        // composer->end();
+        //
 
-        composer->begin("zenCopy");
-        composer->set_parameter("to", "string");
-        composer->set_parameter("from", "string");
-
-        composer->push("to.data");
-        composer->push("bool");
-        composer->call("bool", 1, zen::composer::call_result::pushed);
-        composer->begin_if_then();
-        composer->push("to.data");
-        composer->call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
-        composer->end_if();
-
-        composer->set_local("data", "long");
-        composer->push("data");
-        composer->push("from.len");
-        composer->call(std::to_string(zen::allocate), 2, zen::composer::call_result::pushed);
-
-        composer->push("data");
-        composer->push("from.data");
-        composer->push("from.len");
-        composer->call(std::to_string(zen::copy), 3, zen::composer::call_result::pushed);
-
-        composer->push("to.data");
-        composer->push("data");
-        composer->assign();
-
-        composer->push("to.len");
-        composer->push("from.len");
-        composer->assign();
-        composer->end();
-
-        composer->begin("[zenConstructor]");
-        composer->set_return_type("string");
-        composer->push("<return>");
-        composer->push<zen::i64>(composer->get_type("string")->get_full_size(), "long");
-        composer->call(std::to_string(zen::allocate), 2, zen::composer::call_result::pushed);
-
-        composer->push("<return>.len");
-        composer->push<zen::i64>(0, "long");
-        composer->assign();
-
-        composer->push("<return>.data");
-        composer->push<zen::types::heap::string*>(zen::types::heap::string::empty(), "string");
-        composer->push<zen::i64>(1, "long");
-        composer->call(std::to_string(zen::copy), 3, zen::composer::call_result::pushed);
-
-        composer->assume_returned();
-        composer->end();
-
-        composer->begin("stringTest");
-        composer->set_local("name", "string");
-        // composer->set_local("count", "short");
-        composer->push("name");
-        composer->push<zen::types::heap::string*>(zen::types::heap::string::from_string("zen"), "string");
-        composer->assign();
-        composer->end();
-
-        composer->begin("stringTest2");
-        composer->set_parameter("it", "string");
-        composer->set_local("name", "string");
-        composer->push("it");
-        composer->push("name");
-        composer->assign();
-        composer->end();
+        //
+        // composer->begin("[zenConstructor]");
+        // composer->set_return_type("string");
+        // composer->push("<return>");
+        // composer->push<zen::i64>(composer->get_type("string")->get_full_size(), "long");
+        // composer->call(std::to_string(zen::allocate), 2, zen::composer::call_result::pushed);
+        //
+        // composer->push("<return>.len");
+        // composer->push<zen::i64>(0, "long");
+        // composer->assign();
+        //
+        // composer->push("<return>.data");
+        // composer->push<zen::types::heap::string*>(zen::types::heap::string::empty(), "string");
+        // composer->push<zen::i64>(1, "long");
+        // composer->call(std::to_string(zen::copy), 3, zen::composer::call_result::pushed);
+        //
+        // composer->assume_returned();
+        // composer->end();
+        //
+        // composer->begin("stringTest");
+        // composer->set_local("name", "string");
+        // // composer->set_local("count", "short");
+        // composer->push("name");
+        // composer->push<zen::types::heap::string*>(zen::types::heap::string::from_string("zen"), "string");
+        // composer->assign();
+        // composer->end();
+        //
+        // composer->begin("stringTest2");
+        // composer->set_parameter("it", "string");
+        // composer->set_local("name", "string");
+        // composer->push("it");
+        // composer->push("name");
+        // composer->assign();
+        // composer->end();
 
         composer->begin("stringTest3");
         composer->set_return_type("string");
@@ -191,9 +162,10 @@ return 0;
         composer->push("name");
         composer->call("stringTest3", 0, zen::composer::call_result::pushed);
         composer->assign();
-        // composer->call("stringTest3", 0, zen::composer::call_result::pushed);
+        composer->call("stringTest3", 0, zen::composer::call_result::pushed);
         composer->end();
 
+        composer->link();
         composer->bake();
         return 0;
         composer->begin("scope_test");

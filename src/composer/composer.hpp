@@ -206,6 +206,7 @@ public:
     virtual void end_while() = 0;
 
     virtual void using_(const std::string & alias_function, const std::string & original_function) = 0;
+    virtual void link() = 0;
     //
 
     // virtual void begin_class(const std::string & name) = 0;

@@ -62,8 +62,9 @@ namespace zen
         code = {hlt};
 
         auto string_type = std::make_shared<type>("string", 0, type::kind::heap);
+        auto unit_type = std::make_shared<type>("unit", 0);
         types = {
-            {"unit", std::make_shared<type>("unit", 0)},
+            {"unit", unit_type},
             {"int", std::make_shared<type>("int", 4)},
             {"short", std::make_shared<type>("short", 2)},
             {"long", std::make_shared<type>("long", 8)},
@@ -83,7 +84,10 @@ namespace zen
             {"float", {{signature{}, 0}}},
             {"double", {{signature{}, 0}}},
             {"bool", {{signature{}, 0}}},
-            {"byte", {{signature{}, 0}}}
+            {"byte", {{signature{}, 0}}},
+            {"[zenConstructor]", {{signature{string_type},0, false}}},
+            {"zenCopy", {{signature{unit_type, {string_type, string_type}}, 0, false}}},
+            {"[zenDestructor]", {{signature{unit_type, {string_type}}, 0, false}}},
         };
     }
 
@@ -121,7 +125,7 @@ namespace zen
 if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize of {}", __FUNCTION__, #S))
 
 #define KAIZEN_REQUIRE_GLOBAL_SCOPE()\
-if (scope->is(scope::in_function)) throw std::logic_error(fmt::format("{} can only be invoked in global scope", __FUNCTION__))
+if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format("{} can only be invoked in global scope", __FUNCTION__))
 
     void composer::vm::composer::set_return_type(const std::string& name)
     {
@@ -247,6 +251,7 @@ if (scope->is(scope::in_function)) throw std::logic_error(fmt::format("{} can on
         {
             for (const auto& overload : function.second)
             {
+                if (not overload.defined) continue;
                 std::string params;
                 for (const auto& param : overload.signature.parameters)
                 {
@@ -1281,6 +1286,125 @@ if (top()->is(#T))\
             functions[alias_function] = functions[original_function];
         else
             throw exceptions::semantic_error(fmt::format("no such function {}", original_function), _ilc_offset);
+    }
+
+    void composer::vm::composer::_link_string_constructor()
+    {
+        std::optional<std::reference_wrapper<function>> undefined_version;
+        auto & zen_constructors = functions.at("[zenConstructor]");
+        for (auto & zen_constructor : zen_constructors)
+        {
+            if (zen_constructor.signature.type->name == "string" and not zen_constructor.defined)
+                undefined_version = zen_constructor;
+        }
+
+        if (not undefined_version)
+            return;
+
+        begin("[zenConstructor]");
+        undefined_version->get().address = scope->definition.get().address;
+        for (auto& label : undefined_version->get().labels)
+            label.bind(code);
+        set_return_type("string");
+        push("<return>");
+        zen::composer::composer::push<i64>(get_type("string")->get_full_size(), "long");
+        call(std::to_string(zen::allocate), 2, zen::composer::call_result::pushed);
+
+        push("<return>.len");
+        zen::composer::composer::push<i64>(0, "long");
+        assign();
+
+        push("<return>.data");
+        zen::composer::composer::push<string*>(string::empty(), "string");
+        zen::composer::composer::push<i64>(1, "long");
+        call(std::to_string(zen::copy), 3, zen::composer::call_result::pushed);
+
+        assume_returned();
+        end();
+    }
+
+    void composer::vm::composer::_link_string_destructor()
+    {
+        std::optional<std::reference_wrapper<function>> undefined_version;
+        auto & zen_destructors = functions.at("[zenDestructor]");
+        for (auto & zen_destructor : zen_destructors)
+        {
+            if (zen_destructor.signature.parameters.size() == 1 and zen_destructor.signature.parameters.at(0)->name == "string" and not zen_destructor.defined)
+                undefined_version = zen_destructor;
+        }
+        if (not undefined_version)
+            return;
+
+        begin("[zenDestructor]");
+        undefined_version->get().address = scope->definition.get().address;
+        for (auto& label : undefined_version->get().labels)
+            label.bind(code);
+        set_parameter("it", "string");
+        push("it.data");
+        push("bool");
+        call("bool", 1, zen::composer::call_result::pushed);
+        begin_if_then();
+        push("it.data");
+        call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
+        end_if();
+        push("it");
+        call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
+        end();
+    }
+
+    void composer::vm::composer::_link_string_copy()
+    {
+        std::optional<std::reference_wrapper<function>> undefined_version;
+        auto & overloads = functions.at("zenCopy");
+        for (auto & overload : overloads)
+        {
+            if (overload.signature.parameters.size() == 2 and overload.signature.parameters.at(0)->name == "string" and overload.signature.parameters.at(1)->name == "string" and not overload.defined)
+                undefined_version = overload;
+        }
+        if (not undefined_version)
+            return;
+
+        begin("zenCopy");
+        undefined_version->get().address = scope->definition.get().address;
+        for (auto& label : undefined_version->get().labels)
+            label.bind(code);
+        set_parameter("to", "string");
+        set_parameter("from", "string");
+
+        push("to.data");
+        push("bool");
+        call("bool", 1, zen::composer::call_result::pushed);
+        begin_if_then();
+        push("to.data");
+        call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
+        end_if();
+
+        set_local("data", "long");
+        push("data");
+        push("from.len");
+        call(std::to_string(zen::allocate), 2, zen::composer::call_result::pushed);
+
+        push("data");
+        push("from.data");
+        push("from.len");
+        call(std::to_string(zen::copy), 3, zen::composer::call_result::pushed);
+
+        push("to.data");
+        push("data");
+        assign();
+
+        push("to.len");
+        push("from.len");
+        assign();
+        end();
+    }
+
+    void composer::vm::composer::link()
+    {
+        KAIZEN_REQUIRE_GLOBAL_SCOPE();
+        _link_string_constructor();
+        _link_string_destructor();
+        _link_string_copy();
     }
 
     void composer::vm::composer::push(const std::shared_ptr<const type>& type)
