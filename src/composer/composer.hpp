@@ -39,7 +39,7 @@ namespace zen::composer
             fields.emplace_back(name, type);
         }
         explicit operator const std::string&() const { return name; }
-        explicit type(std::string  name, const i64 size, enum kind kind = stack) : kind(kind), name(std::move(name)), _size(size) {}
+        explicit type(std::string  name, const i64 size, const enum kind kind = stack) : kind(kind), name(std::move(name)), _size(size) {}
         bool operator==(const type& other) const
         {
             return name == other.name && _size == other._size;
@@ -54,8 +54,9 @@ namespace zen::composer
 
     enum call_result
     {
-        result,
-        forwarding
+        pushed,
+        assignment,
+        pushed_from_constructor
     };
 
     struct value
@@ -143,7 +144,7 @@ public:
     virtual void end() = 0;
     virtual void bake() = 0;
     // if args count is < 0, it means no assignment is occurring
-    virtual call_result call(const std::string& name, const i8 & args_count, bool assigment_call = false) = 0;
+    virtual call_result call(const std::string& name, const i8 & args_count, const call_result & mode) = 0;
     // TS <- TS+1
     virtual void assign() = 0;
     virtual void push(const std::string & name) = 0;
@@ -203,6 +204,8 @@ public:
     virtual void begin_while() = 0;
     virtual void set_while_condition() = 0;
     virtual void end_while() = 0;
+
+    virtual void using_(const std::string & alias_function, const std::string & original_function) = 0;
     //
 
     // virtual void begin_class(const std::string & name) = 0;

@@ -189,7 +189,7 @@ BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
     }
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
     pragma_skip_assignment_because_of_conversion_special_call = composer->call(
-        name,param_count, assignment_call) == zen::composer::call_result::forwarding && assignment_call;
+        name,param_count, assignment_call ? zen::composer::call_result::assignment : zen::composer::call_result::pushed) == zen::composer::call_result::assignment && assignment_call;
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)

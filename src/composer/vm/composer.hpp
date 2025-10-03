@@ -9,6 +9,7 @@
 #include "../composer.hpp"
 #include <vm/vm.hpp>
 
+#include "function.hpp"
 #include "function_scope.hpp"
 #include "utils/utils.hpp"
 #include "label.hpp"
@@ -19,7 +20,7 @@ class composer : public zen::composer::composer
 public:
     std::unique_ptr<function_scope> scope;
     std::vector<i64> code;
-    std::unordered_map<std::string, std::list<std::pair<signature, i64>>> functions;
+    std::unordered_map<std::string, std::list<function>> functions;
     std::unordered_map<std::string, std::shared_ptr<const type>> types;
     std::shared_ptr<const type>& get_type(const std::string& name) override;
     std::shared_ptr<value> top();
@@ -52,18 +53,17 @@ public:
     void times() override;
     void slash() override;
     void modulo() override;
-    std::shared_ptr<value> _push_callee_return_value(const signature& sig, bool assigment_call = false);
+    std::shared_ptr<value> _push_callee_return_value(const signature& sig, const call_result& mode);
     void _push_callee_arguments(const std::deque<std::shared_ptr<value>>& arguments);
     call_result _call_caster(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::unordered_map<std::string,
-                             i64>>::iterator&
-                             caster_set, bool assigment_call);
-    call_result _call_function_overload(const std::deque<std::shared_ptr<value>>& arguments, const i64& addr, const signature& sig, bool assignment_call = false);
-    call_result _call_function(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::list<std::pair<signature,
-                               long long>>>::iterator&
-                               func_it, bool assigment_call = false);
+                                 i64>>::iterator&
+                             caster_set, const call_result& mode);
+    call_result _call_function_overload(const std::deque<std::shared_ptr<value>>& arguments, function& func, const call_result& mode);
+    call_result _call_function(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::list<function>>::iterator&
+                               func_it, const call_result& mode);
     call_result _call_instruction_write_str(const std::string& name, const i8& args_count);
     call_result _call_instruction(const zen::instruction & instruction, const i8& args_count, const i8& expected_args_count);
-    call_result call(const std::string& name, const i8& args_count, bool assigment_call) override;
+    call_result call(const std::string& name, const i8& args_count, const call_result & mode) override;
     void and_() override;
     void or_() override;
     void not_() override;
@@ -89,6 +89,7 @@ public:
     void set_for_begin_end() override;
     void set_for_begin_end_step() override;
     void end_for() override;
+    void using_(const std::string& alias_function, const std::string& original_function) override;
 
 protected:
     void push(const std::shared_ptr<const type>& type) override;

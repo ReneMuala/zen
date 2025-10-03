@@ -106,13 +106,13 @@ return 0;
         composer->set_parameter("it", "string");
         composer->push("it.data");
         composer->push("bool");
-        composer->call("bool", 1, false);
+        composer->call("bool", 1, zen::composer::call_result::pushed);
         composer->begin_if_then();
         composer->push("it.data");
-        composer->call(std::to_string(zen::deallocate), 1);
+        composer->call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
         composer->end_if();
         composer->push("it");
-        composer->call(std::to_string(zen::deallocate), 1);
+        composer->call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
         composer->end();
 
         composer->begin("zenCopy");
@@ -121,21 +121,21 @@ return 0;
 
         composer->push("to.data");
         composer->push("bool");
-        composer->call("bool", 1, false);
+        composer->call("bool", 1, zen::composer::call_result::pushed);
         composer->begin_if_then();
         composer->push("to.data");
-        composer->call(std::to_string(zen::deallocate), 1);
+        composer->call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
         composer->end_if();
 
         composer->set_local("data", "long");
         composer->push("data");
         composer->push("from.len");
-        composer->call(std::to_string(zen::allocate), 2);
+        composer->call(std::to_string(zen::allocate), 2, zen::composer::call_result::pushed);
 
         composer->push("data");
         composer->push("from.data");
         composer->push("from.len");
-        composer->call(std::to_string(zen::copy), 3);
+        composer->call(std::to_string(zen::copy), 3, zen::composer::call_result::pushed);
 
         composer->push("to.data");
         composer->push("data");
@@ -150,22 +150,23 @@ return 0;
         composer->set_return_type("string");
         composer->push("<return>");
         composer->push<zen::i64>(composer->get_type("string")->get_full_size(), "long");
-        composer->call(std::to_string(zen::allocate), 2);
-        composer->push("<return>");
-        composer->push<zen::types::heap::string*>(zen::types::heap::string::empty(), "string");
-        composer->assign();
+        composer->call(std::to_string(zen::allocate), 2, zen::composer::call_result::pushed);
+
         composer->push("<return>.len");
         composer->push<zen::i64>(0, "long");
         composer->assign();
+
         composer->push("<return>.data");
-        composer->push<zen::i64>(0, "long");
-        composer->assign();
+        composer->push<zen::types::heap::string*>(zen::types::heap::string::empty(), "string");
+        composer->push<zen::i64>(1, "long");
+        composer->call(std::to_string(zen::copy), 3, zen::composer::call_result::pushed);
+
         composer->assume_returned();
         composer->end();
 
         composer->begin("stringTest");
         composer->set_local("name", "string");
-        composer->set_local("count", "short");
+        // composer->set_local("count", "short");
         composer->push("name");
         composer->push<zen::types::heap::string*>(zen::types::heap::string::from_string("zen"), "string");
         composer->assign();
@@ -187,8 +188,10 @@ return 0;
 
         composer->begin("stringTest4");
         composer->set_local("name", "string");
-        composer->push("stringTest3");
-        composer->call("stringTest3", 0);
+        composer->push("name");
+        composer->call("stringTest3", 0, zen::composer::call_result::pushed);
+        composer->assign();
+        // composer->call("stringTest3", 0, zen::composer::call_result::pushed);
         composer->end();
 
         composer->bake();
@@ -321,7 +324,7 @@ return 0;
         composer->push("str.data");
         composer->push("str.len");
         composer->push("fd");
-        composer->call(std::to_string(zen::write_str), 3);
+        composer->call(std::to_string(zen::write_str), 3, zen::composer::call_result::pushed);
         composer->end();
 
         composer->begin("print_string");
@@ -329,13 +332,13 @@ return 0;
         composer->push("write_string");
         composer->push<zen::i64>(reinterpret_cast<zen::i64>(stdout), "long");
         composer->push("string");
-        composer->call("write_string", 2);
+        composer->call("write_string", 2, zen::composer::call_result::pushed);
         composer->end();
 
         composer->begin("test::print_string");
         composer->push("print_string");
         composer->push<zen::types::heap::string*>(zen::types::heap::string::from_string("hello world"), "string");
-        composer->call("print_string", 1);
+        composer->call("print_string", 1, zen::composer::call_result::pushed);
         composer->end();
 
         composer->begin("internal::1_param_test");
@@ -354,21 +357,21 @@ return 0;
         composer->begin("internal::call_test");
         composer->push("internal::1_param_test");
         composer->push<double>(1.0, "double");
-        composer->call("internal::1_param_test", 1);
+        composer->call("internal::1_param_test", 1, zen::composer::call_result::pushed);
         composer->end();
 
         composer->begin("internal::cast_test");
         composer->set_local("x", "double");
         composer->push("x");
         composer->push(20, "int");
-        composer->call("double", 1);
+        composer->call("double", 1, zen::composer::call_result::pushed);
         composer->end();
 
         composer->begin("internal::float_to_int");
         composer->set_return_type("int");
         composer->set_parameter("x", "float");
         composer->push("x");
-        composer->call("int", -1);
+        composer->call("int", 1, zen::composer::call_result::pushed);
         composer->return_value();
         composer->end();
 
@@ -378,10 +381,10 @@ return 0;
         composer->set_parameter("y", "int");
         composer->push("<double>");
         composer->push("x");
-        composer->call("double", -1);
+        composer->call("double", 1, zen::composer::call_result::pushed);
         composer->push("<double>");
         composer->push("y");
-        composer->call("double", -1);
+        composer->call("double", 1, zen::composer::call_result::pushed);
         composer->plus();
         composer->return_value();
         composer->end();

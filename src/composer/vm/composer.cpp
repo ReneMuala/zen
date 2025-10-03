@@ -24,7 +24,7 @@
                     {\
                         fmt::println("[zenDestructor]({})", local->label);\
                         push(local);\
-                        call("[zenDestructor]",1, false);\
+                        call("[zenDestructor]",1, call_result::pushed);\
                     } catch (const std::exception & e)\
                     {\
                         throw exceptions::semantic_error(fmt::format("missing destructor implementation for type {}", local->type->name), _ilc_offset);\
@@ -108,7 +108,7 @@ namespace zen
     void composer::vm::composer::set_parameter(std::string name, const std::string& type)
     {
         const auto t = get_type(type);
-        std::get<signature>(scope->definition.get()).parameters.emplace_back(get_type(type));
+        scope->definition.get().signature.parameters.emplace_back(get_type(type));
         const i64 address = scope->stack_usage - /* jump callee IP */static_cast<i64>(sizeof(i64));
         scope->stack_usage += t->get_size();
         auto sym = std::make_shared<value>(name, t, address);
@@ -119,6 +119,9 @@ namespace zen
 
 #define KAIZEN_REQUIRE_SCOPE(S)\
 if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousize of {}", __FUNCTION__, #S))
+
+#define KAIZEN_REQUIRE_GLOBAL_SCOPE()\
+if (scope->is(scope::in_function)) throw std::logic_error(fmt::format("{} can only be invoked in global scope", __FUNCTION__))
 
     void composer::vm::composer::set_return_type(const std::string& name)
     {
@@ -134,7 +137,7 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
                 std::make_shared<value>(type, scope->stack_usage - /* jump callee IP */static_cast<i64>(sizeof(i64))));
             scope->stack_usage += type->get_size();
         }
-        std::get<signature>(scope->definition.get()).type = type;
+        scope->definition.get().signature.type = type;
     }
 
     void composer::vm::composer::return_value()
@@ -184,16 +187,16 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
         {
             if (const auto func_it = functions.find("[zenConstructor]"); func_it != functions.end())
             {
-                for (const auto& zen_allocator : func_it->second)
+                for (auto& zen_allocator : func_it->second)
                 {
-                    if (zen_allocator.first.type == t)
+                    if (zen_allocator.signature.type == t)
                     {
                         push(name);
                         // will push 8 bytes (result of the call)
-                        _call_function_overload({}, zen_allocator.second, zen_allocator.first, false);
-                        _call_instruction(i64_to_i64, 2, 2);
+                        _call_function_overload({}, zen_allocator, call_result::pushed_from_constructor);
+                        // _call_instruction(i64_to_i64, 2, 2);
                     }
-                };
+                }
             }
             else
             {
@@ -217,7 +220,7 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
                                                  "please use a named return or ensure that all control paths return a value of type {}",
                                                  scope->return_data.value->type->name));
         KAIZEN_IF_SCOPE_DESTROY_HEAP_LOCALS();
-        const auto sig = std::get<signature>(scope->definition.get());
+        const auto&  sig = scope->definition.get().signature;
         const auto sizes = get_return_size(sig) + get_parameters_size(sig);
         if (const auto most_delta = scope->stack_usage - sizes; most_delta > 0)
         {
@@ -225,6 +228,7 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
             code.push_back(most_delta);
         }
         code.push_back(zen::ret);
+        scope = nullptr;
     }
 
     std::shared_ptr<const composer::type>& composer::vm::composer::get_type(const std::string& name)
@@ -244,13 +248,13 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
             for (const auto& overload : function.second)
             {
                 std::string params;
-                for (const auto& param : overload.first.parameters)
+                for (const auto& param : overload.signature.parameters)
                 {
                     params += fmt::format("{}, ", param->name);
                 }
                 fmt::println("{}({}) = {}", function.first, params.empty() ? "" : params.substr(0, params.length() - 2),
-                             overload.first.type ? overload.first.type->name : "*");
-                for (i64 i = overload.second; i < code.size(); i++)
+                             overload.signature.type ? overload.signature.type->name : "*");
+                for (i64 i = overload.address; i < code.size(); i++)
                 {
                     const auto& _code = code[i];
                     if (_code == most)
@@ -421,7 +425,7 @@ if (not scope->is(S)) throw std::logic_error(fmt::format("cannot invoke {} ousiz
             {
                 push(lhs);
                 push(rhs);
-                call("zenCopy", 2, false);
+                call("zenCopy", 2, call_result::pushed);
                 return;
             }
             catch (std::exception& _)
@@ -972,12 +976,11 @@ if (top()->is(#T))\
         }
 
     std::shared_ptr<composer::value> composer::vm::composer::_push_callee_return_value(
-        const signature& sig, bool assigment_call)
+        const signature& sig, const call_result& mode)
     {
-        std::optional<value> result;
         if (sig.type->get_size())
         {
-            if (assigment_call)
+            if (mode == assignment)
             {
                 if (_stack.empty())
                     throw exceptions::semantic_error("cannot proceed assignment call without stack elements to",
@@ -985,24 +988,51 @@ if (top()->is(#T))\
                 fmt::println("assignment call in {} as {} = ...()", scope->name, top()->label);
                 const auto r = top();
                 if (r->type != sig.type)
-                    throw exceptions::semantic_error(fmt::format("cannot assign {} to {}", sig.type->name, r->type->name),
-                                                     _ilc_offset);
+                    throw exceptions::semantic_error(
+                        fmt::format("cannot assign {} to {}", sig.type->name, r->type->name),
+                        _ilc_offset);
                 if (r->type->kind == type::heap)
                 {
                     fmt::println("assigment call succeeded");
                     code.push_back(push_i64);
                     code.push_back(r->address(scope->stack_usage));
+                    scope->stack_usage += sig.type->get_size();
                     pop();
                     return r;
                 }
                 fmt::println("assigment call failed");
                 pop();
             }
-            const i64 address = scope->stack_usage;
-            code.push_back(zen::most);
-            code.push_back(-sig.type->get_size());
-            scope->stack_usage += sig.type->get_size();
-            return std::make_shared<value>(sig.type, address, value::temporary);
+            else if (mode == pushed_from_constructor)
+            {
+                auto result = top();
+                pop();
+                return result;
+            }
+            else if (mode == pushed)
+            {
+                if (sig.type->kind == type::heap)
+                // this will allocate data when no assignment is present in a call to a method that returns an object
+                {
+                    /**
+                        TODO: something i can to do improve this is to keep track of all [rr]'s in order to reuse them in a next call of similar type.
+                        -> But thats tricky... what if a nested call occurs? Data corruption for sure.
+                            -> Maybe if i verify if the [rr] whats already used before trying to utilize it again.
+                                -> ok, that should do it.
+                    */
+                    set_local("[rr]", sig.type->name);
+                    push("[rr]");
+                    return _push_callee_return_value(sig, assignment);
+                }
+                else
+                {
+                    const i64 address = scope->stack_usage;
+                    code.push_back(zen::most);
+                    code.push_back(-sig.type->get_size());
+                    scope->stack_usage += sig.type->get_size();
+                    return std::make_shared<value>(sig.type, address, value::temporary);
+                }
+            }
         }
         return nullptr;
     }
@@ -1011,28 +1041,46 @@ if (top()->is(#T))\
     {
         for (const auto& value : arguments)
         {
-            if (value->is("byte"))
-                code.push_back(zen::push_i8);
-            else if (value->is("bool"))
-                code.push_back(zen::push_boolean);
-            else if (value->is("short"))
-                code.push_back(zen::push_i16);
-            else if (value->is("int"))
-                code.push_back(zen::push_i32);
-            else if (value->is("float"))
-                code.push_back(zen::push_f32);
-            else if (value->is("double"))
-                code.push_back(zen::push_f64);
-            else // if (value.is("long") or true)
+            if (value->type->kind == type::kind::heap and value->kind == value::kind::constant)
+            {
+                /// TODO: optimize using the same logic as [rr]
+                set_local("[cha]", value->type->name);
+                push("[cha]");
+                push(value);
+                value->kind = value::kind::temporary; // fake it to avoid infinit recursion
+                call("zenCopy", 2, call_result::pushed);
+                value->kind = value::kind::constant;
+                push("[cha]");
                 code.push_back(zen::push_i64);
-            code.push_back(value->address(scope->stack_usage));
+                code.push_back(top()->address(scope->stack_usage));
+                pop();
+            }
+            else
+            {
+                if (value->is("byte"))
+                    code.push_back(zen::push_i8);
+                else if (value->is("bool"))
+                    code.push_back(zen::push_boolean);
+                else if (value->is("short"))
+                    code.push_back(zen::push_i16);
+                else if (value->is("int"))
+                    code.push_back(zen::push_i32);
+                else if (value->is("float"))
+                    code.push_back(zen::push_f32);
+                else if (value->is("double"))
+                    code.push_back(zen::push_f64);
+                else // if (value.is("long") or true)
+                    code.push_back(zen::push_i64);
+                code.push_back(value->address(scope->stack_usage));
+            }
         }
     }
 
     composer::call_result composer::vm::composer::_call_caster(const std::string& name, const i8& args_count,
                                                                const std::unordered_map<
                                                                    std::string, std::unordered_map<
-                                                                       std::string, i64>>::iterator& caster_set, const bool assigment_call)
+                                                                       std::string, i64>>::iterator& caster_set,
+                                                               const call_result& mode)
     {
         if (_stack.empty())
         {
@@ -1051,7 +1099,7 @@ if (top()->is(#T))\
         }
         const auto rhs = top();
         pop();
-        if (not assigment_call)
+        if (not mode)
             push(get_type(name));
         else if (_stack.empty())
             throw exceptions::semantic_error(fmt::format(
@@ -1066,11 +1114,11 @@ if (top()->is(#T))\
                 code.push_back(caster->second);
                 code.push_back(lhs->address(scope->stack_usage));
                 code.push_back(rhs->address(scope->stack_usage));
-                if (not assigment_call)
+                if (not mode)
                 {
                     push(lhs);
                 }
-                return call_result::forwarding;
+                return call_result::assignment;
             }
             else
             {
@@ -1090,9 +1138,10 @@ if (top()->is(#T))\
     }
 
     composer::call_result composer::vm::composer::_call_function_overload(
-        const std::deque<std::shared_ptr<value>>& arguments, const i64& addr, const signature& sig, bool assignment_call)
+        const std::deque<std::shared_ptr<value>>& arguments, function& func,
+        const call_result& mode)
     {
-        const auto returned = _push_callee_return_value(sig, assignment_call);
+        const auto returned = _push_callee_return_value(func.signature, mode);
         // }
         _push_callee_arguments(arguments);
 
@@ -1101,20 +1150,23 @@ if (top()->is(#T))\
             push(returned);
         }
         code.push_back(zen::call);
-        code.push_back(addr);
-        if (const i64 call_params_cost = get_parameters_size(sig))
+        code.push_back(func.address);
+        if (not func.address)
+        {
+            label lab;
+            lab.use(code);
+            func.labels.push_back(lab);
+        }
+        if (const i64 call_params_cost = get_parameters_size(func.signature))
         {
             code.push_back(zen::most);
             code.push_back(call_params_cost);
         }
-        return  assignment_call ? call_result::forwarding : call_result::result;
+        return mode ? call_result::assignment : call_result::pushed;
     }
 
     composer::call_result composer::vm::composer::_call_function(const std::string& name, const i8& args_count,
-                                                                 const std::unordered_map<
-                                                                     std::string, std::list<std::pair<
-                                                                         signature, long long>>>::
-                                                                 iterator& func_it, bool assigment_call)
+                                                                 const std::unordered_map<std::string, std::list<function>>::iterator& func_it, const call_result& mode)
     {
         std::deque<std::shared_ptr<value>> arguments;
         for (int i = 0; i < args_count; i++)
@@ -1123,10 +1175,10 @@ if (top()->is(#T))\
             pop();
         }
 
-        std::optional<std::reference_wrapper<const std::pair<signature, long long>>> candidate;
-        for (const auto& overload : func_it->second)
+        std::optional<std::reference_wrapper<function>> candidate;
+        for (auto& overload : func_it->second)
         {
-            if (overload.first.parameters.size() != arguments.size()) continue;
+            if (overload.signature.parameters.size() != arguments.size()) continue;
             if (arguments.empty())
             {
                 candidate = overload;
@@ -1134,7 +1186,7 @@ if (top()->is(#T))\
             }
             for (int i = 0; i < arguments.size(); i++)
             {
-                if (overload.first.parameters.at(i) != arguments.at(i)->type)
+                if (overload.signature.parameters.at(i) != arguments.at(i)->type)
                     break;
                 if (i + 1 == arguments.size())
                     candidate = overload;
@@ -1145,11 +1197,9 @@ if (top()->is(#T))\
 
         if (not candidate)
             throw exceptions::semantic_error(fmt::format("no function overload matched for \'{}\'", name), _ilc_offset);
-        const i64& addr = candidate->get().second;
-        const signature& sig = candidate->get().first;
         // if (args_count < 0) // when assigning, copy the value directly to lhs
         // {
-        return _call_function_overload(arguments, addr, sig, assigment_call);
+        return _call_function_overload(arguments, candidate->get(), mode);
     }
 
     composer::call_result composer::vm::composer::_call_instruction_write_str(
@@ -1175,7 +1225,7 @@ if (top()->is(#T))\
             code.push_back(args.top()->address(scope->stack_usage));
             args.pop();
         }
-        return call_result::result;
+        return call_result::pushed;
     }
 
     composer::call_result composer::vm::composer::_call_instruction(const zen::instruction& name, const i8& args_count,
@@ -1200,44 +1250,7 @@ if (top()->is(#T))\
             code.push_back(args.top()->address(scope->stack_usage));
             args.pop();
         }
-        return call_result::result;
-    }
-
-    composer::call_result composer::vm::composer::call(const std::string& name, const i8& args_count, const bool assigment_call)
-    {
-        KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        static std::unordered_map<std::string, std::unordered_map<std::string, i64>> casters{
-            {"bool", KAIZEN_CASTER_MAP_FOR(i8)},
-            {"byte", KAIZEN_CASTER_MAP_FOR(i8)},
-            {"short", KAIZEN_CASTER_MAP_FOR(i16)},
-            {"int", KAIZEN_CASTER_MAP_FOR(i32)},
-            {"long", KAIZEN_CASTER_MAP_FOR(i64)},
-            {"float", KAIZEN_CASTER_MAP_FOR(f32)},
-            {"double", KAIZEN_CASTER_MAP_FOR(f64)}
-        };
-        if (top()->is("function"))
-            pop(); // pop the caster itself from composer's stack
-        if (const auto caster_set = casters.find(name); caster_set != casters.end())
-        {
-            return _call_caster(name, args_count, caster_set, assigment_call);
-        }
-
-        if (const auto func_it = functions.find(name); func_it != functions.end())
-        {
-            return _call_function(name, args_count, func_it, assigment_call);
-        }
-        const int name_i32 = strtol(name.c_str(), nullptr, 10);
-        if (name_i32 == write_str)
-            return _call_instruction_write_str(name, args_count);
-        if (name_i32 >= write_i8 and name_i32 <= write_f64)
-            return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 1);
-        if (name_i32 == allocate || name_i32 == i64_to_i64)
-            return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 2);
-        if (name_i32 == deallocate)
-            return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 1);
-        if (name_i32 == copy)
-            return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 3);
-        throw exceptions::semantic_error(fmt::format("function \"{}\" was not found", name), _ilc_offset);
+        return call_result::pushed;
     }
 
     void composer::vm::composer::end_for()
@@ -1261,12 +1274,59 @@ if (top()->is(#T))\
         }
     }
 
+    void composer::vm::composer::using_(const std::string& alias_function, const std::string& original_function)
+    {
+        KAIZEN_REQUIRE_GLOBAL_SCOPE();
+        if (const auto function = functions.find(original_function); function != functions.end())
+            functions[alias_function] = functions[original_function];
+        else
+            throw exceptions::semantic_error(fmt::format("no such function {}", original_function), _ilc_offset);
+    }
+
     void composer::vm::composer::push(const std::shared_ptr<const type>& type)
     {
         _stack.emplace(std::make_shared<value>(type, scope->stack_usage, value::temporary));
         code.push_back(most);
         code.push_back(-type->get_size());
         scope->stack_usage += type->get_size();
+    }
+
+    composer::call_result composer::vm::composer::call(const std::string& name, const i8& args_count,
+                                                       const call_result& mode)
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
+        static std::unordered_map<std::string, std::unordered_map<std::string, i64>> casters{
+            {"bool", KAIZEN_CASTER_MAP_FOR(i8)},
+            {"byte", KAIZEN_CASTER_MAP_FOR(i8)},
+            {"short", KAIZEN_CASTER_MAP_FOR(i16)},
+            {"int", KAIZEN_CASTER_MAP_FOR(i32)},
+            {"long", KAIZEN_CASTER_MAP_FOR(i64)},
+            {"float", KAIZEN_CASTER_MAP_FOR(f32)},
+            {"double", KAIZEN_CASTER_MAP_FOR(f64)}
+        };
+        if (top()->is("function"))
+            pop(); // pop the caster itself from composer's stack
+        if (const auto caster_set = casters.find(name); caster_set != casters.end())
+        {
+            return _call_caster(name, args_count, caster_set, mode);
+        }
+
+        if (const auto func_it = functions.find(name); func_it != functions.end())
+        {
+            return _call_function(name, args_count, func_it, mode);
+        }
+        const int name_i32 = strtol(name.c_str(), nullptr, 10);
+        if (name_i32 == write_str)
+            return _call_instruction_write_str(name, args_count);
+        if (name_i32 >= write_i8 and name_i32 <= write_f64)
+            return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 1);
+        if (name_i32 == allocate || name_i32 == i64_to_i64)
+            return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 2);
+        if (name_i32 == deallocate)
+            return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 1);
+        if (name_i32 == copy)
+            return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 3);
+        throw exceptions::semantic_error(fmt::format("function \"{}\" was not found", name), _ilc_offset);
     }
 
     i64 composer::vm::composer::get_parameters_size(const signature& sig)
