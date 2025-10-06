@@ -91,7 +91,7 @@ void print_zen_string(void * str)
     }
     // printf("(%d bytes)", len);
 }
-
+extern char foo_case0[];
 int main(int argc, char** argv) try
 {
 #ifdef KAIZEN_WASM
@@ -99,7 +99,6 @@ return 0;
 #else
     if (true)
     {
-
         zen::composer::composer* composer = get_composer();
 
         // composer->begin("[zenDestructor]");

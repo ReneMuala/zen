@@ -65,6 +65,7 @@ namespace zen::composer
         {
             temporary,
             constant,
+            fake_constant,
             variable
         };
         kind kind;
@@ -83,8 +84,7 @@ namespace zen::composer
         }
         [[nodiscard]] i64 address(const i64 & st_point) const
         {
-            if (kind == constant) return _address;
-            return  _address - st_point;
+            return kind == kind::constant or kind == kind::fake_constant ? _address : _address - st_point;
         }
         explicit value(const std::shared_ptr<const composer::type> & type, const i64 & address, const enum kind & kind = variable) :
             kind(kind), offset(0), type(type), _address(address)

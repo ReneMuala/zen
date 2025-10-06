@@ -22,7 +22,7 @@
                 {\
                     try\
                     {\
-                        fmt::println("[zenDestructor]({})", local->label);\
+                        /*fmt::println("[zenDestructor]({})", local->label);*/\
                         push(local);\
                         call("[zenDestructor]",1, call_result::pushed);\
                     } catch (const std::exception & e)\
@@ -1052,7 +1052,7 @@ if (top()->is(#T))\
                 set_local("[cha]", value->type->name);
                 push("[cha]");
                 push(value);
-                value->kind = value::kind::temporary; // fake it to avoid infinit recursion
+                value->kind = value::kind::fake_constant; // fake it to avoid infinit recursion
                 call("zenCopy", 2, call_result::pushed);
                 value->kind = value::kind::constant;
                 push("[cha]");
