@@ -85,7 +85,7 @@ namespace zen
             {"double", {{signature{}, 0}}},
             {"bool", {{signature{}, 0}}},
             {"byte", {{signature{}, 0}}},
-            {"[zenConstructor]", {{signature{string_type},0, false}}},
+            {"[zenConstructor]", {{signature{string_type}, 0, false}}},
             {"zenCopy", {{signature{unit_type, {string_type, string_type}}, 0, false}}},
             {"[zenDestructor]", {{signature{unit_type, {string_type}}, 0, false}}},
         };
@@ -113,8 +113,8 @@ namespace zen
     {
         const auto t = get_type(type);
         scope->definition.get().signature.parameters.emplace_back(get_type(type));
-        const i64 address = scope->stack_usage - /* jump callee IP */static_cast<i64>(sizeof(i64));
-        scope->stack_usage += t->get_size();
+        const i64 address = scope->get_stack_usage() - /* jump callee IP */static_cast<i64>(sizeof(i64));
+        scope->use_stack(t->get_size());
         auto sym = std::make_shared<value>(name, t, address);
         sym->no_destructor = true;
         scope->locals[name].push_back(sym);
@@ -130,7 +130,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
     void composer::vm::composer::set_return_type(const std::string& name)
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        if (scope->stack_usage)
+        if (scope->get_stack_usage())
         {
             throw std::logic_error("return type cannot be set after params");
         }
@@ -138,8 +138,8 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         if (type->get_size() != 0)
         {
             scope->return_data.value = (
-                std::make_shared<value>(type, scope->stack_usage - /* jump callee IP */static_cast<i64>(sizeof(i64))));
-            scope->stack_usage += type->get_size();
+                std::make_shared<value>(type, scope->get_stack_usage() - /* jump callee IP */static_cast<i64>(sizeof(i64))));
+            scope->use_stack(type->get_size());
         }
         scope->definition.get().signature.type = type;
     }
@@ -150,8 +150,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         if (scope->get_return_status() == block_scope::concise_return)
             throw exceptions::semantic_error("cannot return values more than once", _ilc_offset);
         scope->set_return_status(block_scope::concise_return);
-        const auto rhs = top();
-        pop();
+        const auto rhs = pop_operand();
         if (not scope->return_data.value->is("unit"))
         {
             push(scope->return_data.value);
@@ -175,7 +174,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
     void composer::vm::composer::set_local(std::string name, const std::string& type)
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        constexpr std::string no_constructor = "::noConstructor";
+        std::string no_constructor = "::noConstructor";
         std::shared_ptr<const zen::composer::type> t;
         const bool no_construtor_mode = type.ends_with(no_constructor);
         if (no_construtor_mode)
@@ -183,8 +182,8 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         else
             t = get_type(type);
         scope->set_local(name, t);
-        // scope->locals.emplace(name, symbol(name, t, scope->stack_usage));
-        // scope->stack_usage += t->get_size();
+        // scope->locals.emplace(name, symbol(name, t, scope->get_stack_usage()));
+        // scope->get_stack_usage() += t->get_size();
         code.push_back(zen::most);
         code.push_back(-t->get_size());
         if (t->kind == type::heap and not no_construtor_mode)
@@ -198,6 +197,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                         push(name);
                         // will push 8 bytes (result of the call)
                         _call_function_overload({}, zen_allocator, call_result::pushed_from_constructor);
+                        break;
                         // _call_instruction(i64_to_i64, 2, 2);
                     }
                 }
@@ -224,9 +224,9 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                                                  "please use a named return or ensure that all control paths return a value of type {}",
                                                  scope->return_data.value->type->name));
         KAIZEN_IF_SCOPE_DESTROY_HEAP_LOCALS();
-        const auto&  sig = scope->definition.get().signature;
+        const auto& sig = scope->definition.get().signature;
         const auto sizes = get_return_size(sig) + get_parameters_size(sig);
-        if (const auto most_delta = scope->stack_usage - sizes; most_delta > 0)
+        if (const auto most_delta = scope->get_stack_usage() - sizes; most_delta > 0)
         {
             code.push_back(zen::most);
             code.push_back(most_delta);
@@ -257,20 +257,23 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                 {
                     params += fmt::format("{}, ", param->name);
                 }
-                fmt::println("{}({}) = {}", function.first, params.empty() ? "" : params.substr(0, params.length() - 2),
-                             overload.signature.type ? overload.signature.type->name : "*");
+                fmt::println("{}({}) = {} [{}]", function.first,
+                             params.empty() ? "" : params.substr(0, params.length() - 2),
+                             overload.signature.type ? overload.signature.type->name : "*", overload.address);
                 for (i64 i = overload.address; i < code.size(); i++)
                 {
+                    auto _i = i;
+                    fmt::print("\t");
                     const auto& _code = code[i];
                     if (_code == most)
                     {
                         fmt::print("most, {}, ", code[i + 1]);
                         i += 1;
                     }
-                    else if (_code == walk)
+                    else if (_code == zen::refer)
                     {
-                        fmt::print("walk, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
-                        i += 3;
+                        fmt::print("refer, {}, {} ", code[i + 1], code[i + 2]);
+                        i += 2;
                     }
                     else if (_code == copy)
                     {
@@ -366,9 +369,12 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                         fmt::print("ret, ");
                     else if (_code == hlt)
                         fmt::print("hlt, ");
+                    else if (_code == placeholder)
+                        fmt::print("placeholder, ");
                     else
                         std::cout << _code << ' ';
                     if (_code == zen::ret || _code == zen::hlt) break;
+                    fmt::println("[{}] ", _i);
                 }
                 std::cout << std::endl;
             }
@@ -384,10 +390,26 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                                                  "<KAIZEN-INTERNAL-API> Cannot compose operation {} because stack size {} is below expected",
                                                  __FUNCTION__, _stack.size()), _ilc_offset);
         }
-        const auto rhs = top();
-        pop();
-        auto lhs = top();
-        pop();
+        auto rhs = pop_operand(false);
+        auto lhs = pop_operand(false);
+        const bool dereference_assignment = lhs->is_reference or rhs->is_reference;
+        if (dereference_assignment)
+        {
+            if (not lhs->is_reference)
+            {
+                push("<long>");
+                const auto new_lhs = top();
+                assign_reference(new_lhs, lhs);
+                lhs = new_lhs;
+            }
+            if (not rhs->is_reference)
+            {
+                push("<long>");
+                const auto new_rhs = top();
+                assign_reference(new_rhs, rhs);
+                rhs = new_rhs;
+            }
+        }
         if (lhs->kind == value::constant)
         {
             throw exceptions::semantic_error("cannot assign value to constant", _ilc_offset,
@@ -409,20 +431,30 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             set_local(lhs->label, lhs->type->name);
             lhs = scope->get_local(lhs->label);
         }
-
-        if (rhs->is("short") and rhs->has_same_type_as(*lhs))
+        if (not rhs->has_same_type_as(*lhs))
+        {
+            throw exceptions::semantic_error(fmt::format(
+                                                 "cannot assign {} to {}", rhs->type->name,
+                                                 lhs->type->name), _ilc_offset,
+                                             fmt::format(
+                                                 "please consider using type casting. Eg. x = {}(y) or define a custom copy operator",
+                                                 lhs->type->name, rhs->type->name));
+        }
+        if (dereference_assignment)
+            code.push_back(copy);
+        else if (rhs->is("short"))
             code.push_back(zen::i16_to_i16);
-        else if (rhs->is("int") and rhs->has_same_type_as(*lhs))
+        else if (rhs->is("int"))
             code.push_back(zen::i32_to_i32);
-        else if (rhs->is("long") and rhs->has_same_type_as(*lhs))
+        else if (rhs->is("long"))
             code.push_back(zen::i64_to_i64);
-        else if (lhs->is("float") and rhs->has_same_type_as(*lhs))
+        else if (lhs->is("float"))
             code.push_back(zen::f32_to_f32);
-        else if (lhs->is("double") and rhs->has_same_type_as(*lhs))
+        else if (lhs->is("double"))
             code.push_back(zen::f64_to_f64);
-        else if ((lhs->is("byte") or lhs->is("bool")) and rhs->has_same_type_as(*lhs))
+        else if ((lhs->is("byte") or lhs->is("bool")))
             code.push_back(zen::i8_to_i8);
-        // else if (lhs->type->kind == type::heap and rhs->has_same_type_as(*lhs))
+        // else if (lhs->type->kind == type::heap)
         // code.push_back(zen::i64_to_i64);
         else
         {
@@ -435,16 +467,14 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             }
             catch (std::exception& _)
             {
-                throw exceptions::semantic_error(fmt::format(
-                                                     "cannot assign {} to {}", rhs->type->name,
-                                                     lhs->type->name), _ilc_offset,
-                                                 fmt::format(
-                                                     "please consider using type casting. Eg. x = {}(y) or define a custom copy operator",
-                                                     lhs->type->name, rhs->type->name));
             }
         }
-        code.push_back(lhs->address(scope->stack_usage));
-        code.push_back(rhs->address(scope->stack_usage));
+        code.push_back(lhs->address(scope->get_stack_usage()));
+        code.push_back(rhs->address(scope->get_stack_usage()));
+        if (dereference_assignment)
+        {
+            code.push_back((i64)_pool.get<i64>(lhs->type->get_size()).get());
+        }
     }
 
     std::vector<std::string> split_name(const std::string& name)
@@ -475,13 +505,14 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         val->offset = item.first;
         val->type = item.second;
         // fmt::println("{}: {} [{}]", name, val.type->name, val.offset);
-        if (val->offset)
+        if (tokens.size() > 1)
         {
             push(val->type);
-            code.push_back(walk);
-            code.push_back(top()->address(scope->stack_usage));
-            code.push_back(location->address(scope->stack_usage));
-            code.push_back(val->offset);
+            top()->is_reference = true;
+            code.push_back(zen::add_i64);
+            code.push_back(top()->address(scope->get_stack_usage()));
+            code.push_back(location->address(scope->get_stack_usage()));
+            code.push_back((i64)(_pool.get<i64>(val->offset).get()));
         }
         else
             push(val);
@@ -552,10 +583,8 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             throw std::logic_error(fmt::format(\
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",\
                 __FUNCTION__, _stack.size()));\
-        const auto rhs = top();\
-        pop();\
-        const auto lhs = top();\
-        pop();\
+        const auto rhs = pop_operand();\
+        const auto lhs = pop_operand();\
         push(lhs->type);\
         if (lhs->has_same_type_as(*rhs))\
         {\
@@ -573,9 +602,9 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",\
                                                  lhs->type->name, rhs->type->name));\
         }\
-        code.push_back(top()->address(scope->stack_usage));\
-        code.push_back(lhs->address(scope->stack_usage));\
-        code.push_back(rhs->address(scope->stack_usage));\
+        code.push_back(top()->address(scope->get_stack_usage()));\
+        code.push_back(lhs->address(scope->get_stack_usage()));\
+        code.push_back(rhs->address(scope->get_stack_usage()));\
     }
 
 
@@ -587,15 +616,14 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             throw std::logic_error(fmt::format(\
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",\
                 __FUNCTION__, _stack.size()));\
-        const auto val = top();\
-        pop();\
+        const auto val = pop_operand();\
         push("<bool>");\
         if (val->is("bool")) \
                 code.push_back(zen::boolean_##I);\
             else\
                 throw exceptions::semantic_error(fmt::format(\
                                                      "cannot apply "#I" to type \"{}\"", val->type->name), _ilc_offset, "please consider using type casting. Eg. bool(x)");\
-        code.push_back(val->address(scope->stack_usage));\
+        code.push_back(val->address(scope->get_stack_usage()));\
     }
 
 #define KAIZEN_IF_RELATIONAL_CHAIN(F)\
@@ -620,10 +648,8 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             throw std::logic_error(fmt::format(\
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",\
                 __FUNCTION__, _stack.size()));\
-        const auto rhs = top();\
-        pop();\
-        const auto lhs = top();\
-        pop();\
+        const auto rhs = pop_operand();\
+        const auto lhs = pop_operand();\
         push("<bool>");\
         if (lhs->has_same_type_as(*rhs))\
         {\
@@ -641,11 +667,34 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                                                  "please consider using type casting. Eg. x = {}(y) // with y: {}, if applicable.",\
                                                  lhs->type->name, rhs->type->name));\
         }\
-        code.push_back(top()->address(scope->stack_usage));\
-        code.push_back(lhs->address(scope->stack_usage));\
-        code.push_back(rhs->address(scope->stack_usage));\
+        code.push_back(top()->address(scope->get_stack_usage()));\
+        code.push_back(lhs->address(scope->get_stack_usage()));\
+        code.push_back(rhs->address(scope->get_stack_usage()));\
     }
 
+    std::shared_ptr<composer::value> composer::vm::composer::pop_operand(const bool allow_dereferencing)
+    {
+        auto operand = top();
+        if (operand->is("unit"))
+            throw exceptions::semantic_error("expected value", _ilc_offset);
+        pop();
+        if (not allow_dereferencing or not operand->is_reference)
+            return operand;
+        return dereference(operand);
+    }
+
+    std::shared_ptr<composer::value> composer::vm::composer::dereference(const std::shared_ptr<value>& value)
+    {
+        push(get_type("long"));
+        const auto destination = top();
+        pop();
+        self_assign_reference(destination);
+        code.push_back(zen::copy);
+        code.push_back(destination->address(scope->get_stack_usage()));
+        code.push_back(value->address(scope->get_stack_usage()));
+        code.push_back((i64)_pool.get<i64>(value->type->get_size()).get());
+        return destination;
+    }
 
     KAIZEN_DEFINE_ARITH_COMPOSITION(plus, sum, add, KAIZEN_IF_ARITHMETICS_CHAIN);
     KAIZEN_DEFINE_ARITH_COMPOSITION(minus, subtract, sub, KAIZEN_IF_ARITHMETICS_CHAIN);
@@ -670,12 +719,9 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
                 __FUNCTION__,
                 _stack.size()));
-        const auto scd = top();
-        pop();
-        const auto fst = top();
-        pop();
-        const auto condition = top();
-        pop();
+        const auto scd = pop_operand();
+        const auto fst = pop_operand();
+        const auto condition = pop_operand();
         push(fst->type);
         if (not condition->is("bool"))
             throw exceptions::semantic_error(fmt::format("cannot apply ternary to type \"{}\"", condition->type->name),
@@ -685,7 +731,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                                              _ilc_offset);
         label alt, end;
         code.push_back(go_if_not);
-        code.push_back(condition->address(scope->stack_usage));
+        code.push_back(condition->address(scope->get_stack_usage()));
         code.push_back(0);
         alt.use(code);
 
@@ -723,11 +769,10 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
                 __FUNCTION__,
                 _stack.size()));
-        const auto condition = top();
-        pop();
+        const auto condition = pop_operand();
         label end;
         code.push_back(go_if_not);
-        code.push_back(condition->address(scope->stack_usage));
+        code.push_back(condition->address(scope->get_stack_usage()));
         code.push_back(0);
         end.use(code);
         scope->labels.push(end);
@@ -757,13 +802,27 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
 if (top()->is(#T))\
 {\
     auto it = top();\
-    push(it);\
-    zen::composer::composer::push<NT>(1, #T);\
-    _call_instruction(add_ ## NT, 3,3);\
-    push(it);\
+    if (it->is_reference)\
+    {\
+        pop();\
+        push(it->type);\
+        const auto result = top();\
+        push(dereference(it));\
+        zen::composer::composer::push<NT>(1, it->type->name);\
+        _call_instruction(add_ ## NT, 3, 3);\
+        push(it);\
+        push(result);\
+        assign();\
+        push(result);\
+    } else\
+    {\
+        push(it);\
+        zen::composer::composer::push<NT>(1, it->type->name);\
+        _call_instruction(add_ ## NT, 3, 3);\
+        push(it);\
+    }\
     return;\
 }
-
 
     void composer::vm::composer::pre_increment()
     {
@@ -787,10 +846,25 @@ if (top()->is(#T))\
 if (top()->is(#T))\
 {\
     auto it = top();\
-    push(it);\
-    zen::composer::composer::push<NT>(1, #T);\
-    _call_instruction(sub_ ## NT, 3,3);\
-    push(it);\
+    if (it->is_reference)\
+    {\
+        pop();\
+        push(it->type);\
+        const auto result = top();\
+        push(dereference(it));\
+        zen::composer::composer::push<NT>(1, it->type->name);\
+        _call_instruction(sub_ ## NT, 3, 3);\
+        push(it);\
+        push(result);\
+        assign();\
+        push(result);\
+    } else\
+    {\
+        push(it);\
+        zen::composer::composer::push<NT>(1, it->type->name);\
+        _call_instruction(sub_ ## NT, 3, 3);\
+        push(it);\
+    }\
     return;\
 }
 
@@ -814,20 +888,34 @@ if (top()->is(#T))\
     }
 
 #define KAIZEN_IF_POSTINCREMENT_FOR(T, NT)\
-    if (top()->is(#T))\
+if (top()->is(#T))\
+{\
+    const auto it = top();\
+    push(it->type);\
+    auto old = top();\
+    push(it);\
+    assign();\
+    if (it->is_reference)\
     {\
-        const auto it = top();\
+        pop();\
         push(it->type);\
-        auto old = top();\
+        const auto _new = top();\
+        push(dereference(it));\
+        zen::composer::composer::push<NT>(1, it->type->name);\
+        _call_instruction(add_ ## NT, 3, 3);\
         push(it);\
+        push(_new);\
         assign();\
-            \
+    } else\
+    {\
         push(it);\
-        zen::composer::composer::push<NT>(1, #T);\
-        _call_instruction(add_##NT, 3, 3);\
         push(it);\
-        return;\
-    }
+        zen::composer::composer::push<NT>(1, it->type->name);\
+        _call_instruction(add_ ## NT, 3, 3);\
+    }\
+    push(old);\
+    return;\
+}
 
     void composer::vm::composer::post_increment()
     {
@@ -848,20 +936,34 @@ if (top()->is(#T))\
     };
 
 #define KAIZEN_IF_POSTDECREMENT_FOR(T, NT)\
-    if (top()->is(#T))\
+if (top()->is(#T))\
+{\
+    const auto it = top();\
+    push(it->type);\
+    auto old = top();\
+    push(it);\
+    assign();\
+    if (it->is_reference)\
     {\
-        const auto it = top();\
+        pop();\
         push(it->type);\
-        auto old = top();\
+        const auto _new = top();\
+        push(dereference(it));\
+        zen::composer::composer::push<NT>(1, it->type->name);\
+        _call_instruction(sub_ ## NT, 3, 3);\
         push(it);\
+        push(_new);\
         assign();\
-            \
+    } else\
+    {\
         push(it);\
-        zen::composer::composer::push<NT>(1, #T);\
-        _call_instruction(sub_##NT, 3, 3);\
         push(it);\
-        return;\
-    }
+        zen::composer::composer::push<NT>(1, it->type->name);\
+        _call_instruction(sub_ ## NT, 3, 3);\
+    }\
+    push(old);\
+    return;\
+}
 
     void composer::vm::composer::post_decrement()
     {
@@ -901,12 +1003,9 @@ if (top()->is(#T))\
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
                 __FUNCTION__,
                 _stack.size()));
-        const auto last = top();
-        pop();
-        const auto first = top();
-        pop();
-        const auto iterator = top();
-        pop();
+        const auto last = pop_operand();
+        const auto first = pop_operand();
+        const auto iterator = pop_operand();
 
         push(iterator);
         push(first);
@@ -919,8 +1018,7 @@ if (top()->is(#T))\
         push(last);
         lower_or_equal();
         code.push_back(go_if_not);
-        code.push_back(top()->address(scope->stack_usage));
-        pop();
+        code.push_back(pop_operand()->address(scope->get_stack_usage()));
         code.push_back(0);
         end.use(code);
 
@@ -937,14 +1035,10 @@ if (top()->is(#T))\
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
                 __FUNCTION__,
                 _stack.size()));
-        const auto step = top();
-        pop();
-        const auto last = top();
-        pop();
-        const auto first = top();
-        pop();
-        const auto iterator = top();
-        pop();
+        const auto step = pop_operand();
+        const auto last = pop_operand();
+        const auto first = pop_operand();
+        const auto iterator = pop_operand();
 
         push(iterator);
         push(first);
@@ -959,8 +1053,7 @@ if (top()->is(#T))\
         push(last);
         lower_or_equal();
         code.push_back(go_if_not);
-        code.push_back(top()->address(scope->stack_usage));
-        pop();
+        code.push_back(pop_operand()->address(scope->get_stack_usage()));
         code.push_back(0);
         end.use(code);
 
@@ -991,7 +1084,7 @@ if (top()->is(#T))\
                     throw exceptions::semantic_error("cannot proceed assignment call without stack elements to",
                                                      _ilc_offset);
                 fmt::println("assignment call in {} as {} = ...()", scope->name, top()->label);
-                const auto r = top();
+                const auto r = pop_operand();
                 if (r->type != sig.type)
                     throw exceptions::semantic_error(
                         fmt::format("cannot assign {} to {}", sig.type->name, r->type->name),
@@ -1000,18 +1093,15 @@ if (top()->is(#T))\
                 {
                     fmt::println("assigment call succeeded");
                     code.push_back(push_i64);
-                    code.push_back(r->address(scope->stack_usage));
-                    scope->stack_usage += sig.type->get_size();
-                    pop();
+                    code.push_back(r->address(scope->get_stack_usage()));
+                    scope->use_stack(sig.type->get_size());
                     return r;
                 }
                 fmt::println("assigment call failed");
-                pop();
             }
             else if (mode == pushed_from_constructor)
             {
-                auto result = top();
-                pop();
+                auto result = pop_operand();
                 return result;
             }
             else if (mode == pushed)
@@ -1031,10 +1121,11 @@ if (top()->is(#T))\
                 }
                 else
                 {
-                    const i64 address = scope->stack_usage;
+                    const i64 address = scope->get_stack_usage();
                     code.push_back(zen::most);
                     code.push_back(-sig.type->get_size());
-                    scope->stack_usage += sig.type->get_size();
+                    // scope->get_stack_usage() += sig.type->get_size();
+                    scope->use_stack(sig.type->get_size());
                     return std::make_shared<value>(sig.type, address, value::temporary);
                 }
             }
@@ -1057,10 +1148,9 @@ if (top()->is(#T))\
                 value->kind = value::kind::constant;
                 push("[cha]");
                 code.push_back(zen::push_i64);
-                code.push_back(top()->address(scope->stack_usage));
-                pop();
+                code.push_back(pop_operand()->address(scope->get_stack_usage()));
             }
-            else
+            else if (value->type->kind == type::kind::stack)
             {
                 if (value->is("byte"))
                     code.push_back(zen::push_i8);
@@ -1074,9 +1164,13 @@ if (top()->is(#T))\
                     code.push_back(zen::push_f32);
                 else if (value->is("double"))
                     code.push_back(zen::push_f64);
-                else // if (value.is("long") or true)
+                else if (value->is("long"))
                     code.push_back(zen::push_i64);
-                code.push_back(value->address(scope->stack_usage));
+                code.push_back(value->address(scope->get_stack_usage()));
+            } else
+            {
+                code.push_back(push_i64);
+                code.push_back(value->address(scope->get_stack_usage()));
             }
         }
     }
@@ -1102,26 +1196,36 @@ if (top()->is(#T))\
                                                  "please consider using multiple instructions when converting multiple values.\nEg. v = {0}(w) x = {0}(y)",
                                                  name));
         }
-        const auto rhs = top();
-        pop();
-        if (not mode)
+        const auto rhs = pop_operand();
+        if (mode == pushed)
             push(get_type(name));
         else if (_stack.empty())
             throw exceptions::semantic_error(fmt::format(
                                                  "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
                                                  __FUNCTION__, _stack.size()), _ilc_offset);
-        const auto lhs = top();
-        pop();
+        const auto lhs = pop_operand(false);
         if (lhs->is(name))
         {
             if (const auto caster = caster_set->second.find(rhs->type->name); caster != caster_set->second.end())
             {
-                code.push_back(caster->second);
-                code.push_back(lhs->address(scope->stack_usage));
-                code.push_back(rhs->address(scope->stack_usage));
-                if (not mode)
+                if (lhs->is_reference)
                 {
+                    push(lhs->type);
+                    const auto temp = top();
+                    pop();
+                    code.push_back(caster->second);
+                    code.push_back(temp->address(scope->get_stack_usage()));
+                    code.push_back(rhs->address(scope->get_stack_usage()));
                     push(lhs);
+                    push(temp);
+                    assign();
+                } else
+                {
+                    code.push_back(caster->second);
+                    code.push_back(lhs->address(scope->get_stack_usage()));
+                    code.push_back(rhs->address(scope->get_stack_usage()));
+                    if (mode == pushed)
+                        push(lhs);
                 }
                 return call_result::assignment;
             }
@@ -1158,7 +1262,7 @@ if (top()->is(#T))\
         code.push_back(func.address);
         if (not func.address)
         {
-            label lab;
+            global_label lab;
             lab.use(code);
             func.labels.push_back(lab);
         }
@@ -1167,17 +1271,19 @@ if (top()->is(#T))\
             code.push_back(zen::most);
             code.push_back(call_params_cost);
         }
+        fmt::println("calling oveld {} {} ", scope->name, _ilc_offset);
         return mode ? call_result::assignment : call_result::pushed;
     }
 
     composer::call_result composer::vm::composer::_call_function(const std::string& name, const i8& args_count,
-                                                                 const std::unordered_map<std::string, std::list<function>>::iterator& func_it, const call_result& mode)
+                                                                 const std::unordered_map<
+                                                                     std::string, std::list<function>>::iterator&
+                                                                 func_it, const call_result& mode)
     {
         std::deque<std::shared_ptr<value>> arguments;
         for (int i = 0; i < args_count; i++)
         {
-            arguments.push_front(top());
-            pop();
+            arguments.push_front(pop_operand());
         }
 
         std::optional<std::reference_wrapper<function>> candidate;
@@ -1219,15 +1325,14 @@ if (top()->is(#T))\
         std::stack<std::shared_ptr<value>> args;
         for (int i = 0; i < args_count; i++)
         {
-            auto v = top();
-            pop();
-            // v.prepare(code, scope->stack_usage);
+            auto v = pop_operand();
+            // v.prepare(code, scope->get_stack_usage());
             args.push(v);
         }
         code.push_back(zen::write_str);
         for (int i = 0; i < args_count; i++)
         {
-            code.push_back(args.top()->address(scope->stack_usage));
+            code.push_back(args.top()->address(scope->get_stack_usage()));
             args.pop();
         }
         return call_result::pushed;
@@ -1245,14 +1350,13 @@ if (top()->is(#T))\
         std::stack<std::shared_ptr<value>> args;
         for (int i = 0; i < args_count; i++)
         {
-            auto v = top();
-            pop();
+            auto v = pop_operand(false);
             args.push(v);
         }
         code.push_back(name);
         for (int i = 0; i < args_count; i++)
         {
-            code.push_back(args.top()->address(scope->stack_usage));
+            code.push_back(args.top()->address(scope->get_stack_usage()));
             args.pop();
         }
         return call_result::pushed;
@@ -1291,8 +1395,8 @@ if (top()->is(#T))\
     void composer::vm::composer::_link_string_constructor()
     {
         std::optional<std::reference_wrapper<function>> undefined_version;
-        auto & zen_constructors = functions.at("[zenConstructor]");
-        for (auto & zen_constructor : zen_constructors)
+        auto& zen_constructors = functions.at("[zenConstructor]");
+        for (auto& zen_constructor : zen_constructors)
         {
             if (zen_constructor.signature.type->name == "string" and not zen_constructor.defined)
                 undefined_version = zen_constructor;
@@ -1315,10 +1419,8 @@ if (top()->is(#T))\
         assign();
 
         push("<return>.data");
-        zen::composer::composer::push<string*>(string::empty(), "string");
-        zen::composer::composer::push<i64>(1, "long");
-        call(std::to_string(zen::copy), 3, zen::composer::call_result::pushed);
-
+        zen::composer::composer::push<i64>(0, "long");
+        assign();
         assume_returned();
         end();
     }
@@ -1326,10 +1428,11 @@ if (top()->is(#T))\
     void composer::vm::composer::_link_string_destructor()
     {
         std::optional<std::reference_wrapper<function>> undefined_version;
-        auto & zen_destructors = functions.at("[zenDestructor]");
-        for (auto & zen_destructor : zen_destructors)
+        auto& zen_destructors = functions.at("[zenDestructor]");
+        for (auto& zen_destructor : zen_destructors)
         {
-            if (zen_destructor.signature.parameters.size() == 1 and zen_destructor.signature.parameters.at(0)->name == "string" and not zen_destructor.defined)
+            if (zen_destructor.signature.parameters.size() == 1 and zen_destructor.signature.parameters.at(0)->name ==
+                "string" and not zen_destructor.defined)
                 undefined_version = zen_destructor;
         }
         if (not undefined_version)
@@ -1344,6 +1447,7 @@ if (top()->is(#T))\
         push("bool");
         call("bool", 1, zen::composer::call_result::pushed);
         begin_if_then();
+        push("<int>");
         push("it.data");
         call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
         end_if();
@@ -1355,10 +1459,11 @@ if (top()->is(#T))\
     void composer::vm::composer::_link_string_copy()
     {
         std::optional<std::reference_wrapper<function>> undefined_version;
-        auto & overloads = functions.at("zenCopy");
-        for (auto & overload : overloads)
+        auto& overloads = functions.at("zenCopy");
+        for (auto& overload : overloads)
         {
-            if (overload.signature.parameters.size() == 2 and overload.signature.parameters.at(0)->name == "string" and overload.signature.parameters.at(1)->name == "string" and not overload.defined)
+            if (overload.signature.parameters.size() == 2 and overload.signature.parameters.at(0)->name == "string" and
+                overload.signature.parameters.at(1)->name == "string" and not overload.defined)
                 undefined_version = overload;
         }
         if (not undefined_version)
@@ -1370,12 +1475,18 @@ if (top()->is(#T))\
             label.bind(code);
         set_parameter("to", "string");
         set_parameter("from", "string");
-
         push("to.data");
         push("bool");
         call("bool", 1, zen::composer::call_result::pushed);
         begin_if_then();
-        push("to.data");
+        // push("to.data");
+        // call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
+        // push("to.len");
+        // call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
+        push("to");
+        auto dest = top();
+        push("<long>");
+        assign_reference(top(), dest);
         call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
         end_if();
 
@@ -1407,12 +1518,28 @@ if (top()->is(#T))\
         _link_string_copy();
     }
 
+    void composer::vm::composer::self_assign_reference(const std::shared_ptr<value>& value)
+    {
+        value->is_reference = true;
+        code.push_back(zen::refer);
+        code.push_back(value->address(scope->get_stack_usage()));
+        code.push_back(value->address(scope->get_stack_usage()));
+    }
+
+    void composer::vm::composer::assign_reference(const std::shared_ptr<value>& to, const std::shared_ptr<value>& from)
+    {
+        to->is_reference = true;
+        code.push_back(zen::refer);
+        code.push_back(to->address(scope->get_stack_usage()));
+        code.push_back(from->address(scope->get_stack_usage()));
+    }
+
     void composer::vm::composer::push(const std::shared_ptr<const type>& type)
     {
-        _stack.emplace(std::make_shared<value>(type, scope->stack_usage, value::temporary));
+        _stack.emplace(std::make_shared<value>(type, scope->get_stack_usage(), value::temporary));
         code.push_back(most);
         code.push_back(-type->get_size());
-        scope->stack_usage += type->get_size();
+        scope->use_stack(type->get_size());
     }
 
     composer::call_result composer::vm::composer::call(const std::string& name, const i8& args_count,
@@ -1450,6 +1577,8 @@ if (top()->is(#T))\
             return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 1);
         if (name_i32 == copy)
             return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 3);
+        if (name_i32 == placeholder)
+            return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 0);
         throw exceptions::semantic_error(fmt::format("function \"{}\" was not found", name), _ilc_offset);
     }
 
@@ -1489,8 +1618,7 @@ if (top()->is(#T))\
                                              _ilc_offset);
         }
         code.push_back(zen::instruction::go_if_not);
-        const auto condition = top();
-        pop();
+        const auto condition = pop_operand();
         if (not condition->is("bool"))
         {
             throw exceptions::semantic_error("if condition must be bool", _ilc_offset,
@@ -1505,7 +1633,7 @@ if (top()->is(#T))\
             scope->labels.pop();
         }
 
-        code.push_back(condition->address(scope->stack_usage));
+        code.push_back(condition->address(scope->get_stack_usage()));
         code.push_back(0);
         else_label.use(code);
 

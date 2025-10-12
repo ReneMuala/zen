@@ -185,6 +185,20 @@ TEST(vm_unit, push_i64_test)
     EXPECT_EQ(stack.size(), sizeof(i64));
 }
 
+TEST(vm_unit, push_i64_2_test)
+{
+    zen::vm::stack stack;
+    i64 value = 123456;
+    i64 value2 = 78910;
+    std::vector<i64> code {push_i64, vm::ref(value), push_i64, vm::ref(value2), hlt};
+    zen::vm vm1;
+    vm1.load(code);
+    vm1.run(stack, 0);
+    EXPECT_EQ(stack.size(), sizeof(i64)*2);
+    EXPECT_EQ(*(i64*)(stack - sizeof(i64)), value2);
+    EXPECT_EQ(*(i64*)(stack - sizeof(i64)*2), value);
+}
+
 TEST(vm_unit, push_f32_test)
 {
     zen::vm::stack stack;

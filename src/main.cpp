@@ -92,8 +92,46 @@ void print_zen_string(void * str)
     // printf("(%d bytes)", len);
 }
 extern char foo_case0[];
+
+struct demo_struct_string
+{
+    zen::i64 a;
+    zen::i64 b;
+};
+
+void test_vm()
+{
+    using namespace zen;
+    i64 ptr,ptr2, size = 16;
+    i64 a = 1, b = 2, aptr = 0, bptr = 0, fsize = 8;
+    std::vector<i64> code;
+    code = {
+        allocate, vm::ref(ptr), vm::ref(size),
+        refer, vm::ref(aptr), vm::ref(a),
+        refer, vm::ref(bptr), vm::ref(b),
+        copy, vm::ref(ptr), vm::ref(aptr), vm::ref(fsize),
+        add_i64, vm::ref(ptr2), vm::ref(ptr), vm::ref(fsize),
+        copy, vm::ref(ptr2), vm::ref(bptr), vm::ref(fsize),
+    };
+    zen::vm vm;
+    vm.load(code);
+    vm.run();
+    auto it = (demo_struct_string*)ptr;
+    fmt::println("demo_struct_string {{ .a = {}, .b = {} }}\n", it->a, it->b);
+    // fmt::println("a -> {} {}", (i64)&a, aptr);
+
+    // for (int i = 0 ; i < size ; i++)
+    // {
+    //     fmt::print("[{}]({},", i, text[i]);
+    //     fmt::print("{})", ((const char*)ptr)[i]);
+    // }
+    // std::cout << std::endl;
+}
+
 int main(int argc, char** argv) try
 {
+    test_vm();
+    return 0;
 #ifdef KAIZEN_WASM
 return 0;
 #else
@@ -149,22 +187,52 @@ return 0;
         // composer->push("name");
         // composer->assign();
         // composer->end();
-
-        composer->begin("stringTest3");
-        composer->set_return_type("string");
-        composer->push<zen::types::heap::string*>(zen::types::heap::string::empty(), "string");
-        composer->return_value();
-        composer->end();
-
-        composer->begin("stringTest4");
-        composer->set_local("name", "string");
-        composer->push("name");
-        composer->call("stringTest3", 0, zen::composer::call_result::pushed);
-        composer->assign();
-        composer->call("stringTest3", 0, zen::composer::call_result::pushed);
-        composer->end();
-
+        //
+        // composer->begin("stringTest3");
+        // composer->set_return_type("string");
+        // composer->push<zen::types::heap::string*>(zen::types::heap::string::empty(), "string");
+        // composer->return_value();
+        // composer->end();
+        //
+        // composer->begin("stringTest4");
+        // composer->set_local("name", "string");
+        // composer->push("name");
+        // composer->call("stringTest3", 0, zen::composer::call_result::pushed);
+        // composer->assign();
+        // composer->call("stringTest3", 0, zen::composer::call_result::pushed);
+        // composer->end();
         composer->link();
+
+        composer->begin("stringTest5");
+        composer->set_local("name1", "string");
+        composer->set_local("name2", "string");
+        composer->push("name1.len");
+        composer->push("name2.len");
+        composer->assign();
+        composer->end();
+
+        composer->begin("stringTest6");
+        composer->set_local("name1", "string");
+        composer->set_local("name2", "string");
+        composer->set_local("total_len", "long");
+        composer->push("total_len");
+        composer->push("name1.len");
+        composer->push("name2.len");
+        composer->plus();
+        composer->assign();
+        composer->end();
+
+        composer->begin("stringTest7");
+        composer->set_local("name1", "string");
+        composer->set_local("name2", "string");
+        composer->set_local("name3", "string");
+        composer->push("name3.len");
+        composer->push("name1.len");
+        composer->push("name2.len");
+        composer->plus();
+        composer->assign();
+        composer->end();
+
         composer->bake();
         return 0;
         composer->begin("scope_test");

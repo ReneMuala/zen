@@ -108,7 +108,7 @@ break;
 #define KAIZEN_STACK_PUSH_FOR_TYPE(T) \
 case push_ ## T:\
 stack -= sizeof(T); \
-*static_cast<T*>(stack - sizeof(T)) = *address<T>(this->code[i + 1], stack); \
+*static_cast<T*>(stack - sizeof(T)) = *address<T>(this->code[i + 1] - (this->code[i + 1] < 0 ? sizeof(T) : 0), stack); \
 i += 1; \
 break;
 
@@ -128,8 +128,7 @@ void* zen::vm::stack::operator-(const i64& size)
 {
     if (size > -this->negative_stack_size)
     {
-        fmt::println(stderr, "zen::vm::stack address out of range: {}", size);
-        return nullptr;
+        throw std::runtime_error(fmt::format("zen::vm::stack address out of range: ({} of {})", size, -this->negative_stack_size));
     }
     return reinterpret_cast<void*>(reinterpret_cast<i64>(data) + abs(this->negative_stack_size) - size);
 }
@@ -139,7 +138,7 @@ bool zen::vm::stack::operator-=(const i64& size)
     negative_stack_size -= size;
     if (negative_stack_size <= 0)
         return (data = realloc(data, std::abs(negative_stack_size)));
-    fmt::println(stderr, "zen::vm::stack invalid resize: {}", size);
+    throw std::runtime_error(fmt::format("zen::vm::stack invalid resize: {}", size));
     negative_stack_size -= std::abs(size);
     return false;
 }
@@ -149,7 +148,7 @@ bool zen::vm::stack::operator+=(const i64& size)
     negative_stack_size += size;
     if (negative_stack_size <= 0)
         return (data = realloc(data, std::abs(negative_stack_size)));
-    fmt::println(stderr, "zen::vm::stack stack overflow: {}", size);
+    throw std::runtime_error(fmt::format("zen::vm::stack stack overflow: {}", size));
     negative_stack_size -= std::abs(size);
     return false;
 }
@@ -183,159 +182,206 @@ void zen::vm::run(const i64& entry_point)
 
 void zen::vm::run(stack& stack, const i64& entry_point)
 {
-    for (auto i = entry_point; i < this->code.size(); i++)
-    {
-        switch (this->code[i])
+    std::vector<i64> stack_usage_deque;
+    i64 i = 0;
+    i64 last_stack_usage = 0;
+    try {
+        for (i = entry_point; i < this->code.size(); i++)
         {
-        KAIZEN_STACK_PUSH_FOR_TYPE(i8)
-        KAIZEN_STACK_PUSH_FOR_TYPE(i16)
-        KAIZEN_STACK_PUSH_FOR_TYPE(i32)
-        KAIZEN_STACK_PUSH_FOR_TYPE(i64)
-        KAIZEN_STACK_PUSH_FOR_TYPE(f32)
-        KAIZEN_STACK_PUSH_FOR_TYPE(f64)
-        KAIZEN_STACK_PUSH_FOR_TYPE(boolean)
+            i64 stack_usage_difference = -stack.negative_stack_size - last_stack_usage;
+            if (stack_usage_difference)
+                fmt::println("sud = {}", stack_usage_difference);
 
-        KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i8)
-        KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i16)
-        KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i32)
-        KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i64)
-        KAIZEN_ARITHMETICS_FOR_FLOAT_TYPE(f32)
-        KAIZEN_ARITHMETICS_FOR_FLOAT_TYPE(f64)
-
-        KAIZEN_RELATIONAL_FOR_TYPE(i8)
-        KAIZEN_RELATIONAL_FOR_TYPE(i16)
-        KAIZEN_RELATIONAL_FOR_TYPE(i32)
-        KAIZEN_RELATIONAL_FOR_TYPE(i64)
-        KAIZEN_RELATIONAL_FOR_TYPE(f32)
-        KAIZEN_RELATIONAL_FOR_TYPE(f64)
-
-        KAIZEN_CONVERSION_FOR_TYPE(i8)
-        KAIZEN_CONVERSION_FOR_TYPE(i16)
-        KAIZEN_CONVERSION_FOR_TYPE(i32)
-        KAIZEN_CONVERSION_FOR_TYPE(i64)
-        KAIZEN_CONVERSION_FOR_TYPE(f32)
-        KAIZEN_CONVERSION_FOR_TYPE(f64)
-            // KAIZEN_CONVERSION_FOR_TYPE(boolean)
-        KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i8)
-        KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i16)
-        KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i32)
-        KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i64)
-        KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(f32)
-        KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(f64)
-        KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(boolean)
-        case write_str:
-            fwrite((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8), 1,
-                   std::min(*address<i64>(this->code[i + 2], stack), *(i64*)(*address<i64>(this->code[i + 1], stack))),
-                   (FILE*)*address<i64>(this->code[i + 3], stack));
-            i += 3;
-            break;
-        case read_str: // ok, this looks messy, but let me explain because its actually simple and safe ;)
-            // before reading, resize the destination to the expected size (if necessary).
-            if (*(i64*)(*address<i64>(this->code[i + 1], stack)) != *address<i64>(this->code[i + 2], stack))
+            if (stack_usage_difference > 0)
+                stack_usage_deque.push_back(stack_usage_difference);
+            else
             {
-                *(i64*)*address<i64>(this->code[i + 1], stack) = *address<i64>(this->code[i + 2], stack);
+                while (stack_usage_difference < 0 and not stack_usage_deque.empty())
+                {
+                    stack_usage_difference += stack_usage_deque.back();
+                    stack_usage_deque.pop_back();
+                }
+            }
+            last_stack_usage = -stack.negative_stack_size;
+            auto stack_usage = last_stack_usage;
+            for (const auto & sti : stack_usage_deque)
+            {
+                fmt::print("\tstack[{}] ", stack_usage);
+                switch (sti)
+                {
+                case 1:
+                    fmt::println("{}",*(i8*)(stack - stack_usage));
+                    break;
+                case 2:
+                    fmt::println("{}",*(i16*)(stack - stack_usage));
+                    break;
+                case 4:
+                    fmt::println("{}",*(i32*)(stack - stack_usage));
+                    break;
+                case 8:
+                    fmt::println("{}",*(i64*)(stack - stack_usage));
+                    break;
+                    default:break;
+                }
+                stack_usage -= sti;
+            }
+            fmt::print("{} ({})\n", i, code[i]);
+            switch (this->code[i])
+            {
+                KAIZEN_STACK_PUSH_FOR_TYPE(i8)
+                KAIZEN_STACK_PUSH_FOR_TYPE(i16)
+                KAIZEN_STACK_PUSH_FOR_TYPE(i32)
+                KAIZEN_STACK_PUSH_FOR_TYPE(i64)
+                KAIZEN_STACK_PUSH_FOR_TYPE(f32)
+                KAIZEN_STACK_PUSH_FOR_TYPE(f64)
+                KAIZEN_STACK_PUSH_FOR_TYPE(boolean)
+
+                KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i8)
+                KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i16)
+                KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i32)
+                KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i64)
+                KAIZEN_ARITHMETICS_FOR_FLOAT_TYPE(f32)
+                KAIZEN_ARITHMETICS_FOR_FLOAT_TYPE(f64)
+
+                KAIZEN_RELATIONAL_FOR_TYPE(i8)
+                KAIZEN_RELATIONAL_FOR_TYPE(i16)
+                KAIZEN_RELATIONAL_FOR_TYPE(i32)
+                KAIZEN_RELATIONAL_FOR_TYPE(i64)
+                KAIZEN_RELATIONAL_FOR_TYPE(f32)
+                KAIZEN_RELATIONAL_FOR_TYPE(f64)
+
+                KAIZEN_CONVERSION_FOR_TYPE(i8)
+                KAIZEN_CONVERSION_FOR_TYPE(i16)
+                KAIZEN_CONVERSION_FOR_TYPE(i32)
+                KAIZEN_CONVERSION_FOR_TYPE(i64)
+                KAIZEN_CONVERSION_FOR_TYPE(f32)
+                KAIZEN_CONVERSION_FOR_TYPE(f64)
+                    // KAIZEN_CONVERSION_FOR_TYPE(boolean)
+                KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i8)
+                KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i16)
+                KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i32)
+                KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i64)
+                KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(f32)
+                KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(f64)
+                KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(boolean)
+            case write_str:
+                fwrite((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8), 1,
+                       std::min(*address<i64>(this->code[i + 2], stack), *(i64*)(*address<i64>(this->code[i + 1], stack))),
+                       (FILE*)*address<i64>(this->code[i + 3], stack));
+                i += 3;
+                break;
+            case read_str: // ok, this looks messy, but let me explain because its actually simple and safe ;)
+                // before reading, resize the destination to the expected size (if necessary).
+                if (*(i64*)(*address<i64>(this->code[i + 1], stack)) != *address<i64>(this->code[i + 2], stack))
+                {
+                    *(i64*)*address<i64>(this->code[i + 1], stack) = *address<i64>(this->code[i + 2], stack);
+                    *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = (i64)realloc(
+                        (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8),
+                        *(i64*)*address<i64>(this->code[i + 1], stack));
+                }
+                // read and partially resize destination (updating its size member only)
+                *(i64*)*address<i64>(this->code[i + 1], stack) = (i64)fread(
+                    (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8), 1,
+                    *(i64*)*address<i64>(this->code[i + 1], stack), (FILE*)*address<i64>(this->code[i + 3], stack));
+                // complete destination resize operation leaving one extra byte for retro compatibility with c strings
                 *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = (i64)realloc(
                     (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8),
-                    *(i64*)*address<i64>(this->code[i + 1], stack));
-            }
-            // read and partially resize destination (updating its size member only)
-            *(i64*)*address<i64>(this->code[i + 1], stack) = (i64)fread(
-                (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8), 1,
-                *(i64*)*address<i64>(this->code[i + 1], stack), (FILE*)*address<i64>(this->code[i + 3], stack));
-            // complete destination resize operation leaving one extra byte for retro compatibility with c strings
-            *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = (i64)realloc(
-                (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8),
-                *(i64*)*address<i64>(this->code[i + 1], stack) + 1);
-            // zero that extra byte
-            ((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8))[*(i64*)*address<
-                i64>(this->code[i + 1], stack)] = 0;
-            i += 3;
-            break;
-        KAIZEN_IO_READ_FOR_SCALAR_TYPE(i8)
-        KAIZEN_IO_READ_FOR_SCALAR_TYPE(i16)
-        KAIZEN_IO_READ_FOR_SCALAR_TYPE(i32)
-        KAIZEN_IO_READ_FOR_SCALAR_TYPE(i64)
-        KAIZEN_IO_READ_FOR_SCALAR_TYPE(f32)
-        KAIZEN_IO_READ_FOR_SCALAR_TYPE(f64)
-        KAIZEN_IO_READ_FOR_SCALAR_TYPE(boolean)
+                    *(i64*)*address<i64>(this->code[i + 1], stack) + 1);
+                // zero that extra byte
+                ((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8))[*(i64*)*address<
+                    i64>(this->code[i + 1], stack)] = 0;
+                i += 3;
+                break;
+                KAIZEN_IO_READ_FOR_SCALAR_TYPE(i8)
+                KAIZEN_IO_READ_FOR_SCALAR_TYPE(i16)
+                KAIZEN_IO_READ_FOR_SCALAR_TYPE(i32)
+                KAIZEN_IO_READ_FOR_SCALAR_TYPE(i64)
+                KAIZEN_IO_READ_FOR_SCALAR_TYPE(f32)
+                KAIZEN_IO_READ_FOR_SCALAR_TYPE(f64)
+                KAIZEN_IO_READ_FOR_SCALAR_TYPE(boolean)
 
-        case boolean_and:
-            *address<boolean>(this->code[i + 1], stack) = *address<boolean>(this->code[i + 2], stack) and *address<
-                boolean>(this->code[i + 3], stack);
-            i += 3;
-            break;
-        case boolean_or:
-            *address<boolean>(this->code[i + 1], stack) = *address<boolean>(this->code[i + 2], stack) or *address<
-                boolean>(this->code[i + 3], stack);
-            i += 3;
-            break;
-        case boolean_not:
-            *address<boolean>(this->code[i + 1], stack) = not*address<boolean>(this->code[i + 2], stack);
-            i += 2;
-            break;
-        case most:
-            stack += this->code[i + 1]; // NOLINT
-            i += 1;
-            break;
-        case go:
-            i += this->code[i + 1] > 0 ? this->code[i + 1] + 1 : this->code[i + 1];
-            break;
-        case go_if_not:
-            if (not *address<boolean>(this->code[i + 1], stack))
-                i += this->code[i + 2] > 0 ? this->code[i + 2] + 2 : this->code[i + 2];
-            else
+                case boolean_and:
+                *address<boolean>(this->code[i + 1], stack) = *address<boolean>(this->code[i + 2], stack) and *address<
+                    boolean>(this->code[i + 3], stack);
+                i += 3;
+                break;
+            case boolean_or:
+                *address<boolean>(this->code[i + 1], stack) = *address<boolean>(this->code[i + 2], stack) or *address<
+                    boolean>(this->code[i + 3], stack);
+                i += 3;
+                break;
+            case boolean_not:
+                *address<boolean>(this->code[i + 1], stack) = not*address<boolean>(this->code[i + 2], stack);
                 i += 2;
-            break;
-        case call:
-            stack -= sizeof(i64); // NOLINT
-            *static_cast<i64*>(stack - sizeof(i64)) = i + 2;
-            // i = *address<i64>(this->code[i + 1], stack) - 1;
-            i = *static_cast<i64*>(stack - ((this->code[i + 1] + 2) * sizeof(i64))) - 1;
-            break;
-        case ret:
-            i = *static_cast<i64*>(stack - sizeof(i64)) - 1;
-            stack += sizeof(i64); // NOLINT
-            break;
-        case allocate:
-            *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(malloc(
-                *address<i64>(this->code[i + 2], stack)));
-            if (not *address<i64>(this->code[i + 1], stack))
-            {
-                throw std::runtime_error(fmt::format("fatal error: out of heap memory (zen vm halted at {})", i));
+                break;
+            case most:
+                stack += this->code[i + 1]; // NOLINT
+                i += 1;
+                break;
+            case go:
+                i += this->code[i + 1] > 0 ? this->code[i + 1] + 1 : this->code[i + 1];
+                break;
+            case go_if_not:
+                if (not *address<boolean>(this->code[i + 1], stack))
+                    i += this->code[i + 2] > 0 ? this->code[i + 2] + 2 : this->code[i + 2];
+                else
+                    i += 2;
+                break;
+            case call:
+                stack -= sizeof(i64); // NOLINT
+                *static_cast<i64*>(stack - sizeof(i64)) = i + 2;
+                i = this->code[i + 1] - 1;
+                break;
+            case ret:
+                i = *static_cast<i64*>(stack - sizeof(i64)) - 1;
+                stack += sizeof(i64); // NOLINT
+                break;
+            case allocate:
+                *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(malloc(
+                    *address<i64>(this->code[i + 2], stack)));
+                if (not *address<i64>(this->code[i + 1], stack))
+                {
+                    throw std::runtime_error(fmt::format("fatal error: out of heap memory (zen vm halted at {})", i));
+                }
+                i += 2;
+                break;
+            case deallocate:
+                free(reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)));
+                i += 1;
+                break;
+            case reallocate:
+                *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(realloc(
+                    reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)),
+                    *address<i64>(this->code[i + 2], stack)));
+                if (not *address<i64>(this->code[i + 1], stack))
+                {
+                    throw std::runtime_error(fmt::format("fatal error: out of heap memory (zen vm halted at {})", i));
+                }
+                i += 2;
+                break;
+            case copy:
+                // fmt::println("*({}){} = {}", *address<i64>(this->code[i + 3], stack), *address<i64>(this->code[i + 1], stack), *address<i64>(this->code[i + 2], stack));
+                fmt::println("copy({},{},{})", *address<i64>(this->code[i + 1], stack), *address<i64>(this->code[i + 2], stack),*address<i64>(this->code[i + 3], stack));
+                memcpy(reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)),
+                       reinterpret_cast<void*>(*address<i64>(this->code[i + 2], stack)),
+                       *address<i64>(this->code[i + 3], stack));
+                i += 3;
+                break;
+            case refer:
+                *address<i64>(this->code[i + 1], stack) = (i64)address<i64>(this->code[i + 2], stack);
+                i += 2;
+                break;
+            case placeholder:
+                break;
+            default:
+                fmt::println(stderr, "fatal error: unsupported operation {} (zen vm halted at {})", this->code[i], i);
+            case hlt:
+                return;
             }
-            i += 2;
-            break;
-        case deallocate:
-            free(reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)));
-            i += 1;
-            break;
-        case reallocate:
-            *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(realloc(
-                reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)),
-                *address<i64>(this->code[i + 2], stack)));
-            if (not *address<i64>(this->code[i + 1], stack))
-            {
-                throw std::runtime_error(fmt::format("fatal error: out of heap memory (zen vm halted at {})", i));
-            }
-            i += 2;
-            break;
-        case copy:
-            memcpy(reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)),
-                   reinterpret_cast<void*>(*address<i64>(this->code[i + 2], stack)),
-                   *address<i64>(this->code[i + 3], stack));
-            i += 3;
-            break;
-        case walk:
-            *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(reinterpret_cast<char*>(*address<i64>(
-                    this->code[i + 2], stack))) +
-                static_cast<i64>(sizeof(this->code[i + 3]));
-            i += 3;
-            break;
-        default:
-            fmt::println(stderr, "fatal error: unsupported operation {} (zen vm halted at {})", this->code[i], i);
-        case hlt:
-            return;
         }
+    } catch (std::exception & e)
+    {
+        fmt::print(stderr, "fatal error: {}\nvm halted at {}", e.what(), i);
     }
 }
 

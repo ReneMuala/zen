@@ -137,8 +137,9 @@ namespace zen
         reallocate,
         /// copy <destination:i64> <source:i64> <n-bytes:i64>
         copy,
-        /// walk <destination:i64> <pointer:i64> <offset:i64> advance pointer in offset bytes storing the new address in destination.
-        walk,
+        /// walk <pointer:i64> <item:i64> advance pointer in offset bytes storing the new address in destination.
+        refer,
+        placeholder,
     };
     class vm
     {

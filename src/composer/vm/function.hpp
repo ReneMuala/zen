@@ -3,7 +3,7 @@
 //
 
 #pragma once
-#include "label.hpp"
+#include "global_label.hpp"
 #include "composer/composer.hpp"
 namespace zen::composer::vm
 {
@@ -12,6 +12,6 @@ namespace zen::composer::vm
         signature signature;
         i64 address;
         bool defined = true;
-        std::vector<label> labels;
+        std::vector<global_label> labels;
     };
 }

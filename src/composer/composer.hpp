@@ -73,6 +73,7 @@ namespace zen::composer
         std::shared_ptr<const type> type;
         bool no_destructor = false;
         std::string label;
+        bool is_reference = false;
 
         [[nodiscard]] bool is(const std::string & type_name) const
         {

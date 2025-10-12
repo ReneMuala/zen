@@ -12,12 +12,14 @@ namespace zen::composer::vm
     {
         std::unordered_map<std::string, std::deque<std::shared_ptr<value>>> locals = {};
         i64 stack_usage = {};
+
         enum return_status
         {
             no_return = 0,
             branched_return = 1,
             concise_return = 1 << 3,
         } return_status = {no_return};
+
         std::shared_ptr<value> get_local(const std::string& name)
         {
             std::shared_ptr<value> target;
@@ -30,12 +32,38 @@ namespace zen::composer::vm
             }
             return target;
         }
+
+        void use_stack(const i64 size)
+        {
+            if (nested_scope)
+            {
+                nested_scope->use_stack(size);
+            }
+            else
+            {
+                stack_usage += size;
+            }
+        }
+
+        i64 get_stack_usage() const
+        {
+            if (nested_scope)
+            {
+                return stack_usage + nested_scope->get_stack_usage();
+            }
+            else
+            {
+                return stack_usage;
+            }
+        }
+
         void set_local(const std::string& name, const std::shared_ptr<const zen::composer::type>& t)
         {
             if (nested_scope)
             {
                 nested_scope->set_local(name, t);
-            } else
+            }
+            else
             {
                 locals[name].push_back(std::make_shared<value>(name, t, stack_usage));
                 stack_usage += t->get_size();
@@ -53,6 +81,7 @@ namespace zen::composer::vm
                 nested_scope = scope;
             }
         }
+
         decltype(locals)& ___dncd__deepest_locals()
         {
             if (nested_scope)
@@ -63,8 +92,9 @@ namespace zen::composer::vm
             }
             return locals;
         }
+
         /// do not call directly
-        i64 __dncd__pop(enum return_status & root_status)
+        i64 __dncd__pop(enum return_status& root_status)
         {
             if (nested_scope)
             {
@@ -81,7 +111,8 @@ namespace zen::composer::vm
                 root_status = branched_return;
             else if (type == in_else_if and return_status == concise_return)
                 root_status = branched_return;
-            else if (type == in_else and return_status == concise_return and (root_status == branched_return or root_status == concise_return))
+            else if (type == in_else and return_status == concise_return and (root_status == branched_return or
+                root_status == concise_return))
                 root_status = concise_return;
             else
                 root_status = no_return;
@@ -110,8 +141,8 @@ namespace zen::composer::vm
             return 1;
         }
 
-        template<typename T>
-        T * current(const enum type type)
+        template <typename T>
+        T* current(const enum type type)
         {
             if (not nested_scope) return nullptr;
             if (nested_scope->nested_scope)
@@ -121,11 +152,10 @@ namespace zen::composer::vm
 
         static block_scope* __unsafely_make(const enum type type);
 
-        [[nodiscard]] bool is(const enum type &t) const
+        [[nodiscard]] bool is(const enum type& t) const
         {
             if (nested_scope) return nested_scope->is(t);
-            return (type & t)  == t;
+            return (type & t) == t;
         }
     };
 }
-

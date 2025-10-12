@@ -39,10 +39,38 @@ TEST(integration, add_numbers)
     stack.push<i32>(a); // a
     stack.push<i32>(b); // b
     stack.push<i32>(c); // c
-    stack.push<i64>(0);
+    stack.push<i64>(0); // address to return to
     zen::vm vm1;
     vm1.load(composer->code);
     vm1.run(stack, 1);
     stack += sizeof(i32) * 3;
     EXPECT_EQ(stack.top<i32>(), a + b + c);
+}
+
+TEST(integration, hello_world)
+{
+    const auto composer = dynamic_cast<zen::composer::vm::composer*>(get_composer());
+    composer->reset();
+
+    composer->begin("print");
+    composer->set_parameter("string", "string");
+    composer->push("string.data");
+    composer->push("string.len");
+    composer->zen::composer::composer::push<i64>(reinterpret_cast<i64>(stdout), "long");
+    composer->call(std::to_string(write_str), 3, composer::call_result::pushed);
+    composer->end();
+
+    setup_parser_test(R"(main = { s : string })");
+    EXPECT_TRUE(parse());
+    composer->link();
+    composer->bake();
+    const std::list<composer::vm::function> main_functions = composer->functions["main"];
+    EXPECT_EQ(main_functions.size(), 1);
+    const composer::vm::function main = main_functions.front();
+    zen::vm::stack stack;
+    stack.push<i64>(0); // returning address
+    zen::vm vm1;
+    vm1.load(composer->code);
+    vm1.run(stack, main.address);
+    EXPECT_TRUE(true);
 }
