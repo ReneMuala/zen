@@ -54,15 +54,42 @@ TEST(integration, hello_world)
 
     composer->begin("print");
     composer->set_parameter("string", "string");
-    composer->push("string.data");
-    composer->push("string.len");
+    {
+        composer->push("string.data");
+        const auto deref = composer->dereference(composer->top());
+        composer->call(std::to_string(placeholder), 0, composer::call_result::pushed);
+        composer->pop();
+        composer->push(deref);
+    }
+    {
+        composer->push("string.len");
+        const auto deref = composer->dereference(composer->top());
+        composer->pop();
+        composer->push(deref);
+    }
     composer->zen::composer::composer::push<i64>(reinterpret_cast<i64>(stdout), "long");
     composer->call(std::to_string(write_str), 3, composer::call_result::pushed);
     composer->end();
-
-    setup_parser_test(R"(main = { s : string })");
-    EXPECT_TRUE(parse());
     composer->link();
+
+    setup_parser_test(R"(
+        /*sum(x: int, y: int) = int(x+y)
+        div(y: float, z: float) = float {
+            if(z != 0f){
+                y/z
+            } else {
+                0f
+            }
+        }*/
+        main = {
+            i: int = 1
+            _: unit = print("hello world\n")
+            while(i < 50){
+                _: unit = print("damn it works\n")
+                i = i + 1
+            }
+        })");
+    EXPECT_TRUE(parse());
     composer->bake();
     const std::list<composer::vm::function> main_functions = composer->functions["main"];
     EXPECT_EQ(main_functions.size(), 1);

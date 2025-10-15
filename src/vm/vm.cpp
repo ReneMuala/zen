@@ -188,44 +188,56 @@ void zen::vm::run(stack& stack, const i64& entry_point)
     try {
         for (i = entry_point; i < this->code.size(); i++)
         {
-            i64 stack_usage_difference = -stack.negative_stack_size - last_stack_usage;
-            if (stack_usage_difference)
-                fmt::println("sud = {}", stack_usage_difference);
+            if (false)
+            {
+                bool display = true or i == 86;
+                i64 stack_usage_difference = -stack.negative_stack_size - last_stack_usage;
+                if (stack_usage_difference && display)
+                    fmt::println("sud = {}", stack_usage_difference);
 
-            if (stack_usage_difference > 0)
-                stack_usage_deque.push_back(stack_usage_difference);
-            else
-            {
-                while (stack_usage_difference < 0 and not stack_usage_deque.empty())
+                if (stack_usage_difference > 0)
+                    stack_usage_deque.push_back(stack_usage_difference);
+                else
                 {
-                    stack_usage_difference += stack_usage_deque.back();
-                    stack_usage_deque.pop_back();
+                    while (stack_usage_difference < 0 and not stack_usage_deque.empty())
+                    {
+                        stack_usage_difference += stack_usage_deque.back();
+                        stack_usage_deque.pop_back();
+                    }
+                }
+                last_stack_usage = -stack.negative_stack_size;
+                auto stack_usage = last_stack_usage;
+                if (display)
+                {
+                    for (const auto & sti : stack_usage_deque)
+                    {
+                        fmt::print("\tstack[{}] ", stack_usage);
+                        switch (sti)
+                        {
+                        case 1:
+                            fmt::println("{}",*(i8*)(stack - stack_usage));
+                            break;
+                        case 2:
+                            fmt::println("{}",*(i16*)(stack - stack_usage));
+                            break;
+                        case 4:
+                            fmt::println("{}",*(i32*)(stack - stack_usage));
+                            break;
+                        case 8:
+                            fmt::println("{}",*(i64*)(stack - stack_usage));
+                            break;
+                        default:break;
+                        }
+                        stack_usage -= sti;
+                    }
+                    fmt::print("{} ({})\n", i, code[i]);
+                    if (false)
+                    {
+                        std::string line;
+                        std::getline(std::cin, line);
+                    }
                 }
             }
-            last_stack_usage = -stack.negative_stack_size;
-            auto stack_usage = last_stack_usage;
-            for (const auto & sti : stack_usage_deque)
-            {
-                fmt::print("\tstack[{}] ", stack_usage);
-                switch (sti)
-                {
-                case 1:
-                    fmt::println("{}",*(i8*)(stack - stack_usage));
-                    break;
-                case 2:
-                    fmt::println("{}",*(i16*)(stack - stack_usage));
-                    break;
-                case 4:
-                    fmt::println("{}",*(i32*)(stack - stack_usage));
-                    break;
-                case 8:
-                    fmt::println("{}",*(i64*)(stack - stack_usage));
-                    break;
-                    default:break;
-                }
-                stack_usage -= sti;
-            }
-            fmt::print("{} ({})\n", i, code[i]);
             switch (this->code[i])
             {
                 KAIZEN_STACK_PUSH_FOR_TYPE(i8)
@@ -265,8 +277,9 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(f64)
                 KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(boolean)
             case write_str:
-                fwrite((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8), 1,
-                       std::min(*address<i64>(this->code[i + 2], stack), *(i64*)(*address<i64>(this->code[i + 1], stack))),
+                fwrite((char*)(*address<i64>(this->code[i + 1], stack)), 1,
+                       // std::min(*address<i64>(this->code[i + 2], stack), *(i64*)(*address<i64>(this->code[i + 1], stack))),
+                       *address<i64>(this->code[i + 2], stack),
                        (FILE*)*address<i64>(this->code[i + 3], stack));
                 i += 3;
                 break;
@@ -361,7 +374,7 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 break;
             case copy:
                 // fmt::println("*({}){} = {}", *address<i64>(this->code[i + 3], stack), *address<i64>(this->code[i + 1], stack), *address<i64>(this->code[i + 2], stack));
-                fmt::println("copy({},{},{})", *address<i64>(this->code[i + 1], stack), *address<i64>(this->code[i + 2], stack),*address<i64>(this->code[i + 3], stack));
+                // fmt::println("copy({},{},{})", *address<i64>(this->code[i + 1], stack), *address<i64>(this->code[i + 2], stack),*address<i64>(this->code[i + 3], stack));
                 memcpy(reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)),
                        reinterpret_cast<void*>(*address<i64>(this->code[i + 2], stack)),
                        *address<i64>(this->code[i + 3], stack));

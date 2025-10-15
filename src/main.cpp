@@ -130,8 +130,8 @@ void test_vm()
 
 int main(int argc, char** argv) try
 {
-    test_vm();
-    return 0;
+    // test_vm();
+    // return 0;
 #ifdef KAIZEN_WASM
 return 0;
 #else
@@ -139,6 +139,48 @@ return 0;
     {
         zen::composer::composer* composer = get_composer();
 
+        composer->begin("scope_test1");
+        composer->set_local("foo1", "string");
+        composer->begin_while();
+        composer->zen::composer::composer::push<zen::i64>(1,"long");
+        composer->zen::composer::composer::push<zen::i64>(2,"long");
+        composer->lower();
+        composer->set_while_condition();
+        composer->call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
+        composer->set_local("a", "string");
+        composer->end_while();
+        composer->end();
+        composer->link();
+        composer->bake();
+        return 0;
+
+        composer->begin("sum_using_reverse");
+        composer->set_return_type("int");
+        composer->set_return_name("result");
+        composer->set_parameter("begin", "int");
+        composer->set_parameter("end", "int");
+        composer->set_local("result", "int");
+        composer->push("result");
+        composer->push<zen::i32>(0, "int");
+        composer->assign();
+        composer->begin_for();
+        composer->set_local("i", "int");
+        composer->push("i");
+        composer->push("end");
+        composer->push("begin");
+        composer->push<zen::i32>(-1, "int");
+        composer->call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
+        composer->set_for_begin_end_step();
+        composer->call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
+        composer->push("result");
+        composer->push("result");
+        composer->push("i");
+        composer->plus();
+        composer->assign();
+        composer->end_for();
+        composer->end();
+        composer->bake();
+        return 0;
         // composer->begin("[zenDestructor]");
         // composer->set_parameter("it", "string");
         // composer->push("it.data");
@@ -464,7 +506,13 @@ return 0;
 
     std::stringstream stream0;
     stream0.str(R"(
-
+sum_using_for(x: int, y: int) = int(result) {
+    result: int = 0
+    for(i:int = x, y){
+        result = result + i
+    }
+}
+/*
 duplicate(x: int) = int(x * 2)
 
 callDuplicate() = int {
@@ -518,6 +566,7 @@ test_asgn(y: int) = {
 }
 add(a: int, b: int, c: int) = int { a + b + c }
 add2(a: int, b: int, c: int) =  int { a + b }
+*/
 )");
 
     zen::lexer lexer(stream0);

@@ -96,7 +96,7 @@ BEGIN_PRODUCTION(PRODUCTION_NIF)
     static auto composer = get_composer();
     REQUIRE_TERMINAL(TKEYWORD_IF)
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_OPEN, EXPECTED("("))
-   // bool first = true;
+    // bool first = true;
     /* disable extract for now
      *do
     {
@@ -122,6 +122,10 @@ BEGIN_PRODUCTION(PRODUCTION_NIF)
     REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
     while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
     {
+    }
+    if (TRY_REQUIRE_NON_TERMINAL(NVAL))
+    {
+        composer->return_value();
     }
     REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
     while (TRY_REQUIRE_TERMINAL(TKEYWORD_ELSE))
@@ -153,6 +157,10 @@ BEGIN_PRODUCTION(PRODUCTION_NIF)
             while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
             {
             }
+            if (TRY_REQUIRE_NON_TERMINAL(NVAL))
+            {
+                composer->return_value();
+            }
             REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
         }
         else
@@ -161,6 +169,10 @@ BEGIN_PRODUCTION(PRODUCTION_NIF)
             REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
             while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
             {
+            }
+            if (TRY_REQUIRE_NON_TERMINAL(NVAL))
+            {
+                composer->return_value();
             }
             REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
             break;
@@ -171,13 +183,14 @@ END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
     auto composer = get_composer();
-    bool assignment_call = ILC::offset > 0 and ILC::offset < ILC::chain_size and ILC::chain[ILC::offset - 1] == TEQU;
     const std::string name = parser::id;
     if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
     {
         parser::type.clear();
     }
     REQUIRE_TERMINAL(TPARENTHESIS_OPEN)
+    composer->pop();
+    bool assignment_call = ILC::offset > 3 and ILC::offset < ILC::chain_size and ILC::chain[ILC::offset - 3] == TEQU;
     zen::i8 param_count = 0;
     while (TRY_REQUIRE_NON_TERMINAL(NVAL))
     {
@@ -189,7 +202,9 @@ BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
     }
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
     pragma_skip_assignment_because_of_conversion_special_call = composer->call(
-        name,param_count, assignment_call ? zen::composer::call_result::assignment : zen::composer::call_result::pushed) == zen::composer::call_result::assignment && assignment_call;
+            name, param_count,
+            assignment_call ? zen::composer::call_result::assignment : zen::composer::call_result::pushed) ==
+        zen::composer::call_result::assignment && assignment_call;
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
@@ -296,15 +311,22 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NFOR)
+    static auto composer = get_composer();
     REQUIRE_TERMINAL(TKEYWORD_FOR)
+    composer->begin_for();
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_OPEN, EXPECTED("("))
     do
     {
         REQUIRE_TERMINAL_CALLBACK(TID, EXPECTED("ID"))
+        std::string iterator = tokens[ILC::offset-1].value;
+        parser::type.clear();
         if (TRY_REQUIRE_TERMINAL(TCOLON))
         {
             REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
         }
+        std::string type = parser::type;
+        composer->set_local(iterator, type);
+        composer->push(iterator);
         REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
         REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
         REQUIRE_TERMINAL_CALLBACK(TCOMMA, EXPECTED(","))
@@ -312,6 +334,10 @@ BEGIN_PRODUCTION(PRODUCTION_NFOR)
         if (TRY_REQUIRE_TERMINAL(TCOMMA))
         {
             REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
+            composer->set_for_begin_end_step();
+        } else
+        {
+            composer->set_for_begin_end();
         }
     }
     while (TRY_REQUIRE_TERMINAL(TSEMICOLON));
@@ -321,12 +347,14 @@ BEGIN_PRODUCTION(PRODUCTION_NFOR)
     {
     }
     REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
+    composer->end_for();
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NWHILE)
     static auto composer = get_composer();
     REQUIRE_TERMINAL(TKEYWORD_WHILE)
     composer->begin_while();
+    fmt::println("pragma_ignore_missing_symbols = {}", pragma_ignore_missing_symbols);
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_OPEN, EXPECTED("("))
     REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
@@ -502,7 +530,8 @@ END_PRODUCTION
 BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_CHAR_ARRAY)
     static auto composer = get_composer();
     REQUIRE_TERMINAL(TCHAR_ARRAY)
-    composer->push<zen::types::heap::string*>(zen::types::heap::string::from_string(tokens[ILC::offset - 1].value), "string");
+    composer->push<zen::types::heap::string*>(zen::types::heap::string::from_string(tokens[ILC::offset - 1].value),
+                                              "string");
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_NOT_VAL)
@@ -598,7 +627,11 @@ BEGIN_PRODUCTION(PRODUCTION_NVARIABLE_DEFINITION)
     static auto composer = get_composer();
     // provides parser::id
     pragma_ignore_missing_symbols = true;
-    REQUIRE_NON_TERMINAL(NID)
+    if (not TRY_REQUIRE_NON_TERMINAL(NID))
+    {
+        pragma_ignore_missing_symbols = false;
+        ROLLBACK_PRODUCTION();
+    }
     pragma_ignore_missing_symbols = false;
     const auto name = parser::id;
     REQUIRE_TERMINAL(TCOLON)
@@ -644,7 +677,7 @@ BEGIN_PRODUCTION(META_PRODUCTION_GLOBAL_STAT)
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NSTAT_FROM_ASGN)
-static zen::composer::composer* composer = get_composer();
+    static zen::composer::composer* composer = get_composer();
     REQUIRE_NON_TERMINAL(NID)
     if (TRY_REQUIRE_TERMINAL(TEQU))
     {
@@ -665,7 +698,7 @@ BEGIN_PRODUCTION(PRODUCTION_NSINGLE_VAL)
     bool post_increment = false;
     bool post_decrement = false;
     REQUIRE_NON_TERMINAL(NSINGLE_VAL_PREDICATE)
-    if (not (pre_increment or pre_decrement))
+    if (not(pre_increment or pre_decrement))
     {
         post_increment = TRY_REQUIRE_TERMINAL(TPLUS_PLUS);
         post_decrement = post_increment or TRY_REQUIRE_TERMINAL(TMINUS_MINUS);

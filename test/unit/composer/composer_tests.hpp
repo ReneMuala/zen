@@ -961,10 +961,11 @@ TEST(composer_unit, while_) {
     composer->plus();
     composer->end_while();
     composer->end();
+    composer->bake();
     auto _p2 = (i64)composer->_pool.get<i32>(1).get(); // increment
     auto _p = (i64)composer->_pool.get<i32>(0).get();
-    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
-        (std::vector<i64>{hlt, most, -4, i32_to_i32, -4, _p, most, -1, lte_i32, -1, -21, -17, go_if_not, -1, 17, most, -4, i32_to_i32, -4, -25, add_i32, -25, -25, _p2, most, -4, add_i32, -4, -13, -29, go, -23, i32_to_i32, -33, -13, most, 13, ret,}));
+    const auto _c = std::vector<i64>{hlt, most, -4, i32_to_i32, -4, _p, most, -1, lte_i32, -1, -21, -17, go_if_not, -1, 21, most, -4, i32_to_i32, -4, -25, add_i32, -25, -25, _p2, most, -4, add_i32, -4, -29, -8, most, 8, most, 1, go, -27, i32_to_i32, -24, -4, most, 4, ret,};
+    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,_c);
 }
 
 TEST(composer_unit, for1_) {
@@ -996,7 +997,7 @@ TEST(composer_unit, for1_) {
     auto _p2 = (i64)composer->_pool.get<i32>(1).get(); // increment
     auto _p = (i64)composer->_pool.get<i32>(0).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
-        (std::vector<i64>{hlt, most, -4, i32_to_i32, -4, _p, most, -4, i32_to_i32, -16, -20, most, -4, i32_to_i32, -4, -20, add_i32, -20, -20, _p2, most, -1, lte_i32, -1, -21, -21, go_if_not, -1, 11, most, -4, add_i32, -4, -13, -25, i32_to_i32, -13, -4, go, -26, i32_to_i32, -33, -13, most, 13, ret,}));
+        (std::vector<i64>{hlt, most, -4, i32_to_i32, -4, _p, most, -4, i32_to_i32, -4, -24, most, -4, i32_to_i32, -4, -8, add_i32, -8, -8, _p2, most, -1, lte_i32, -1, -5, -25, go_if_not, -1, 11, most, -4, add_i32, -4, -17, -13, i32_to_i32, -17, -4, go, -26, i32_to_i32, -37, -17, most, 17, ret,}));
 }
 
 TEST(composer_unit, for2_) {
@@ -1029,7 +1030,7 @@ TEST(composer_unit, for2_) {
     auto _p2 = (i64)composer->_pool.get<i32>(-1).get(); // increment
     auto _p = (i64)composer->_pool.get<i32>(0).get();
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
-        (std::vector<i64>{hlt, most, -4, i32_to_i32, -4, _p, most, -4, i32_to_i32, -16, -16, most, -4, add_i32, -4, -20, _p2, most, -1, lte_i32, -1, -5, -25, go_if_not, -1, 11, most, -4, add_i32, -4, -13, -25, i32_to_i32, -13, -4, go, -23, i32_to_i32, -33, -13, most, 13, ret}));
+        (std::vector<i64>{hlt, most, -4, i32_to_i32, -4, _p, most, -4, i32_to_i32, -4, -20, most, -4, add_i32, -4, -8, _p2, most, -1, lte_i32, -1, -5, -29, go_if_not, -1, 11, most, -4, add_i32, -4, -17, -13, i32_to_i32, -17, -4, go, -23, i32_to_i32, -37, -17, most, 17, ret}));
 }
 
 TEST(composer_unit, scope) {
@@ -1058,9 +1059,10 @@ TEST(composer_unit, scope) {
     composer->plus();
     composer->assign();
     composer->end();
+    composer->bake();
     auto _p = (i64)composer->_pool.get<zen::boolean>(true).get(); // increment
     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
-        (std::vector<i64>{hlt, most, -4, most, -4, most, -4, go_if_not, _p, 19, most, -4, most, -4, most, -4, most, -4, add_i32, -4, -12, -8, i32_to_i32, -16, -4, most, 12, go, -19, most, -4, add_i32, -4, -16, -12, i32_to_i32, -20, -4, most, 20, ret,}));
+        (std::vector<i64>{hlt, most, -4, most, -4, most, -4, go_if_not, _p, 19, most, -4, most, -4, most, -4, most, -4, add_i32, -4, -12, -8, i32_to_i32, -16, -4, most, 16, go, -19, most, -4, add_i32, -4, -12, -8, i32_to_i32, -16, -4, most, 16, ret,}));
 }
 
 TEST(composer_unit, overloading)

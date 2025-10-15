@@ -22,7 +22,7 @@
                 {\
                     try\
                     {\
-                        /*fmt::println("[zenDestructor]({})", local->label);*/\
+                        fmt::println("[zenDestructor]({}):{}", local->label, __LINE__);\
                         push(local);\
                         call("[zenDestructor]",1, call_result::pushed);\
                     } catch (const std::exception & e)\
@@ -35,6 +35,14 @@
 #define KAIZEN_IF_SCOPE_CLOSURE()\
     KAIZEN_IF_SCOPE_DESTROY_HEAP_LOCALS()\
     if (const i64 size = scope->__dncd__pop(scope->return_status); std::abs(size) > 0)\
+    {\
+        code.push_back(most);\
+        code.push_back(std::abs(size));\
+    }
+
+#define KAIZEN_IF_SCOPE_CLOSURE_NON_DESTRUCTIVE()\
+    KAIZEN_IF_SCOPE_DESTROY_HEAP_LOCALS()\
+    if (const i64 size = scope->__dncd__peek(scope->return_status); std::abs(size) > 0)\
     {\
         code.push_back(most);\
         code.push_back(std::abs(size));\
@@ -138,7 +146,8 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         if (type->get_size() != 0)
         {
             scope->return_data.value = (
-                std::make_shared<value>(type, scope->get_stack_usage() - /* jump callee IP */static_cast<i64>(sizeof(i64))));
+                std::make_shared<value>(
+                    type, scope->get_stack_usage() - /* jump callee IP */static_cast<i64>(sizeof(i64))));
             scope->use_stack(type->get_size());
         }
         scope->definition.get().signature.type = type;
@@ -150,9 +159,9 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         if (scope->get_return_status() == block_scope::concise_return)
             throw exceptions::semantic_error("cannot return values more than once", _ilc_offset);
         scope->set_return_status(block_scope::concise_return);
-        const auto rhs = pop_operand();
         if (not scope->return_data.value->is("unit"))
         {
+            const auto rhs = pop_operand();
             push(scope->return_data.value);
             push(rhs);
             assign();
@@ -181,31 +190,34 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             t = get_type(type.substr(0, type.length() - no_constructor.size()));
         else
             t = get_type(type);
-        scope->set_local(name, t);
+        scope->set_local(name, t, scope->get_stack_usage());
         // scope->locals.emplace(name, symbol(name, t, scope->get_stack_usage()));
         // scope->get_stack_usage() += t->get_size();
-        code.push_back(zen::most);
-        code.push_back(-t->get_size());
-        if (t->kind == type::heap and not no_construtor_mode)
+        if (t->get_size() != 0)
         {
-            if (const auto func_it = functions.find("[zenConstructor]"); func_it != functions.end())
+            code.push_back(zen::most);
+            code.push_back(-t->get_size());
+            if (t->kind == type::heap and not no_construtor_mode)
             {
-                for (auto& zen_allocator : func_it->second)
+                if (const auto func_it = functions.find("[zenConstructor]"); func_it != functions.end())
                 {
-                    if (zen_allocator.signature.type == t)
+                    for (auto& zen_allocator : func_it->second)
                     {
-                        push(name);
-                        // will push 8 bytes (result of the call)
-                        _call_function_overload({}, zen_allocator, call_result::pushed_from_constructor);
-                        break;
-                        // _call_instruction(i64_to_i64, 2, 2);
+                        if (zen_allocator.signature.type == t)
+                        {
+                            push(name);
+                            // will push 8 bytes (result of the call)
+                            _call_function_overload({}, zen_allocator, call_result::pushed_from_constructor);
+                            break;
+                            // _call_instruction(i64_to_i64, 2, 2);
+                        }
                     }
                 }
-            }
-            else
-            {
-                throw exceptions::semantic_error(fmt::format("missing construtor implementation for type {}", type),
-                                                 _ilc_offset);
+                else
+                {
+                    throw exceptions::semantic_error(fmt::format("missing construtor implementation for type {}", type),
+                                                     _ilc_offset);
+                }
             }
         }
     }
@@ -307,13 +319,13 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                         fmt::print("sub, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
                         i += 3;
                     }
-                    else if (_code == mul_i32 || _code == mul_i64 || _code == mul_f64 || _code == mul_i8 || _code ==
+                    else if (_code == mul_f32 || _code == mul_i32 || _code == mul_i64 || _code == mul_f64 || _code == mul_i8 || _code ==
                         mul_i16)
                     {
                         fmt::print("mul, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
                         i += 3;
                     }
-                    else if (_code == div_i32 || _code == div_i64 || _code == div_f64 || _code == div_i8 || _code ==
+                    else if (_code == div_f32 || _code == div_i32 || _code == div_i64 || _code == div_f64 || _code == div_i8 || _code ==
                         div_i16)
                     {
                         fmt::print("div, {}, {}, {}, ", code[i + 1], code[i + 2], code[i + 3]);
@@ -790,12 +802,17 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         scope->labels.pop();
         label begin = scope->labels.top();
         scope->labels.pop();
+        call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
         KAIZEN_IF_SCOPE_CLOSURE(); // in_while_body
-        KAIZEN_IF_SCOPE_CLOSURE(); // in_while_prologue
+        call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
+        KAIZEN_IF_SCOPE_CLOSURE_NON_DESTRUCTIVE(); // in_while_prologue, keeping it for cases where condition is false
+        call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
         code.push_back(go);
         code.push_back(0);
         begin.use(code);
         end.bind(code);
+        KAIZEN_IF_SCOPE_CLOSURE(); // in_while_prologue
+        call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
     }
 
 #define KAIZEN_IF_PREINCREMENT_FOR(T, NT)\
@@ -1039,7 +1056,7 @@ if (top()->is(#T))\
         const auto last = pop_operand();
         const auto first = pop_operand();
         const auto iterator = pop_operand();
-
+        fmt::println("for({}:{} = {}, {}, {})", iterator->address(scope->get_stack_usage()), iterator->type->name, first->address(scope->get_stack_usage()), last->address(scope->get_stack_usage()), step->address(scope->get_stack_usage()));
         push(iterator);
         push(first);
         assign();
@@ -1083,7 +1100,6 @@ if (top()->is(#T))\
                 if (_stack.empty())
                     throw exceptions::semantic_error("cannot proceed assignment call without stack elements to",
                                                      _ilc_offset);
-                fmt::println("assignment call in {} as {} = ...()", scope->name, top()->label);
                 const auto r = pop_operand();
                 if (r->type != sig.type)
                     throw exceptions::semantic_error(
@@ -1097,11 +1113,10 @@ if (top()->is(#T))\
                     scope->use_stack(sig.type->get_size());
                     return r;
                 }
-                fmt::println("assigment call failed");
             }
             else if (mode == pushed_from_constructor)
             {
-                auto result = pop_operand();
+                auto result = pop_operand(false);
                 return result;
             }
             else if (mode == pushed)
@@ -1137,20 +1152,7 @@ if (top()->is(#T))\
     {
         for (const auto& value : arguments)
         {
-            if (value->type->kind == type::kind::heap and value->kind == value::kind::constant)
-            {
-                /// TODO: optimize using the same logic as [rr]
-                set_local("[cha]", value->type->name);
-                push("[cha]");
-                push(value);
-                value->kind = value::kind::fake_constant; // fake it to avoid infinit recursion
-                call("zenCopy", 2, call_result::pushed);
-                value->kind = value::kind::constant;
-                push("[cha]");
-                code.push_back(zen::push_i64);
-                code.push_back(pop_operand()->address(scope->get_stack_usage()));
-            }
-            else if (value->type->kind == type::kind::stack)
+            if (value->type->kind == type::kind::stack)
             {
                 if (value->is("byte"))
                     code.push_back(zen::push_i8);
@@ -1166,11 +1168,16 @@ if (top()->is(#T))\
                     code.push_back(zen::push_f64);
                 else if (value->is("long"))
                     code.push_back(zen::push_i64);
+                else
+                    throw exceptions::semantic_error("unknown scalar type", _ilc_offset);
                 code.push_back(value->address(scope->get_stack_usage()));
-            } else
+                scope->use_stack(value->type->get_size());
+            }
+            else
             {
                 code.push_back(push_i64);
                 code.push_back(value->address(scope->get_stack_usage()));
+                scope->use_stack(sizeof(i64));
             }
         }
     }
@@ -1219,7 +1226,8 @@ if (top()->is(#T))\
                     push(lhs);
                     push(temp);
                     assign();
-                } else
+                }
+                else
                 {
                     code.push_back(caster->second);
                     code.push_back(lhs->address(scope->get_stack_usage()));
@@ -1254,7 +1262,7 @@ if (top()->is(#T))\
         // }
         _push_callee_arguments(arguments);
 
-        if (returned)
+        if (returned && mode != pushed_from_constructor)
         {
             push(returned);
         }
@@ -1266,12 +1274,12 @@ if (top()->is(#T))\
             lab.use(code);
             func.labels.push_back(lab);
         }
-        if (const i64 call_params_cost = get_parameters_size(func.signature))
+        if (const i64 call_params_cost = get_parameters_size(func.signature); call_params_cost && mode != pushed_from_constructor)
         {
             code.push_back(zen::most);
             code.push_back(call_params_cost);
+            scope->use_stack(-call_params_cost);
         }
-        fmt::println("calling oveld {} {} ", scope->name, _ilc_offset);
         return mode ? call_result::assignment : call_result::pushed;
     }
 
@@ -1283,7 +1291,30 @@ if (top()->is(#T))\
         std::deque<std::shared_ptr<value>> arguments;
         for (int i = 0; i < args_count; i++)
         {
-            arguments.push_front(pop_operand());
+            auto value = pop_operand(false);
+            if (value->type->kind == type::kind::heap and value->kind == value::kind::constant)
+            {
+                /// TODO: optimize using the same logic as [rr]
+                set_local("[cha]", value->type->name);
+                push("[cha]");
+                auto cha = top();
+                // push(value);
+                push("<long>");
+                assign_reference(top(), value);
+                top()->type = value->type;
+                top()->is_reference = true;
+                try
+                {
+                    // value->kind = value::kind::fake_constant;
+                    call("zenCopy", 2, call_result::pushed);
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << e.what() << std::endl;
+                }
+                value = cha;
+            }
+            arguments.push_front(value);
         }
 
         std::optional<std::reference_wrapper<function>> candidate;
@@ -1325,7 +1356,7 @@ if (top()->is(#T))\
         std::stack<std::shared_ptr<value>> args;
         for (int i = 0; i < args_count; i++)
         {
-            auto v = pop_operand();
+            auto v = pop_operand(false);
             // v.prepare(code, scope->get_stack_usage());
             args.push(v);
         }
@@ -1381,6 +1412,7 @@ if (top()->is(#T))\
             begin.use(code);
             end.bind(code);
         }
+        KAIZEN_IF_SCOPE_CLOSURE();
     }
 
     void composer::vm::composer::using_(const std::string& alias_function, const std::string& original_function)
@@ -1444,11 +1476,15 @@ if (top()->is(#T))\
             label.bind(code);
         set_parameter("it", "string");
         push("it.data");
-        push("bool");
         call("bool", 1, zen::composer::call_result::pushed);
         begin_if_then();
         push("<int>");
-        push("it.data");
+        {
+            push("it.data");
+            const auto deref = dereference(top());
+            pop();
+            push(deref);
+        }
         call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
         end_if();
         push("it");
@@ -1476,33 +1512,44 @@ if (top()->is(#T))\
         set_parameter("to", "string");
         set_parameter("from", "string");
         push("to.data");
-        push("bool");
-        call("bool", 1, zen::composer::call_result::pushed);
+        // push("bool");
+        // call("bool", 1, zen::composer::call_result::pushed);
+        zen::composer::composer::push<i64>(0, "long");
+        not_equal();
         begin_if_then();
-        // push("to.data");
-        // call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
-        // push("to.len");
-        // call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
-        push("to");
-        auto dest = top();
-        push("<long>");
-        assign_reference(top(), dest);
+        push("to.data");
         call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
         end_if();
 
         set_local("data", "long");
         push("data");
-        push("from.len");
+        {
+            push("from.len");
+            const auto deref = dereference(top());
+            pop();
+            push(deref);
+        }
         call(std::to_string(zen::allocate), 2, zen::composer::call_result::pushed);
 
         push("data");
-        push("from.data");
-        push("from.len");
+        {
+            push("from.data");
+            const auto deref = dereference(top());
+            pop();
+            push(deref);
+        }
+        {
+            push("from.len");
+            const auto deref = dereference(top());
+            pop();
+            push(deref);
+        }
         call(std::to_string(zen::copy), 3, zen::composer::call_result::pushed);
 
         push("to.data");
         push("data");
         assign();
+
 
         push("to.len");
         push("from.len");
@@ -1555,8 +1602,7 @@ if (top()->is(#T))\
             {"float", KAIZEN_CASTER_MAP_FOR(f32)},
             {"double", KAIZEN_CASTER_MAP_FOR(f64)}
         };
-        if (top()->is("function"))
-            pop(); // pop the caster itself from composer's stack
+
         if (const auto caster_set = casters.find(name); caster_set != casters.end())
         {
             return _call_caster(name, args_count, caster_set, mode);
