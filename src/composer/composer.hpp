@@ -206,6 +206,9 @@ public:
     virtual void set_while_condition() = 0;
     virtual void end_while() = 0;
 
+    virtual void begin_block() = 0;
+    virtual void end_block() = 0;
+
     virtual void using_(const std::string & alias_function, const std::string & original_function) = 0;
     virtual void link() = 0;
     //

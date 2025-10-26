@@ -8,7 +8,6 @@
 #include <queue>
 #include <sstream>
 
-#include "for_scope.hpp"
 #include "exceptions/semantic_error.hpp"
 
 #define KAIZEN_IF_SCOPE_OPENING(T)\
@@ -708,6 +707,24 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         return destination;
     }
 
+    void composer::vm::composer::begin_block()
+    {
+        fmt::println("scope->depth() {}", scope->depth());
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
+        KAIZEN_IF_SCOPE_OPENING(scope::in_block);
+        fmt::println("scope->depth() {}", scope->depth());
+    }
+
+    void composer::vm::composer::end_block()
+    {
+        fmt::println("1. scope->depth() {}", scope->depth());
+        KAIZEN_REQUIRE_SCOPE(scope::in_block);
+        KAIZEN_IF_SCOPE_CLOSURE();
+        scope->__dncd__pop(scope->return_status);
+        fmt::println("2. scope->depth() {}", scope->depth());
+    }
+
+
     KAIZEN_DEFINE_ARITH_COMPOSITION(plus, sum, add, KAIZEN_IF_ARITHMETICS_CHAIN);
     KAIZEN_DEFINE_ARITH_COMPOSITION(minus, subtract, sub, KAIZEN_IF_ARITHMETICS_CHAIN);
     KAIZEN_DEFINE_ARITH_COMPOSITION(times, multiply, mul, KAIZEN_IF_ARITHMETICS_CHAIN);
@@ -802,17 +819,13 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         scope->labels.pop();
         label begin = scope->labels.top();
         scope->labels.pop();
-        call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
         KAIZEN_IF_SCOPE_CLOSURE(); // in_while_body
-        call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
         KAIZEN_IF_SCOPE_CLOSURE_NON_DESTRUCTIVE(); // in_while_prologue, keeping it for cases where condition is false
-        call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
         code.push_back(go);
         code.push_back(0);
         begin.use(code);
         end.bind(code);
         KAIZEN_IF_SCOPE_CLOSURE(); // in_while_prologue
-        call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
     }
 
 #define KAIZEN_IF_PREINCREMENT_FOR(T, NT)\
@@ -1012,6 +1025,26 @@ if (top()->is(#T))\
         throw exceptions::semantic_error("iterator based for is not supported yet", _ilc_offset);
     }
 
+     #define KAIZEN_IF_INCREMENT_FOR(T, NT)\
+     if (top()->is(#T))\
+     {\
+         const auto it = top();\
+         push(it);\
+         zen::composer::composer::push<NT>(1, it->type->name);\
+         _call_instruction(add_ ## NT, 3, 3);\
+         return;\
+    }
+
+    void composer::vm::composer::increment_by_one()
+    {
+        KAIZEN_IF_INCREMENT_FOR(byte, i8);
+        KAIZEN_IF_INCREMENT_FOR(short, i16);
+        KAIZEN_IF_INCREMENT_FOR(int, i32);
+        KAIZEN_IF_INCREMENT_FOR(long, i64);
+        KAIZEN_IF_INCREMENT_FOR(float, f32);
+        KAIZEN_IF_INCREMENT_FOR(double, f64);
+    }
+
     void composer::vm::composer::set_for_begin_end()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_for);
@@ -1020,6 +1053,7 @@ if (top()->is(#T))\
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
                 __FUNCTION__,
                 _stack.size()));
+        KAIZEN_IF_SCOPE_OPENING(scope::in_for); // for iterator related memory elements
         const auto last = pop_operand();
         const auto first = pop_operand();
         const auto iterator = pop_operand();
@@ -1027,12 +1061,18 @@ if (top()->is(#T))\
         push(iterator);
         push(first);
         assign();
+        code.push_back(zen::go);
+        code.push_back(0);
 
-        label begin, end;
+
+        label begin, end, condition;
+        condition.use(code);
         begin.bind(code);
         push(iterator);
-        post_increment();
+        increment_by_one();
+        push(iterator);
         push(last);
+        condition.bind(code); // skip increment on the first run
         lower_or_equal();
         code.push_back(go_if_not);
         code.push_back(pop_operand()->address(scope->get_stack_usage()));
@@ -1041,7 +1081,7 @@ if (top()->is(#T))\
 
         scope->labels.push(begin);
         scope->labels.push(end);
-        scope->current<for_scope>(scope::in_for)->nested_iterators_count++;
+        KAIZEN_IF_SCOPE_OPENING(scope::in_for_body);
     }
 
     void composer::vm::composer::set_for_begin_end_step()
@@ -1052,6 +1092,7 @@ if (top()->is(#T))\
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
                 __FUNCTION__,
                 _stack.size()));
+        KAIZEN_IF_SCOPE_OPENING(scope::in_function);
         const auto step = pop_operand();
         const auto last = pop_operand();
         const auto first = pop_operand();
@@ -1076,7 +1117,12 @@ if (top()->is(#T))\
 
         scope->labels.push(begin);
         scope->labels.push(end);
-        scope->current<for_scope>(scope::in_for)->nested_iterators_count++;
+        code.push_back(placeholder);
+        code.push_back(placeholder);
+        code.push_back(placeholder);
+        code.push_back(placeholder);
+        KAIZEN_IF_SCOPE_CLOSURE_NON_DESTRUCTIVE();
+        KAIZEN_IF_SCOPE_OPENING(scope::in_for);
     };
 
 #define KAIZEN_CASTER_MAP_FOR(T)\
@@ -1396,21 +1442,19 @@ if (top()->is(#T))\
     void composer::vm::composer::end_for()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_for);
-        const auto current = scope->current<for_scope>(scope::in_for);
-        if (current->nested_iterators_count * 2 < scope->labels.size())
-        {
-            throw exceptions::semantic_error("cannot finish inconsistent for loop.", _ilc_offset);
-        }
-        for (int i = 0; i < current->nested_iterators_count; i++)
+        while (scope->is(scope::in_for_body))
         {
             label end = scope->labels.top();
             scope->labels.pop();
             label begin = scope->labels.top();
             scope->labels.pop();
+            KAIZEN_IF_SCOPE_CLOSURE();
+            KAIZEN_IF_SCOPE_CLOSURE_NON_DESTRUCTIVE(); // iterator related stuff
             code.push_back(go);
             code.push_back(0);
             begin.use(code);
             end.bind(code);
+            KAIZEN_IF_SCOPE_CLOSURE(); // iterator related stuff
         }
         KAIZEN_IF_SCOPE_CLOSURE();
     }

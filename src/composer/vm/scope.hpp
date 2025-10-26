@@ -20,6 +20,7 @@ namespace zen::composer::vm
             in_while_prologue = in_function | 1 << 6,
             in_while_body = in_function | 1 << 7,
             in_for = in_function | 1 << 8,
+            in_for_body = in_for | 1 << 9,
         } type = {no_scope};
 
         [[nodiscard]] bool is(const enum type &t) const

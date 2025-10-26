@@ -95,7 +95,8 @@ public:
     void _link_string_copy();
     void link() override;
     std::shared_ptr<value> dereference(const std::shared_ptr<value> & value);
-
+    void begin_block() override;
+    void end_block() override;
 protected:
     void self_assign_reference(const std::shared_ptr<value>& value);
     void assign_reference(const std::shared_ptr<value>& to, const std::shared_ptr<value>& from);
@@ -103,6 +104,7 @@ protected:
     void push(const std::shared_ptr<const type>& type) override;
     static i64 get_parameters_size(const signature& sig);
     static i64 get_return_size(const signature& sig);
+    void increment_by_one();
 };
 
 } // zen

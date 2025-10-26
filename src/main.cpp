@@ -14,23 +14,28 @@
 #else
 #define EMSCRIPTEN_KEEPALIVE
 #endif
-
+#include <chrono>
 std::vector<zen::token> tokens;
 
 extern "C" {
 EMSCRIPTEN_KEEPALIVE
-void zen_sum(int a, int b){
-    fmt::print("{} + {} = {}\n", a, b, a+b);
+
+void zen_sum(int a, int b)
+{
+    fmt::print("{} + {} = {}\n", a, b, a + b);
 }
 
-void EMSCRIPTEN_KEEPALIVE zen_reset(){
+void EMSCRIPTEN_KEEPALIVE zen_reset()
+{
     get_composer()->reset();
 }
 
 EMSCRIPTEN_KEEPALIVE
+
 bool zen_run(const char* entrance)
 {
-    if (entrance == nullptr){
+    if (entrance == nullptr)
+    {
         fmt::println("[zen_run] called with null argument.");
         return false;
     }
@@ -39,9 +44,12 @@ bool zen_run(const char* entrance)
 }
 
 EMSCRIPTEN_KEEPALIVE
+
 bool zen_compile(const char* code)
-try {
-    if (code == nullptr){
+try
+{
+    if (code == nullptr)
+    {
         fmt::println("[zen_compile] called with null argument.");
         return false;
     }
@@ -67,30 +75,33 @@ try {
         std::cout << "Failed " << std::endl;
     }
     return true;
-} catch (std::exception& e){
+}
+catch (std::exception& e)
+{
     std::cout << e.what() << std::endl;
     return false;
 }
 }
 
-void* make_zen_string(const std::string & str)
+void* make_zen_string(const std::string& str)
 {
-    void * data = malloc(sizeof(char) * str.size() + sizeof(zen::i64));
+    void* data = malloc(sizeof(char) * str.size() + sizeof(zen::i64));
     *static_cast<zen::i64*>(data) = str.length();
     memcpy((char*)(data) + sizeof(zen::i64), str.data(), str.length());
     return data;
 }
 
-void print_zen_string(void * str)
+void print_zen_string(void* str)
 {
     zen::i64 len = *static_cast<zen::i64*>(str);
-    zen::i64 i= 0;
+    zen::i64 i = 0;
     while (i < len)
     {
         printf("%c", *(char*)((char*)str + sizeof(zen::i64) + i++));
     }
     // printf("(%d bytes)", len);
 }
+
 extern char foo_case0[];
 
 struct demo_struct_string
@@ -102,7 +113,7 @@ struct demo_struct_string
 void test_vm()
 {
     using namespace zen;
-    i64 ptr,ptr2, size = 16;
+    i64 ptr, ptr2, size = 16;
     i64 a = 1, b = 2, aptr = 0, bptr = 0, fsize = 8;
     std::vector<i64> code;
     code = {
@@ -128,6 +139,27 @@ void test_vm()
     // std::cout << std::endl;
 }
 
+inline void setup_parser_test(const std::string& code)
+{
+    ILC::chain.clear();
+    tokens.clear();
+    parser::reset();
+    std::stringstream stream(code);
+    zen::lexer lexer(stream);
+    while (auto token = lexer.next())
+    {
+        ILC::chain.push_back(token->type);
+        tokens.emplace_back(token.value());
+    }
+    ILC::chain_size = ILC::chain.size();
+}
+
+inline void setup_integration_test(const std::string& code, zen::composer::composer* composer)
+{
+    composer->reset();
+    setup_parser_test(code);
+}
+
 int main(int argc, char** argv) try
 {
     // test_vm();
@@ -137,370 +169,74 @@ return 0;
 #else
     if (true)
     {
-        zen::composer::composer* composer = get_composer();
+        // zen::composer::composer* composer = get_composer();
+        fmt::println("starting");
+        auto composer = dynamic_cast<zen::composer::vm::composer*>(get_composer());
+        composer->reset();
 
-        composer->begin("scope_test1");
-        composer->set_local("foo1", "string");
-        composer->begin_while();
-        composer->zen::composer::composer::push<zen::i64>(1,"long");
-        composer->zen::composer::composer::push<zen::i64>(2,"long");
-        composer->lower();
-        composer->set_while_condition();
-        composer->call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
-        composer->set_local("a", "string");
-        composer->end_while();
-        composer->end();
-        composer->link();
-        composer->bake();
-        return 0;
-
-        composer->begin("sum_using_reverse");
-        composer->set_return_type("int");
-        composer->set_return_name("result");
-        composer->set_parameter("begin", "int");
-        composer->set_parameter("end", "int");
-        composer->set_local("result", "int");
-        composer->push("result");
-        composer->push<zen::i32>(0, "int");
-        composer->assign();
-        composer->begin_for();
-        composer->set_local("i", "int");
-        composer->push("i");
-        composer->push("end");
-        composer->push("begin");
-        composer->push<zen::i32>(-1, "int");
-        composer->call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
-        composer->set_for_begin_end_step();
-        composer->call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
-        composer->push("result");
-        composer->push("result");
-        composer->push("i");
-        composer->plus();
-        composer->assign();
-        composer->end_for();
-        composer->end();
-        composer->bake();
-        return 0;
-        // composer->begin("[zenDestructor]");
-        // composer->set_parameter("it", "string");
-        // composer->push("it.data");
-        // composer->push("bool");
-        // composer->call("bool", 1, zen::composer::call_result::pushed);
-        // composer->begin_if_then();
-        // composer->push("it.data");
-        // composer->call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
-        // composer->end_if();
-        // composer->push("it");
-        // composer->call(std::to_string(zen::deallocate), 1, zen::composer::call_result::pushed);
-        // composer->end();
-        //
-
-        //
-        // composer->begin("[zenConstructor]");
-        // composer->set_return_type("string");
-        // composer->push("<return>");
-        // composer->push<zen::i64>(composer->get_type("string")->get_full_size(), "long");
-        // composer->call(std::to_string(zen::allocate), 2, zen::composer::call_result::pushed);
-        //
-        // composer->push("<return>.len");
-        // composer->push<zen::i64>(0, "long");
-        // composer->assign();
-        //
-        // composer->push("<return>.data");
-        // composer->push<zen::types::heap::string*>(zen::types::heap::string::empty(), "string");
-        // composer->push<zen::i64>(1, "long");
-        // composer->call(std::to_string(zen::copy), 3, zen::composer::call_result::pushed);
-        //
-        // composer->assume_returned();
-        // composer->end();
-        //
-        // composer->begin("stringTest");
-        // composer->set_local("name", "string");
-        // // composer->set_local("count", "short");
-        // composer->push("name");
-        // composer->push<zen::types::heap::string*>(zen::types::heap::string::from_string("zen"), "string");
-        // composer->assign();
-        // composer->end();
-        //
-        // composer->begin("stringTest2");
-        // composer->set_parameter("it", "string");
-        // composer->set_local("name", "string");
-        // composer->push("it");
-        // composer->push("name");
-        // composer->assign();
-        // composer->end();
-        //
-        // composer->begin("stringTest3");
-        // composer->set_return_type("string");
-        // composer->push<zen::types::heap::string*>(zen::types::heap::string::empty(), "string");
-        // composer->return_value();
-        // composer->end();
-        //
-        // composer->begin("stringTest4");
-        // composer->set_local("name", "string");
-        // composer->push("name");
-        // composer->call("stringTest3", 0, zen::composer::call_result::pushed);
-        // composer->assign();
-        // composer->call("stringTest3", 0, zen::composer::call_result::pushed);
-        // composer->end();
-        composer->link();
-
-        composer->begin("stringTest5");
-        composer->set_local("name1", "string");
-        composer->set_local("name2", "string");
-        composer->push("name1.len");
-        composer->push("name2.len");
-        composer->assign();
-        composer->end();
-
-        composer->begin("stringTest6");
-        composer->set_local("name1", "string");
-        composer->set_local("name2", "string");
-        composer->set_local("total_len", "long");
-        composer->push("total_len");
-        composer->push("name1.len");
-        composer->push("name2.len");
-        composer->plus();
-        composer->assign();
-        composer->end();
-
-        composer->begin("stringTest7");
-        composer->set_local("name1", "string");
-        composer->set_local("name2", "string");
-        composer->set_local("name3", "string");
-        composer->push("name3.len");
-        composer->push("name1.len");
-        composer->push("name2.len");
-        composer->plus();
-        composer->assign();
-        composer->end();
-
-        composer->bake();
-        return 0;
-        composer->begin("scope_test");
-        composer->set_local("result", "int");
-        composer->set_local("x", "int");
-        composer->set_local("y", "int");
-        composer->begin_while();
-        composer->push<zen::boolean>(true, "bool");
-        composer->set_while_condition();
-        composer->set_local("result", "int");
-        composer->set_local("x", "int");
-        composer->set_local("y", "int");
-        composer->push("result");
-        composer->push("x");
-        composer->push("y");
-        composer->plus();
-        composer->assign();
-        composer->end_while();
-        composer->push("result");
-        composer->push("x");
-        composer->push("y");
-        composer->plus();
-        composer->assign();
-        composer->end();
-        composer->bake();
-
-        composer->begin("sum_using_reverse");
-        composer->set_return_type("int");
-        composer->set_return_name("result");
-        composer->set_parameter("begin", "int");
-        composer->set_parameter("end", "int");
-        composer->set_local("result", "int");
-        composer->push("result");
-        composer->push<zen::i32>(0, "int");
-        composer->assign();
-        composer->begin_for();
-        composer->set_local("i", "int");
-        composer->push("i");
-        composer->push("end");
-        composer->push("begin");
-        composer->push<zen::i32>(-1, "int");
-        composer->set_for_begin_end_step();
-        composer->push("result");
-        composer->push("result");
-        composer->push("i");
-        composer->plus();
-        composer->assign();
-        composer->end_for();
-        composer->end();
-        composer->bake();
-
-        composer->begin("sum_using_for");
-        composer->set_return_type("int");
-        composer->set_return_name("result");
-        composer->set_parameter("begin", "int");
-        composer->set_parameter("end", "int");
-        composer->set_local("result", "int");
-        composer->push("result");
-        composer->push<zen::i32>(0, "int");
-        composer->assign();
-        composer->begin_for();
-        composer->set_local("i", "int");
-        composer->push("i");
-        composer->push("begin");
-        composer->push("end");
-        composer->set_for_begin_end();
-        composer->push("result");
-        composer->push("result");
-        composer->push("i");
-        composer->plus();
-        composer->assign();
-        composer->end_for();
-        composer->end();
-        composer->bake();
-
-        composer->begin("sum_using_while");
-        composer->set_return_type("int");
-        composer->set_return_name("result");
-        composer->set_parameter("begin", "int");
-        composer->set_parameter("end", "int");
-        composer->set_local("result", "int");
-        composer->push("result");
-        composer->push<zen::i32>(0, "int");
-        composer->assign();
-        composer->begin_while();
-        composer->push("begin");
-        composer->push("end");
-        composer->lower_or_equal();
-        composer->set_while_condition();
-        composer->push("result");
-        composer->push("result");
-        composer->push("begin");
-        composer->post_increment();
-        composer->plus();
-        composer->end_while();
-        composer->end();
-
-        composer->begin("ternary_a_or_b");
-        composer->set_return_type("int");
-        composer->set_parameter("a", "int");
-        composer->set_parameter("b", "int");
-        composer->set_parameter("c", "bool");
-        composer->push("c");
-        composer->push("a");
-        composer->push("b");
-        composer->ternary();
-        composer->return_value();
-        composer->end();
-
-        composer->begin("x_if_cond_or_y");
-        composer->set_return_type("int");
-        composer->set_parameter("cond", "bool");
-        composer->set_parameter("x", "int");
-        composer->set_parameter("y", "int");
-        composer->push("cond");
-        composer->begin_if_then();
-        composer->push("x");
-        composer->return_value();
-        composer->else_then();
-        composer->push("y");
-        composer->return_value();
-        composer->end_if();
-        composer->end();
-
-        composer->begin("write_string");
-        composer->set_parameter("fd", "long");
-        composer->set_parameter("str", "string");
-        composer->push("str.data");
-        composer->push("str.len");
-        composer->push("fd");
+        composer->begin("print");
+        composer->set_parameter("string", "string");
+        {
+            composer->push("string.data");
+            const auto deref = composer->dereference(composer->top());
+            composer->pop();
+            composer->push(deref);
+        }
+        {
+            composer->push("string.len");
+            const auto deref = composer->dereference(composer->top());
+            composer->pop();
+            composer->push(deref);
+        }
+        composer->zen::composer::composer::push<zen::i64>(reinterpret_cast<zen::i64>(stdout), "long");
         composer->call(std::to_string(zen::write_str), 3, zen::composer::call_result::pushed);
         composer->end();
 
-        composer->begin("print_string");
-        composer->set_parameter("string", "string");
-        composer->push("write_string");
-        composer->push<zen::i64>(reinterpret_cast<zen::i64>(stdout), "long");
-        composer->push("string");
-        composer->call("write_string", 2, zen::composer::call_result::pushed);
-        composer->end();
 
-        composer->begin("test::print_string");
-        composer->push("print_string");
-        composer->push<zen::types::heap::string*>(zen::types::heap::string::from_string("hello world"), "string");
-        composer->call("print_string", 1, zen::composer::call_result::pushed);
+        composer->begin("main");
+        composer->begin_for();
+        composer->set_local("i", "int");
+        composer->push("i");
+        composer->zen::composer::composer::push<zen::i32>(1, "int");
+        composer->zen::composer::composer::push<zen::i32>(3, "int");
+        composer->set_for_begin_end();
+        // composer->push("")
+        // composer->set_local("x", "int");
+        composer->zen::composer::composer::push<zen::types::heap::string*>(zen::types::heap::string::from_string("hello world\n"), "string");
+        composer->call("print", 1, zen::composer::call_result::pushed);
+        composer->end_for();
         composer->end();
+        composer->link();
 
-        composer->begin("internal::1_param_test");
-        composer->set_return_type("double");
-        composer->set_parameter("x", "double");
-        composer->push("x");
-        composer->return_value();
-        composer->end();
 
-        composer->begin("internal::0_param_test");
-        composer->set_return_type("double");
-        composer->push<double>(0.0, "double");
-        composer->return_value();
-        composer->end();
-
-        composer->begin("internal::call_test");
-        composer->push("internal::1_param_test");
-        composer->push<double>(1.0, "double");
-        composer->call("internal::1_param_test", 1, zen::composer::call_result::pushed);
-        composer->end();
-
-        composer->begin("internal::cast_test");
-        composer->set_local("x", "double");
-        composer->push("x");
-        composer->push(20, "int");
-        composer->call("double", 1, zen::composer::call_result::pushed);
-        composer->end();
-
-        composer->begin("internal::float_to_int");
-        composer->set_return_type("int");
-        composer->set_parameter("x", "float");
-        composer->push("x");
-        composer->call("int", 1, zen::composer::call_result::pushed);
-        composer->return_value();
-        composer->end();
-
-        composer->begin("internal::sum_ints_as_doubles");
-        composer->set_return_type("double");
-        composer->set_parameter("x", "int");
-        composer->set_parameter("y", "int");
-        composer->push("<double>");
-        composer->push("x");
-        composer->call("double", 1, zen::composer::call_result::pushed);
-        composer->push("<double>");
-        composer->push("y");
-        composer->call("double", 1, zen::composer::call_result::pushed);
-        composer->plus();
-        composer->return_value();
-        composer->end();
-
-        composer->begin("internal::sum");
-        composer->set_return_type("long");
-        composer->set_parameter("x", "long");
-        composer->set_parameter("y", "long");
-        composer->push("x");
-        composer->push("y");
-        composer->plus();
-        composer->return_value();
-        composer->end();
-
-        composer->begin("internal::timesTwo");
-        composer->set_return_type("double");
-        composer->set_parameter("x", "double");
-        composer->push(2.0, "double");
-        composer->push("x");
-        composer->times();
-        composer->return_value();
-        composer->end();
-
-        composer->begin("internal::timesThree");
-        composer->set_return_type("long"); // most x
-        composer->set_return_name("result");
-        composer->set_parameter("x", "long"); // most x
-        composer->set_local("result", "long"); // most x
-        composer->push("result");
-        composer->push(3, "long");
-        composer->push("x");
-        composer->times(); // most x
-        composer->assign();
-        composer->end();
+        // setup_parser_test(R"(
+        // main = {
+        //     for(i: int = 1, 5){
+        //     }
+        // })");
+        // auto t0 = std::chrono::system_clock::now();
+        // parse();
+        // auto t01 = std::chrono::system_clock::now();
         composer->bake();
+        const std::list<zen::composer::vm::function> main_functions = composer->functions["main"];
+        if (main_functions.empty())
+        {
+            fmt::print("main functions empty\n");
+            return 0;
+        }
+        const zen::composer::vm::function main = main_functions.front();
+        zen::vm::stack stack;
+        stack.push<zen::i64>(0); // returning address
+        zen::vm vm1;
+        vm1.load(composer->code);
+        // auto t1 = std::chrono::system_clock::now();
+        fmt::println("running");
+        vm1.run(stack, main.address);
+        // auto t2 = std::chrono::system_clock::now();
+        // fmt::println("----------------\n1.compiled in {} ms \n2.ran in {} ms\n----------------",
+        //              (long long)std::chrono::duration_cast<std::chrono::milliseconds>(t01 - t0).count(),
+        //              (long long)std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
+        return 0;
     }
     // #define  NATIVE
 

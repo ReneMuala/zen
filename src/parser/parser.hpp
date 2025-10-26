@@ -328,15 +328,18 @@ BEGIN_PRODUCTION(PRODUCTION_NFOR)
         composer->set_local(iterator, type);
         composer->push(iterator);
         REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
+        // composer->begin_block();
         REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
         REQUIRE_TERMINAL_CALLBACK(TCOMMA, EXPECTED(","))
         REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
         if (TRY_REQUIRE_TERMINAL(TCOMMA))
         {
             REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
+            // composer->end_block();
             composer->set_for_begin_end_step();
         } else
         {
+            // composer->end_block();
             composer->set_for_begin_end();
         }
     }
