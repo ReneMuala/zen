@@ -8,6 +8,7 @@
 #include <queue>
 #include <sstream>
 
+#include "composer/vm/function.hpp"
 #include "for_scope.hpp"
 #include "exceptions/semantic_error.hpp"
 
@@ -108,9 +109,9 @@ namespace zen
     void composer::vm::composer::begin(std::string name)
     {
         const auto definition = std::ref(functions[name].emplace_back(
-            signature{
+            function {signature{
                 .type = get_type("unit")
-            }, code.size()));
+            }, static_cast<i64>(code.size())}));
         scope = std::make_unique<function_scope>(definition);
         scope->type = scope::in_function;
         scope->name = name;

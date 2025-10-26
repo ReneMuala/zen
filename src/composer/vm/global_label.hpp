@@ -9,6 +9,7 @@
 #include "types/stack.hpp"
 
 namespace zen::composer::vm {
+   using namespace zen::types::stack;
 class global_label {
    std::list<i64> indexes;
    std::optional<i64> bind_address;

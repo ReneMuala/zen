@@ -10,3 +10,5 @@ cmake-build-debug
 
 libs/old
 deploy_wasm.bat
+.cache
+compile_commands.json

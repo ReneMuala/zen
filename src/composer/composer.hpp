@@ -154,7 +154,7 @@ public:
     {
         auto t = get_type(type);
         if constexpr (std::is_same_v<native, value>)
-            _stack.push(value(t, data.address));
+            _stack.push(std::make_shared<value>(t, data.address));
         else
         {
             const i64 address = (i64)_pool.get<native>(data).get();
