@@ -55,34 +55,30 @@ try
         fmt::println("[zen_compile] called with null argument.");
         return false;
     }
-
-    // zen::composer::composer* composer = get_composer();
     auto composer = dynamic_cast<zen::composer::vm::composer*>(get_composer());
     composer->reset();
-    if (true)
+
+    composer->begin("print");
+    composer->set_parameter("string", "string");
     {
-        composer->begin("print");
-        composer->set_parameter("string", "string");
-        {
-            composer->push("string.data");
-            const auto deref = composer->dereference(composer->top());
-            composer->pop();
-            composer->push(deref);
-        }
-        {
-            composer->push("string.len");
-            const auto deref = composer->dereference(composer->top());
-            composer->pop();
-            composer->push(deref);
-        }
-        composer->zen::composer::composer::push<zen::i64>(reinterpret_cast<zen::i64>(stdout), "long");
-        composer->call(std::to_string(zen::write_str), 3);
-        composer->end();
+        composer->push("string.data");
+        const auto deref = composer->dereference(composer->top());
+        composer->pop();
+        composer->push(deref);
     }
+    {
+        composer->push("string.len");
+        const auto deref = composer->dereference(composer->top());
+        composer->pop();
+        composer->push(deref);
+    }
+    composer->zen::composer::composer::push<zen::i64>(reinterpret_cast<zen::i64>(stdout), "long");
+    composer->call(std::to_string(zen::write_str), 3);
+    composer->end();
+
     composer->link();
     setup_parser_test(std::string(code));
     parse();
-    // composer->bake();
     const std::list<zen::composer::vm::function> main_functions = composer->functions["main"];
     if (main_functions.empty())
     {
@@ -124,14 +120,6 @@ void print_zen_string(void* str)
     // printf("(%d bytes)", len);
 }
 
-extern char foo_case0[];
-
-struct demo_struct_string
-{
-    zen::i64 a;
-    zen::i64 b;
-};
-
 inline void setup_integration_test(const std::string& code, zen::composer::composer* composer)
 {
     composer->reset();
@@ -140,70 +128,11 @@ inline void setup_integration_test(const std::string& code, zen::composer::compo
 
 int main(int argc, char** argv) try
 {
-#ifdef KAIZEN_WASM
-    std::cout << "Click 'Run' or hit CTR+R to execute your ZEN code. Output will appear here." << std::endl;
-return 0;
-#else
-    /*
-    auto composer = dynamic_cast<zen::composer::vm::composer*>(get_composer());
-    composer->reset();
-    composer->begin("main");
-
-    composer->set_local("name", "string");
-    composer->call(std::to_string(zen::placeholder), 0);
-    composer->push("name");
-    composer->zen::composer::composer::push<zen::string*>(zen::string::from_string("hello"), "string");
-    composer->call("zenCopy", 2);
-    composer->call(std::to_string(zen::placeholder), 0);
-    composer->end();
-    composer->link();
-    composer->bake();
-
-
-    auto composer = dynamic_cast<zen::composer::vm::composer*>(get_composer());
-    composer->reset();
-
-    composer->begin("main");
-    composer->set_local("x", "int");
-    composer->push("x");
-    composer->push("x");
-    composer->zen::composer::composer::push<zen::i32>(10, "int");
-    composer->assign();
-    composer->zen::composer::composer::push<zen::i32>(10, "int");
-    composer->greater();
-    composer->begin_if_then();
-    // // composer->call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
-    composer->close_branch();
-    composer->push("x");
-    composer->zen::composer::composer::push<zen::i32>(10, "int");
-    composer->lower();
-    composer->else_if_then();
-    composer->close_branch();
-    composer->push("x");
-    composer->zen::composer::composer::push<zen::i32>(10, "int");
-    composer->lower();
-    composer->else_if_then();
-    // composer->call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
-    // std::cout << __LINE__ << std::endl;
-    composer->close_branch();
-    // std::cout << __LINE__ << std::endl;
-    composer->else_then();
-    // composer->call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
-    // composer->call(std::to_string(zen::placeholder), 0, zen::composer::call_result::pushed);
-    composer->end_if();
-    composer->end();
-    composer->bake();
-
-    return 0;
-*/
-
     zen_run(R"(
-main = {
-	_: unit = print("test")
-    print("test")
-})");
-
-#endif
+        main = {
+            print("Click 'Run' or hit CTR+R to execute your ZEN code. Output will appear here.")
+        }
+    )");
 }
 catch (std::exception& e)
 {

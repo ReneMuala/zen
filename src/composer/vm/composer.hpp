@@ -57,15 +57,15 @@ public:
     void modulo() override;
     std::shared_ptr<value> _push_callee_return_value(const signature& sig,  bool construtor_call);
     void _push_callee_arguments(const std::deque<std::shared_ptr<value>>& arguments);
-    call_result _call_caster(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::unordered_map<std::string,
+    void _call_caster(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::unordered_map<std::string,
                                  i64>>::iterator&
                              caster_set);
-    call_result _call_function_overload(const std::deque<std::shared_ptr<value>>& arguments, function& func, bool construtor_call);
-    call_result _call_function(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::list<function>>::iterator&
+    void _call_function_overload(const std::deque<std::shared_ptr<value>>& arguments, function& func, bool construtor_call);
+    void _call_function(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::list<function>>::iterator&
                                func_it);
-    call_result _call_instruction_write_str(const std::string& name, const i8& args_count);
-    call_result _call_instruction(const zen::instruction & instruction, const i8& args_count, const i8& expected_args_count);
-    call_result call(const std::string& name, const i8& args_count) override;
+    void _call_instruction_write_str(const std::string& name, const i8& args_count);
+    void _call_instruction(const zen::instruction & instruction, const i8& args_count, const i8& expected_args_count);
+    void call(const std::string& name, const i8& args_count) override;
     void and_() override;
     void or_() override;
     void not_() override;

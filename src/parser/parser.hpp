@@ -190,7 +190,6 @@ BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
     }
     REQUIRE_TERMINAL(TPARENTHESIS_OPEN)
     composer->pop();
-    bool assignment_call = false;
     zen::i8 param_count = 0;
     while (TRY_REQUIRE_NON_TERMINAL(NVAL))
     {

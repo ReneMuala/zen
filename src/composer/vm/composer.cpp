@@ -1269,7 +1269,7 @@ if (top()->is(#T))\
         }
     }
 
-    composer::call_result composer::vm::composer::_call_caster(const std::string& name, const i8& args_count,
+    void composer::vm::composer::_call_caster(const std::string& name, const i8& args_count,
                                                                const std::unordered_map<
                                                                    std::string, std::unordered_map<
                                                                        std::string, i64>>::iterator& caster_set)
@@ -1315,7 +1315,6 @@ if (top()->is(#T))\
                     code.push_back(rhs->address(scope->get_stack_usage()));
                     push(lhs);
                 }
-                return call_result::assignment;
             }
             else
             {
@@ -1334,7 +1333,7 @@ if (top()->is(#T))\
         }
     }
 
-    composer::call_result composer::vm::composer::_call_function_overload(
+    void composer::vm::composer::_call_function_overload(
         const std::deque<std::shared_ptr<value>>& arguments, function& func,  const bool construtor_call)
     {
         const auto returned = _push_callee_return_value(func.signature, construtor_call);
@@ -1361,7 +1360,7 @@ if (top()->is(#T))\
         }
     }
 
-    composer::call_result composer::vm::composer::_call_function(const std::string& name, const i8& args_count,
+    void composer::vm::composer::_call_function(const std::string& name, const i8& args_count,
                                                                  const std::unordered_map<
                                                                      std::string, std::list<function>>::iterator&
                                                                  func_it)
@@ -1418,10 +1417,10 @@ if (top()->is(#T))\
 
         if (not candidate)
             throw exceptions::semantic_error(fmt::format("no function overload matched for \'{}\'", name), _ilc_offset);
-        return _call_function_overload(arguments, candidate->get(), false);
+        _call_function_overload(arguments, candidate->get(), false);
     }
 
-    composer::call_result composer::vm::composer::_call_instruction_write_str(
+    void composer::vm::composer::_call_instruction_write_str(
         const std::string& name, const i8& args_count)
     {
         if (_stack.size() < 3 or args_count != 3)
@@ -1443,10 +1442,9 @@ if (top()->is(#T))\
             code.push_back(args.top()->address(scope->get_stack_usage()));
             args.pop();
         }
-        return call_result::pushed;
     }
 
-    composer::call_result composer::vm::composer::_call_instruction(const zen::instruction& name, const i8& args_count,
+    void composer::vm::composer::_call_instruction(const zen::instruction& name, const i8& args_count,
                                                                     const i8& expected_args_count)
     {
         if (_stack.size() < expected_args_count or args_count != expected_args_count)
@@ -1467,7 +1465,6 @@ if (top()->is(#T))\
             code.push_back(args.top()->address(scope->get_stack_usage()));
             args.pop();
         }
-        return call_result::pushed;
     }
 
     void composer::vm::composer::end_for()
@@ -1664,7 +1661,7 @@ if (top()->is(#T))\
         scope->use_stack(type->get_size());
     }
 
-    composer::call_result composer::vm::composer::call(const std::string& name, const i8& args_count)
+    void composer::vm::composer::call(const std::string& name, const i8& args_count)
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
         static std::unordered_map<std::string, std::unordered_map<std::string, i64>> casters{
