@@ -1217,6 +1217,7 @@ if (top()->is(#T))\
                 set_local("[rr]", sig.type->name);
                 push("[rr]");
                 auto rr = top();
+                pop();
                 code.push_back(push_i64);
                 code.push_back(rr->address(scope->get_stack_usage()));
                 scope->use_stack(sig.type->get_size());
