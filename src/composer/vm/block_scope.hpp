@@ -134,6 +134,13 @@ namespace zen::composer::vm
             }
             did_pop = true;
             state = found;
+            update_return_status(root_status);
+            return stack_usage;
+        }
+
+
+        void update_return_status(enum return_status& root_status) const
+        {
             if (type == in_if and return_status == concise_return)
                 root_status = branched_return;
             else if (type == in_else_if and return_status == concise_return)
@@ -141,11 +148,11 @@ namespace zen::composer::vm
             else if (type == in_else and return_status == concise_return and (root_status == branched_return or
                 root_status == concise_return))
                 root_status = concise_return;
-            else
+            else if (type == in_between_branches && return_status)
+                root_status = return_status;
+            else if(type != in_between_branches)
                 root_status = no_return;
-            return stack_usage;
         }
-
 
         /// do not call directly
         i64 __dncd__peek(enum return_status& root_status)
@@ -161,15 +168,7 @@ namespace zen::composer::vm
                 }
                 return nested_scope_usage;
             }
-            if (type == in_if and return_status == concise_return)
-                root_status = branched_return;
-            else if (type == in_else_if and return_status == concise_return)
-                root_status = branched_return;
-            else if (type == in_else and return_status == concise_return and (root_status == branched_return or
-                root_status == concise_return))
-                root_status = concise_return;
-            else
-                root_status = no_return;
+            update_return_status(root_status);
             return stack_usage;
         }
 

@@ -1816,7 +1816,9 @@ if (top()->is(#T))\
         {
             KAIZEN_IF_SCOPE_CLOSURE(); // remove in between branches' scope
         }
+        // const auto return_status = scope->get_return_status();
         KAIZEN_IF_SCOPE_OPENING(scope::in_between_branches); // for other chained ifs temp values
+        // scope->set_return_status(return_status);
     }
 
     void composer::vm::composer::end_if()

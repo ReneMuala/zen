@@ -1292,55 +1292,59 @@ TEST(composer_unit, overloading)
  * todo: add scope tests just to ensure that conditional returning is ok
  */
 /*
-       zen::composer::vm::block_scope scope;
-        zen::composer::vm::function_scope fs;
-        scope = zen::composer::vm::block_scope();
-        fs = zen::composer::vm::function_scope();
-        scope.push(zen::composer::vm::block_scope::__unsafely_make_if());
-        scope.set_return_status(zen::composer::vm::block_scope::concise_return);
-        scope.pop();
-        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+      auto scope = zen::composer::vm::block_scope::__unsafely_make(zen::composer::vm::scope::in_block);
+        scope->__dncd__push(zen::composer::vm::block_scope::__unsafely_make(zen::composer::vm::scope::in_if));
+        scope->set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope->__dncd__pop(scope->return_status);
+        std::cout << __LINE__ << " " << scope->get_return_status() << std::endl;
+        std::cout << __LINE__ << " " << scope->get_return_status() << std::endl;
+        scope->__dncd__push(zen::composer::vm::block_scope::__unsafely_make(zen::composer::vm::scope::in_between_branches));
+        scope->__dncd__peek(scope->return_status);
+        std::cout << __LINE__ << " " << scope->get_return_status() << std::endl;
 
-        scope.push(zen::composer::vm::block_scope::__unsafely_make_else());
-        scope.set_return_status(zen::composer::vm::block_scope::concise_return);
-        scope.pop();
-        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+        scope->__dncd__push(zen::composer::vm::block_scope::__unsafely_make(zen::composer::vm::scope::in_else));
+        scope->set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope->__dncd__pop(scope->return_status);
 
-        scope.push(zen::composer::vm::block_scope::__unsafely_make_if());
-        scope.set_return_status(zen::composer::vm::block_scope::concise_return);
-        scope.pop();
-        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+        scope->__dncd__pop(scope->return_status);
 
-        scope.push(zen::composer::vm::block_scope::__unsafely_make_if());
-        scope.set_return_status(zen::composer::vm::block_scope::concise_return);
-        scope.pop();
-        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+        std::cout << __LINE__ << " " << scope->get_return_status() << std::endl;
 
-        scope.push(zen::composer::vm::block_scope::__unsafely_make_if());
-        // scope.set_return_status(zen::composer::vm::block_scope::concise_return);
-        scope.pop();
-        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+        scope->__dncd__push(zen::composer::vm::block_scope::__unsafely_make(zen::composer::vm::scope::in_if));
+        scope->set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope->__dncd__pop(scope->return_status);
+        std::cout << __LINE__ << " " << scope->get_return_status() << std::endl;
 
-        scope.push(zen::composer::vm::block_scope::__unsafely_make_else());
-        scope.set_return_status(zen::composer::vm::block_scope::concise_return);
-        scope.pop();
-        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+        scope->__dncd__push(zen::composer::vm::block_scope::__unsafely_make(zen::composer::vm::scope::in_if));
+        scope->set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope->__dncd__pop(scope->return_status);
+        std::cout << __LINE__ << " " << scope->get_return_status() << std::endl;
 
-        scope.push(zen::composer::vm::block_scope::__unsafely_make_else());
-        scope.set_return_status(zen::composer::vm::block_scope::concise_return);
-        scope.pop();
-        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+        scope->__dncd__push(zen::composer::vm::block_scope::__unsafely_make(zen::composer::vm::scope::in_if));
+        // scope->set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope->__dncd__pop(scope->return_status);
+        std::cout << __LINE__ << " " << scope->get_return_status() << std::endl;
 
-        scope.push(zen::composer::vm::block_scope::__unsafely_make_if());
-        // scope.set_return_status(zen::composer::vm::block_scope::concise_return);
-        scope.pop();
-        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+        scope->__dncd__push(zen::composer::vm::block_scope::__unsafely_make(zen::composer::vm::scope::in_else));
+        scope->set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope->__dncd__pop(scope->return_status);
+        std::cout << __LINE__ << " " << scope->get_return_status() << std::endl;
 
-        scope.push(zen::composer::vm::block_scope::__unsafely_make_else());
-        scope.set_return_status(zen::composer::vm::block_scope::concise_return);
-        scope.pop();
-        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+        scope->__dncd__push(zen::composer::vm::block_scope::__unsafely_make(zen::composer::vm::scope::in_else));
+        scope->set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope->__dncd__pop(scope->return_status);
+        std::cout << __LINE__ << " " << scope->get_return_status() << std::endl;
 
-        scope.set_return_status(zen::composer::vm::block_scope::concise_return);
-        std::cout << __LINE__ << " " << scope.get_return_status() << std::endl;
+        scope->__dncd__push(zen::composer::vm::block_scope::__unsafely_make(zen::composer::vm::scope::in_if));
+        // scope->set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope->__dncd__pop(scope->return_status);
+        std::cout << __LINE__ << " " << scope->get_return_status() << std::endl;
+
+        scope->__dncd__push(zen::composer::vm::block_scope::__unsafely_make(zen::composer::vm::scope::in_else));
+        scope->set_return_status(zen::composer::vm::block_scope::concise_return);
+        scope->__dncd__pop(scope->return_status);
+        std::cout << __LINE__ << " " << scope->get_return_status() << std::endl;
+
+        scope->set_return_status(zen::composer::vm::block_scope::concise_return);
+        std::cout << __LINE__ << " " << scope->get_return_status() << std::endl;
         */
