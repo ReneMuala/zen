@@ -145,7 +145,7 @@ public:
     virtual void end() = 0;
     virtual void bake() = 0;
     // if args count is < 0, it means no assignment is occurring
-    virtual call_result call(const std::string& name, const i8 & args_count, const call_result & mode) = 0;
+    virtual call_result call(const std::string& name, const i8 & args_count) = 0;
     // TS <- TS+1
     virtual void assign() = 0;
     virtual void push(const std::string & name) = 0;

@@ -55,17 +55,17 @@ public:
     void times() override;
     void slash() override;
     void modulo() override;
-    std::shared_ptr<value> _push_callee_return_value(const signature& sig, const call_result& mode);
+    std::shared_ptr<value> _push_callee_return_value(const signature& sig,  bool construtor_call);
     void _push_callee_arguments(const std::deque<std::shared_ptr<value>>& arguments);
     call_result _call_caster(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::unordered_map<std::string,
                                  i64>>::iterator&
-                             caster_set, const call_result& mode);
-    call_result _call_function_overload(const std::deque<std::shared_ptr<value>>& arguments, function& func, const call_result& mode);
+                             caster_set);
+    call_result _call_function_overload(const std::deque<std::shared_ptr<value>>& arguments, function& func, bool construtor_call);
     call_result _call_function(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::list<function>>::iterator&
-                               func_it, const call_result& mode);
+                               func_it);
     call_result _call_instruction_write_str(const std::string& name, const i8& args_count);
     call_result _call_instruction(const zen::instruction & instruction, const i8& args_count, const i8& expected_args_count);
-    call_result call(const std::string& name, const i8& args_count, const call_result & mode) override;
+    call_result call(const std::string& name, const i8& args_count) override;
     void and_() override;
     void or_() override;
     void not_() override;

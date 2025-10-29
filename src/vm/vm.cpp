@@ -190,7 +190,7 @@ void zen::vm::run(stack& stack, const i64& entry_point)
         {
             if (false)
             {
-                bool display = true or i == 86;
+                bool display = true;
                 i64 stack_usage_difference = -stack.negative_stack_size - last_stack_usage;
                 if (stack_usage_difference && display)
                     fmt::println("sud = {}", stack_usage_difference);

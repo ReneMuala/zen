@@ -29,7 +29,8 @@ void EMSCRIPTEN_KEEPALIVE zen_reset()
 {
     get_composer()->reset();
 }
-    inline void setup_parser_test(const std::string& code)
+
+inline void setup_parser_test(const std::string& code)
 {
     ILC::chain.clear();
     tokens.clear();
@@ -45,6 +46,7 @@ void EMSCRIPTEN_KEEPALIVE zen_reset()
 }
 
 EMSCRIPTEN_KEEPALIVE
+
 bool zen_run(const char* code)
 try
 {
@@ -55,9 +57,10 @@ try
     }
 
     // zen::composer::composer* composer = get_composer();
-        auto composer = dynamic_cast<zen::composer::vm::composer*>(get_composer());
-        composer->reset();
-
+    auto composer = dynamic_cast<zen::composer::vm::composer*>(get_composer());
+    composer->reset();
+    if (true)
+    {
         composer->begin("print");
         composer->set_parameter("string", "string");
         {
@@ -73,26 +76,26 @@ try
             composer->push(deref);
         }
         composer->zen::composer::composer::push<zen::i64>(reinterpret_cast<zen::i64>(stdout), "long");
-        composer->call(std::to_string(zen::write_str), 3, zen::composer::call_result::pushed);
+        composer->call(std::to_string(zen::write_str), 3);
         composer->end();
-
-        composer->link();
-        setup_parser_test(std::string(code));
-        parse();
-        // composer->bake();
-        const std::list<zen::composer::vm::function> main_functions = composer->functions["main"];
-        if (main_functions.empty())
-        {
-            fmt::print("[runtime error: main function not found]\n");
-            return 0;
-        }
-        const zen::composer::vm::function main = main_functions.front();
-        zen::vm::stack stack;
-        stack.push<zen::i64>(0); // returning address
-        zen::vm vm1;
-        vm1.load(composer->code);
-        vm1.run(stack, main.address);
-        fmt::println("");
+    }
+    composer->link();
+    setup_parser_test(std::string(code));
+    parse();
+    // composer->bake();
+    const std::list<zen::composer::vm::function> main_functions = composer->functions["main"];
+    if (main_functions.empty())
+    {
+        fmt::print("[runtime error: main function not found]\n");
+        return 0;
+    }
+    const zen::composer::vm::function main = main_functions.front();
+    zen::vm::stack stack;
+    stack.push<zen::i64>(0); // returning address
+    zen::vm vm1;
+    vm1.load(composer->code);
+    vm1.run(stack, main.address);
+    fmt::println("");
     return true;
 }
 catch (std::exception& e)
@@ -141,7 +144,22 @@ int main(int argc, char** argv) try
     std::cout << "Click 'Run' or hit CTR+R to execute your ZEN code. Output will appear here." << std::endl;
 return 0;
 #else
-/*
+    /*
+    auto composer = dynamic_cast<zen::composer::vm::composer*>(get_composer());
+    composer->reset();
+    composer->begin("main");
+
+    composer->set_local("name", "string");
+    composer->call(std::to_string(zen::placeholder), 0);
+    composer->push("name");
+    composer->zen::composer::composer::push<zen::string*>(zen::string::from_string("hello"), "string");
+    composer->call("zenCopy", 2);
+    composer->call(std::to_string(zen::placeholder), 0);
+    composer->end();
+    composer->link();
+    composer->bake();
+
+
     auto composer = dynamic_cast<zen::composer::vm::composer*>(get_composer());
     composer->reset();
 
@@ -177,17 +195,12 @@ return 0;
     composer->bake();
 
     return 0;
-    */
-    zen_run(R"(main = {
-    x : int = 0
+*/
 
-    if (x > 0) {
-        _ : unit = print("positive")
-    } else if(x == 0){
-        _ : unit = print("zero")
-    } else {
-        _ : unit = print("negative")
-    }
+    zen_run(R"(
+main = {
+	_: unit = print("test")
+    print("test")
 })");
 
 #endif

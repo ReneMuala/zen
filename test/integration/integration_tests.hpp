@@ -58,7 +58,7 @@ TEST(integration, hello_world)
     {
         composer->push("string.data");
         const auto deref = composer->dereference(composer->top());
-        composer->call(std::to_string(placeholder), 0, composer::call_result::pushed);
+        composer->call(std::to_string(placeholder), 0);
         composer->pop();
         composer->push(deref);
     }
@@ -69,7 +69,7 @@ TEST(integration, hello_world)
         composer->push(deref);
     }
     composer->zen::composer::composer::push<i64>(reinterpret_cast<i64>(stdout), "long");
-    composer->call(std::to_string(write_str), 3, composer::call_result::pushed);
+    composer->call(std::to_string(write_str), 3);
     composer->end();
     composer->link();
 

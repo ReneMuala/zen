@@ -15,7 +15,6 @@
 using namespace enums;
 extern std::vector<zen::token> tokens;
 static bool pragma_ignore_missing_symbols = false;
-static bool pragma_skip_assignment_because_of_conversion_special_call = false;
 static std::string pragma_ignore_missing_symbols_data;
 
 // namespace parser
@@ -191,7 +190,7 @@ BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
     }
     REQUIRE_TERMINAL(TPARENTHESIS_OPEN)
     composer->pop();
-    bool assignment_call = ILC::offset > 3 and ILC::offset < ILC::chain_size and ILC::chain[ILC::offset - 3] == TEQU;
+    bool assignment_call = false;
     zen::i8 param_count = 0;
     while (TRY_REQUIRE_NON_TERMINAL(NVAL))
     {
@@ -202,10 +201,7 @@ BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
         }
     }
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
-    pragma_skip_assignment_because_of_conversion_special_call = composer->call(
-            name, param_count,
-            assignment_call ? zen::composer::call_result::assignment : zen::composer::call_result::pushed) ==
-        zen::composer::call_result::assignment && assignment_call;
+    composer->call(name, param_count);
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
@@ -664,10 +660,7 @@ BEGIN_PRODUCTION(PRODUCTION_NASGN_SUFFIX)
         ROLLBACK_PRODUCTION()
     }
     REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
-    if (not pragma_skip_assignment_because_of_conversion_special_call)
-        composer->assign();
-    else
-        pragma_skip_assignment_because_of_conversion_special_call = false;
+    composer->assign();
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_ENDLESS_SUFFIXES)
