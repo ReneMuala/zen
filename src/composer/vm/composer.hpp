@@ -44,9 +44,11 @@ public:
     void push(const std::string& name) override;
     void pop() override;
     void begin_if_then() override;
-    void _begin_if_then(bool nested);
+    void _begin_if_then(bool chained);
     void else_if_then() override;
+    void _else_then(bool partial);
     void else_then() override;
+    void close_branch() override;
     void end_if() override;
     void plus() override;
     void minus() override;
@@ -67,6 +69,7 @@ public:
     void and_() override;
     void or_() override;
     void not_() override;
+    void negate() override;
     void greater() override;
     void greater_or_equal() override;
     void lower() override;

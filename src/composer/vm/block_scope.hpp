@@ -12,7 +12,7 @@ namespace zen::composer::vm
     {
         std::unordered_map<std::string, std::deque<std::shared_ptr<value>>> locals = {};
         i64 stack_usage = {};
-
+        bool did_pop = false;
         enum return_status
         {
             no_return = 0,
@@ -110,6 +110,10 @@ namespace zen::composer::vm
         /// do not call directly
         i64 __dncd__pop(enum return_status& root_status)
         {
+            if (did_pop)
+            {
+                fmt::println("[scope: double-pop detected]");
+            }
             _pop_state state = searching;
             return __dncd__pop(root_status, state);
         }
@@ -119,7 +123,6 @@ namespace zen::composer::vm
         {
             if (nested_scope)
             {
-                fmt::println(">> ns");
                 const i64 nested_scope_usage = nested_scope->__dncd__pop(root_status, state);
                 if (state == found)
                 {
@@ -129,7 +132,7 @@ namespace zen::composer::vm
                 }
                 return nested_scope_usage;
             }
-            fmt::println(">> nns");
+            did_pop = true;
             state = found;
             if (type == in_if and return_status == concise_return)
                 root_status = branched_return;
@@ -181,6 +184,16 @@ namespace zen::composer::vm
                 nested_scope->set_return_status(status);
             else
                 return_status = status;
+        }
+
+        void print_stack_tree() const
+        {
+            fmt::print("> {} ", stack_usage);
+            if (nested_scope)
+            {
+                return nested_scope->print_stack_tree();
+            }
+            fmt::print("\n");
         }
 
         i64 depth() const

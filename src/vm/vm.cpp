@@ -332,11 +332,11 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 i += 1;
                 break;
             case go:
-                i += this->code[i + 1] > 0 ? this->code[i + 1] + 1 : this->code[i + 1];
+                i += this->code[i + 1] >= 0 ? this->code[i + 1] + 1 : this->code[i + 1];
                 break;
             case go_if_not:
                 if (not *address<boolean>(this->code[i + 1], stack))
-                    i += this->code[i + 2] > 0 ? this->code[i + 2] + 2 : this->code[i + 2];
+                    i += this->code[i + 2] >= 0 ? this->code[i + 2] + 2 : this->code[i + 2];
                 else
                     i += 2;
                 break;

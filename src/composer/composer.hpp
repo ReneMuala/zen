@@ -74,7 +74,7 @@ namespace zen::composer
         bool no_destructor = false;
         std::string label;
         bool is_reference = false;
-
+        bool is_negated = false;
         [[nodiscard]] bool is(const std::string & type_name) const
         {
             return type->name == type_name;
@@ -150,15 +150,20 @@ public:
     virtual void assign() = 0;
     virtual void push(const std::string & name) = 0;
     template <typename native>
-    void push(const native && data, const std::string & type)
+    void push(const native && data, const std::string & type, bool negate = false)
     {
         auto t = get_type(type);
         if constexpr (std::is_same_v<native, value>)
-            _stack.push(value(t, data.address));
-        else
+        {
+            auto v = std::make_shared<value>(t, data.address);
+            v->is_negated = negate;
+            _stack.push(v);
+        } else
         {
             const i64 address = (i64)_pool.get<native>(data).get();
-            _stack.emplace(std::make_shared<value>(t, address, value::constant));
+            auto v = std::make_shared<value>(t, address, value::constant);
+            v->is_negated = negate;
+            _stack.emplace(v);
         }
     }
 
@@ -177,6 +182,7 @@ public:
     virtual void and_() = 0;
     virtual void or_() = 0;
     virtual void not_() = 0;
+    virtual void negate() = 0;
     // virtual void operation_logic_extract(const symbol & destination, const value & value) = 0;
     virtual void greater() = 0;
     virtual void greater_or_equal() = 0;
@@ -194,6 +200,7 @@ public:
     virtual void begin_if_then() = 0;
     virtual void else_if_then() = 0;
     virtual void else_then() = 0;
+    virtual void close_branch() = 0;
     virtual void end_if() = 0;
 
     virtual void begin_for() = 0;

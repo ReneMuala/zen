@@ -21,7 +21,7 @@
                 {\
                     try\
                     {\
-                        fmt::println("[zenDestructor]({}):{}", local->label, __LINE__);\
+                        /*fmt::println("[zenDestructor]({}):{}", local->label, __LINE__);*/\
                         push(local);\
                         call("[zenDestructor]",1, call_result::pushed);\
                     } catch (const std::exception & e)\
@@ -732,7 +732,51 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
     KAIZEN_DEFINE_ARITH_COMPOSITION(modulo, compute modulo, mod, KAIZEN_IF_ARITHMETICS_CHAIN_FLOAT);
     KAIZEN_DEFINE_LOGIC_COMPOSITION(and_, and);
     KAIZEN_DEFINE_LOGIC_COMPOSITION(or_, or);
-    KAIZEN_DEFINE_LOGIC_COMPOSITION(not_, not);
+    KAIZEN_DEFINE_LOGIC_COMPOSITION(not_, not)
+
+    #define KAIZEN_IF_NEGATE_FOR(T, NT)\
+if (top()->is(#T))\
+{\
+    auto it = top();\
+    it->is_negated = not it->is_negated;\
+    if (it->is_reference)\
+    {\
+        pop();\
+        push(it->type);\
+        const auto result = top();\
+        push(dereference(it));\
+        zen::composer::composer::push<NT>(-1, it->type->name);\
+        _call_instruction(mul_ ## NT, 3, 3);\
+        push(it);\
+        push(result);\
+        assign();\
+    } else\
+    {\
+        push(it);\
+        zen::composer::composer::push<NT>(-1, it->type->name);\
+        _call_instruction(mul_ ## NT, 3, 3);\
+    }\
+    return;\
+}
+
+    void composer::vm::composer::negate()
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
+        if (_stack.empty())
+            throw std::logic_error(fmt::format(
+                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
+                __FUNCTION__,
+                _stack.size()));
+        KAIZEN_IF_NEGATE_FOR(byte, i8);
+        KAIZEN_IF_NEGATE_FOR(short, i16);
+        KAIZEN_IF_NEGATE_FOR(int, i32);
+        KAIZEN_IF_NEGATE_FOR(long, i64);
+        KAIZEN_IF_NEGATE_FOR(float, f32);
+        KAIZEN_IF_NEGATE_FOR(double, f64);
+        throw exceptions::semantic_error(fmt::format("unsupported operation for type {}", top()->type->name),
+                                         _ilc_offset);
+    };
+
     KAIZEN_DEFINE_RELATIONAL_COMPOSITION(greater, >, gt);
     KAIZEN_DEFINE_RELATIONAL_COMPOSITION(greater_or_equal, >=, gte);
     KAIZEN_DEFINE_RELATIONAL_COMPOSITION(lower, <, lt);
@@ -1092,24 +1136,37 @@ if (top()->is(#T))\
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
                 __FUNCTION__,
                 _stack.size()));
-        KAIZEN_IF_SCOPE_OPENING(scope::in_function);
+        KAIZEN_IF_SCOPE_OPENING(scope::in_for); // for iterator related memory elements
         const auto step = pop_operand();
         const auto last = pop_operand();
         const auto first = pop_operand();
         const auto iterator = pop_operand();
-        fmt::println("for({}:{} = {}, {}, {})", iterator->address(scope->get_stack_usage()), iterator->type->name, first->address(scope->get_stack_usage()), last->address(scope->get_stack_usage()), step->address(scope->get_stack_usage()));
+
         push(iterator);
         push(first);
         assign();
+        code.push_back(zen::go);
+        code.push_back(0);
 
-        label begin, end;
+
+        label begin, end, condition;
+        condition.use(code);
         begin.bind(code);
+        KAIZEN_IF_SCOPE_OPENING(scope::in_function); // because of that plus bellow, it keeps pushing data :[
         push(iterator);
         push(iterator);
         push(step);
         plus();
+        assign();
+        KAIZEN_IF_SCOPE_CLOSURE();
+
+        push(iterator);
         push(last);
-        lower_or_equal();
+        condition.bind(code); // skip increment on the first run
+        if (step->is_negated)
+            greater_or_equal();
+        else
+            lower_or_equal();
         code.push_back(go_if_not);
         code.push_back(pop_operand()->address(scope->get_stack_usage()));
         code.push_back(0);
@@ -1117,12 +1174,7 @@ if (top()->is(#T))\
 
         scope->labels.push(begin);
         scope->labels.push(end);
-        code.push_back(placeholder);
-        code.push_back(placeholder);
-        code.push_back(placeholder);
-        code.push_back(placeholder);
-        KAIZEN_IF_SCOPE_CLOSURE_NON_DESTRUCTIVE();
-        KAIZEN_IF_SCOPE_OPENING(scope::in_for);
+        KAIZEN_IF_SCOPE_OPENING(scope::in_for_body);
     };
 
 #define KAIZEN_CASTER_MAP_FOR(T)\
@@ -1695,13 +1747,11 @@ if (top()->is(#T))\
     void composer::vm::composer::begin_if_then()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        KAIZEN_IF_SCOPE_OPENING(scope::in_if);
         _begin_if_then(false);
     }
 
-    void composer::vm::composer::_begin_if_then(const bool nested)
+    void composer::vm::composer::_begin_if_then(const bool chained)
     {
-        KAIZEN_REQUIRE_SCOPE(scope::in_if);
         if (_stack.empty())
         {
             throw exceptions::semantic_error(fmt::format(R"(cannot use 'if' or 'else if' without providing a value)"),
@@ -1715,7 +1765,7 @@ if (top()->is(#T))\
                                              "please use type casting if applicable.");
         }
         label else_label;
-        if (not nested)
+        if (not chained)
             scope->labels.emplace();
         else
         {
@@ -1728,20 +1778,48 @@ if (top()->is(#T))\
         else_label.use(code);
 
         scope->labels.push(else_label);
+        if (chained)
+        {
+            KAIZEN_IF_SCOPE_OPENING(scope::in_else_if);
+        } else
+        {
+            KAIZEN_IF_SCOPE_OPENING(scope::in_if);
+        }
     }
 
     void composer::vm::composer::else_if_then()
     {
-        KAIZEN_REQUIRE_SCOPE(scope::in_if);
-        else_then();
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
+        _else_then(true);
         _begin_if_then(true);
     }
 
     void composer::vm::composer::else_then()
     {
-        KAIZEN_REQUIRE_SCOPE(scope::in_if);
-        KAIZEN_IF_SCOPE_CLOSURE();
-        KAIZEN_IF_SCOPE_OPENING(scope::in_else);
+
+       _else_then(false);
+    }
+
+    void composer::vm::composer::_else_then(bool partial)
+    {
+        if (not partial)
+            KAIZEN_IF_SCOPE_OPENING(scope::in_else);
+    }
+
+    void composer::vm::composer::close_branch()
+    {
+        const bool chained_scope = scope->is(scope::in_else_if) or scope->is(scope::in_else);
+        if (chained_scope)
+        {
+            KAIZEN_IF_SCOPE_CLOSURE(); // remove else's scope
+            KAIZEN_IF_SCOPE_CLOSURE_NON_DESTRUCTIVE(); // remove in between branches' scope but keep it there for next usages
+        } else
+        {
+            KAIZEN_REQUIRE_SCOPE(scope::in_if);
+            KAIZEN_IF_SCOPE_CLOSURE();
+        }
+
+        code.push_back(placeholder);
         if (scope->labels.size() < 2)
             throw exceptions::semantic_error(fmt::format("cannot use else if without a prior if"), _ilc_offset);
 
@@ -1752,19 +1830,29 @@ if (top()->is(#T))\
         scope->labels.pop();
 
         label& end_label = scope->labels.top();
+        scope->labels.emplace();
         code.push_back(zen::instruction::go);
         code.push_back(0);
         end_label.use(code);
         else_label.bind(code);
-
-        scope->labels.emplace();
+        if (chained_scope)
+        {
+            KAIZEN_IF_SCOPE_CLOSURE(); // remove in between branches' scope
+        }
+        KAIZEN_IF_SCOPE_OPENING(scope::in_between_branches); // for other chained ifs temp values
     }
 
     void composer::vm::composer::end_if()
     {
-        KAIZEN_REQUIRE_SCOPE(scope::in_if);
-        KAIZEN_IF_SCOPE_CLOSURE();
-
+        if (scope->is(scope::in_else_if) or scope->is(scope::in_else))
+        {
+            KAIZEN_IF_SCOPE_CLOSURE(); // remove else's scope
+            KAIZEN_IF_SCOPE_CLOSURE(); // remove in between branches' scope
+        } else
+        {
+            KAIZEN_REQUIRE_SCOPE(scope::in_if);
+            KAIZEN_IF_SCOPE_CLOSURE();
+        }
         if (scope->labels.size() < 2)
             throw exceptions::semantic_error(fmt::format("cannot end if without a prior if"), _ilc_offset);
 

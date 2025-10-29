@@ -130,6 +130,7 @@ BEGIN_PRODUCTION(PRODUCTION_NIF)
     REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
     while (TRY_REQUIRE_TERMINAL(TKEYWORD_ELSE))
     {
+        composer->close_branch();
         if (TRY_REQUIRE_TERMINAL(TKEYWORD_IF))
         {
             REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_OPEN, EXPECTED("("))
@@ -480,7 +481,7 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_NUM)
         {
             data = -data;
         }
-        composer->push<int>(std::move(data), "int");
+        composer->push<int>(std::move(data), "int", negative);
     }
     else if (TRY_REQUIRE_TERMINAL(TBYTE_NUM))
     {
@@ -489,7 +490,7 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_NUM)
         {
             data = -data;
         }
-        composer->push<char>(std::move(data), "byte");
+        composer->push<char>(std::move(data), "byte", negative);
     }
     else if (TRY_REQUIRE_TERMINAL(TSHORT_NUM))
     {
@@ -498,7 +499,7 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_NUM)
         {
             data = -data;
         }
-        composer->push<short>(std::move(data), "short");
+        composer->push<short>(std::move(data), "short", negative);
     }
     else if (TRY_REQUIRE_TERMINAL(TLONG_NUM))
     {
@@ -507,7 +508,7 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_NUM)
         {
             data = -data;
         }
-        composer->push<long>(std::move(data), "long");
+        composer->push<long>(std::move(data), "long", negative);
     }
     else if (TRY_REQUIRE_TERMINAL(TFLOAT_NUM))
     {
@@ -516,7 +517,7 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_NUM)
         {
             data = -data;
         }
-        composer->push<float>(std::move(data), "float");
+        composer->push<float>(std::move(data), "float", negative);
     }
     else
     {
@@ -526,7 +527,7 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_NUM)
         {
             data = -data;
         }
-        composer->push<double>(std::move(data), "double");
+        composer->push<double>(std::move(data), "double", negative);
     }
 END_PRODUCTION
 
@@ -580,6 +581,8 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_ID)
     try
     {
         composer->push(parser::id);
+        if (negative)
+            composer->negate();
     }
     catch (const zen::exceptions::semantic_error& e)
     {
