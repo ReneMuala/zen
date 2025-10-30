@@ -83,7 +83,7 @@ try
     if (main_functions.empty())
     {
         fmt::print("[runtime error: main function not found]\n");
-        return 0;
+        return false;
     }
     const zen::composer::vm::function main = main_functions.front();
     zen::vm::stack stack;
@@ -129,6 +129,68 @@ inline void setup_integration_test(const std::string& code, zen::composer::compo
 int main(int argc, char** argv) try
 {
     zen_run(R"(
+        sum(x:int, y:int) = int(x+y)
+		println() = {
+			print("\n")
+		}
+
+		println(string: string) = {
+			print(string)
+			print("\n")
+		}
+
+		print(number: int) = {
+			if(number >= 10){
+				part: int = number % 10
+				print(number / 10)
+				print(part)
+			} else{
+				if(number == 1){
+					print("1")
+				} else if(number == 2) {
+					print("2")
+				} else if(number == 3) {
+					print("3")
+				} else if(number == 4) {
+					print("4")
+				} else if(number == 5) {
+					print("5")
+				} else if(number == 6) {
+					print("6")
+				} else if(number == 7) {
+					print("7")
+				} else if(number == 8) {
+					print("8")
+				} else if(number == 9) {
+					print("9")
+				} else {
+					print("0")
+				}
+			}
+		}
+
+		println(int: int) = {
+			print(int)
+			print("\n")
+		}
+
+		rect(lines: int, cols: int) = {
+			for(l: int = 1, lines){
+				for(c: int = 1, cols){
+					print("*")
+				}
+				println()
+			}
+		}
+
+		divide(x: int, y: int) = int {
+			if(y != 0){
+				x/y
+			} else {
+				println("[detected division by 0]")
+				0
+			}
+		}
         main = {
             print("Click 'Run' or hit CTR+R to execute your ZEN code. Output will appear here.")
         }

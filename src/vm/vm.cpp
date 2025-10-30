@@ -23,7 +23,7 @@ case mul_ ## T:\
             i+=3;\
 break;\
 case div_ ## T:\
-    *address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) / *address<T>(this->code[i + 3], stack);\
+    *address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 3], stack) == 0 ? 0 : *address<T>(this->code[i + 2], stack) / *address<T>(this->code[i + 3], stack);\
 i+=3;\
 break;\
 case mod_ ## T:\
@@ -45,7 +45,7 @@ case mul_ ## T:\
 i+=3;\
 break;\
 case div_ ## T:\
-*address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) / *address<T>(this->code[i + 3], stack);\
+*address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 3], stack) == 0 ? 0 : *address<T>(this->code[i + 2], stack) / *address<T>(this->code[i + 3], stack);\
 i+=3;\
 break;
 

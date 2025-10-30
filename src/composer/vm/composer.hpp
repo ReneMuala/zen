@@ -43,6 +43,7 @@ public:
     void _push_temporary_value(const std::string& type_name);
     void push(const std::string& name) override;
     void pop() override;
+    void peek_pop_pop_push() override;
     void begin_if_then() override;
     void _begin_if_then(bool chained);
     void else_if_then() override;
@@ -60,12 +61,14 @@ public:
     void _call_caster(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::unordered_map<std::string,
                                  i64>>::iterator&
                              caster_set);
-    void _call_function_overload(const std::deque<std::shared_ptr<value>>& arguments, function& func, bool construtor_call);
-    void _call_function(const std::string& name, const i8& args_count, const std::unordered_map<std::string, std::list<function>>::iterator&
-                               func_it);
-    void _call_instruction_write_str(const std::string& name, const i8& args_count);
-    void _call_instruction(const zen::instruction & instruction, const i8& args_count, const i8& expected_args_count);
-    void call(const std::string& name, const i8& args_count) override;
+    bool _call_function_overload(const std::deque<std::shared_ptr<value>>& arguments, function& func,
+                                 bool construtor_call);
+    bool _call_function(const std::string& name, const i8& args_count,
+                        const std::unordered_map<std::string, std::list<function>>::iterator&
+                        func_it);
+    bool _call_instruction_write_str(const std::string& name, const i8& args_count);
+    bool _call_instruction(const zen::instruction& instruction, const i8& args_count, const i8& expected_args_count);
+    bool call(const std::string& name, const i8& args_count) override;
     void and_() override;
     void or_() override;
     void not_() override;

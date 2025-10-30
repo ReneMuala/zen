@@ -18,6 +18,7 @@ namespace enums
     TPARENTHESIS_OPEN,
     /// )
     TPARENTHESIS_CLOSE,
+    NFUNCTION_BODY,
     /// statement
     NSTAT,
     NGLOBAL_STAT,

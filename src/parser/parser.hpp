@@ -15,6 +15,7 @@
 using namespace enums;
 extern std::vector<zen::token> tokens;
 static bool pragma_ignore_missing_symbols = false;
+static bool pragma_dangling_return_value = false;
 static std::string pragma_ignore_missing_symbols_data;
 
 // namespace parser
@@ -24,7 +25,7 @@ typedef enums::token_type SYMBOL;
 
 BEGIN_ILC_CODEGEN
 
-zen::composer::composer* get_composer()
+inline zen::composer::composer* get_composer()
 {
     static auto composer = std::make_unique<zen::composer::vm::composer>(ILC::offset);
     return (zen::composer::composer*)(composer.get());
@@ -41,7 +42,7 @@ namespace parser
     };
 
     // state_t state = STATEMENT;
-    std::string id, type, value;
+    inline std::string id, type, value;
 
     inline void reset()
     {
@@ -50,8 +51,6 @@ namespace parser
         value.clear();
     }
 }
-
-// std::cerr <<  "syntax error: expected " << ITEM << " found " << tokens[ILC::offset].value << " @" << (int)tokens[ILC::offset].type << " at " << tokens[ILC::offset-1].get_location_string();
 
 #define EXPECTED(ITEM) []() \
         {\
@@ -119,13 +118,7 @@ BEGIN_PRODUCTION(PRODUCTION_NIF)
     composer->begin_if_then();
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
     REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
-    while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
-    {
-    }
-    if (TRY_REQUIRE_NON_TERMINAL(NVAL))
-    {
-        composer->return_value();
-    }
+    REQUIRE_NON_TERMINAL(NFUNCTION_BODY)
     REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
     while (TRY_REQUIRE_TERMINAL(TKEYWORD_ELSE))
     {
@@ -154,26 +147,14 @@ BEGIN_PRODUCTION(PRODUCTION_NIF)
             composer->else_if_then();
             REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
             REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
-            while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
-            {
-            }
-            if (TRY_REQUIRE_NON_TERMINAL(NVAL))
-            {
-                composer->return_value();
-            }
+            REQUIRE_NON_TERMINAL(NFUNCTION_BODY)
             REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
         }
         else
         {
             composer->else_then();
             REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
-            while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
-            {
-            }
-            if (TRY_REQUIRE_NON_TERMINAL(NVAL))
-            {
-                composer->return_value();
-            }
+            REQUIRE_NON_TERMINAL(NFUNCTION_BODY)
             REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
             break;
         }
@@ -200,7 +181,7 @@ BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
         }
     }
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
-    composer->call(name, param_count);
+    pragma_dangling_return_value = composer->call(name, param_count);
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
@@ -290,13 +271,7 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_SUFFIX)
     }
     if (TRY_REQUIRE_TERMINAL(TBRACES_OPEN))
     {
-        while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
-        {
-        } // improve return handler
-        if (TRY_REQUIRE_NON_TERMINAL(NVAL))
-        {
-            composer->return_value();
-        }
+        REQUIRE_NON_TERMINAL(NFUNCTION_BODY)
         REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
     }
     else
@@ -314,7 +289,7 @@ BEGIN_PRODUCTION(PRODUCTION_NFOR)
     do
     {
         REQUIRE_TERMINAL_CALLBACK(TID, EXPECTED("ID"))
-        std::string iterator = tokens[ILC::offset-1].value;
+        std::string iterator = tokens[ILC::offset - 1].value;
         parser::type.clear();
         if (TRY_REQUIRE_TERMINAL(TCOLON))
         {
@@ -333,7 +308,8 @@ BEGIN_PRODUCTION(PRODUCTION_NFOR)
             REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
             // composer->end_block();
             composer->set_for_begin_end_step();
-        } else
+        }
+        else
         {
             // composer->end_block();
             composer->set_for_begin_end();
@@ -342,9 +318,7 @@ BEGIN_PRODUCTION(PRODUCTION_NFOR)
     while (TRY_REQUIRE_TERMINAL(TSEMICOLON));
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
     REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
-    while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
-    {
-    }
+    REQUIRE_NON_TERMINAL(NFUNCTION_BODY)
     REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
     composer->end_for();
 END_PRODUCTION
@@ -359,9 +333,7 @@ BEGIN_PRODUCTION(PRODUCTION_NWHILE)
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
     composer->set_while_condition();
     REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
-    while (TRY_REQUIRE_NON_TERMINAL(NSTAT))
-    {
-    }
+    REQUIRE_NON_TERMINAL(NFUNCTION_BODY)
     REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
     composer->end_while();
 END_PRODUCTION
@@ -674,6 +646,46 @@ BEGIN_PRODUCTION(META_PRODUCTION_GLOBAL_STAT)
     }
 END_PRODUCTION
 
+BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_BODY)
+    static auto composer = get_composer();
+    bool dangling_value = false;
+    while (true)
+    {
+        if (TRY_REQUIRE_NON_TERMINAL(NSTAT))
+        {
+            if (dangling_value)
+            {
+                composer->pop();
+                dangling_value = false;
+            }
+            continue;
+        }
+        if (TRY_REQUIRE_NON_TERMINAL(NID))
+        {
+            if (dangling_value)
+                composer->pop();
+            composer->push(parser::id);
+            if (TRY_REQUIRE_NON_TERMINAL(NSUFFIX_FUNCTION_CALL, EXPECTED("(<argument(s)>)")))
+            {
+                dangling_value = pragma_dangling_return_value;
+                continue;
+            }
+            TRY_REQUIRE_NON_TERMINAL(NSUFIXED_VAL);
+            dangling_value = true;
+            break;
+        }
+        if (TRY_REQUIRE_NON_TERMINAL(NVAL))
+        {
+            dangling_value = true;
+        }
+        break;
+    } // improve return handler
+    if (dangling_value)
+    {
+        composer->return_value();
+    }
+END_PRODUCTION
+
 BEGIN_PRODUCTION(PRODUCTION_NSTAT_FROM_ASGN)
     static zen::composer::composer* composer = get_composer();
     REQUIRE_NON_TERMINAL(NID)
@@ -781,6 +793,11 @@ BEGIN_SYMBOL_BINDING(NSTAT)
             PRODUCTION_NWHILE() or
             PRODUCTION_NSTAT_FROM_ASGN()
         END_SYMBOL_BINDING
+
+BEGIN_SYMBOL_BINDING(NFUNCTION_BODY)
+            PRODUCTION_NFUNCTION_BODY()
+        END_SYMBOL_BINDING
+
 
 BEGIN_SYMBOL_BINDING(NVAL)
         (PRODUCTION_NVAL_PREFIX_VAL() and

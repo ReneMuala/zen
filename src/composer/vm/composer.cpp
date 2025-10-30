@@ -1334,14 +1334,14 @@ if (top()->is(#T))\
         }
     }
 
-    void composer::vm::composer::_call_function_overload(
-        const std::deque<std::shared_ptr<value>>& arguments, function& func,  const bool construtor_call)
+    bool composer::vm::composer::_call_function_overload(
+        const std::deque<std::shared_ptr<value>>& arguments, function& func, const bool construtor_call)
     {
         const auto returned = _push_callee_return_value(func.signature, construtor_call);
         // }
         _push_callee_arguments(arguments);
-
-        if (returned and not construtor_call)
+        const bool returned_result = returned and not construtor_call;
+        if (returned_result)
         {
             push(returned);
         }
@@ -1359,12 +1359,13 @@ if (top()->is(#T))\
             code.push_back(call_params_cost);
             scope->use_stack(-call_params_cost);
         }
+        return returned_result;
     }
 
-    void composer::vm::composer::_call_function(const std::string& name, const i8& args_count,
-                                                                 const std::unordered_map<
-                                                                     std::string, std::list<function>>::iterator&
-                                                                 func_it)
+    bool composer::vm::composer::_call_function(const std::string& name, const i8& args_count,
+                                                const std::unordered_map<
+                                                    std::string, std::list<function>>::iterator&
+                                                func_it)
     {
         std::deque<std::shared_ptr<value>> arguments;
         for (int i = 0; i < args_count; i++)
@@ -1418,10 +1419,10 @@ if (top()->is(#T))\
 
         if (not candidate)
             throw exceptions::semantic_error(fmt::format("no function overload matched for \'{}\'", name), _ilc_offset);
-        _call_function_overload(arguments, candidate->get(), false);
+        return _call_function_overload(arguments, candidate->get(), false);
     }
 
-    void composer::vm::composer::_call_instruction_write_str(
+    bool composer::vm::composer::_call_instruction_write_str(
         const std::string& name, const i8& args_count)
     {
         if (_stack.size() < 3 or args_count != 3)
@@ -1443,10 +1444,11 @@ if (top()->is(#T))\
             code.push_back(args.top()->address(scope->get_stack_usage()));
             args.pop();
         }
+        return false;
     }
 
-    void composer::vm::composer::_call_instruction(const zen::instruction& name, const i8& args_count,
-                                                                    const i8& expected_args_count)
+    bool composer::vm::composer::_call_instruction(const zen::instruction& name, const i8& args_count,
+                                                   const i8& expected_args_count)
     {
         if (_stack.size() < expected_args_count or args_count != expected_args_count)
         {
@@ -1466,6 +1468,7 @@ if (top()->is(#T))\
             code.push_back(args.top()->address(scope->get_stack_usage()));
             args.pop();
         }
+        return false;
     }
 
     void composer::vm::composer::end_for()
@@ -1662,7 +1665,7 @@ if (top()->is(#T))\
         scope->use_stack(type->get_size());
     }
 
-    void composer::vm::composer::call(const std::string& name, const i8& args_count)
+    bool composer::vm::composer::call(const std::string& name, const i8& args_count)
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
         static std::unordered_map<std::string, std::unordered_map<std::string, i64>> casters{
@@ -1677,7 +1680,8 @@ if (top()->is(#T))\
 
         if (const auto caster_set = casters.find(name); caster_set != casters.end())
         {
-            return _call_caster(name, args_count, caster_set);
+            _call_caster(name, args_count, caster_set);
+            return true;
         }
 
         if (const auto func_it = functions.find(name); func_it != functions.end())
@@ -1718,6 +1722,14 @@ if (top()->is(#T))\
     void composer::vm::composer::pop()
     {
         _stack.pop();
+    }
+
+    void composer::vm::composer::peek_pop_pop_push()
+    {
+        const auto top = _stack.top();
+        _stack.pop();
+        _stack.pop();
+        _stack.push(top);
     }
 
     void composer::vm::composer::begin_if_then()

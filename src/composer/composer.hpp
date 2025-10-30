@@ -144,8 +144,8 @@ public:
     virtual void set_local(std::string name, const std::string & type) = 0;
     virtual void end() = 0;
     virtual void bake() = 0;
-    // if args count is < 0, it means no assignment is occurring
-    virtual void call(const std::string& name, const i8 & args_count) = 0;
+    // returns true if the called functions returns a value
+    virtual bool call(const std::string& name, const i8 & args_count) = 0;
     // TS <- TS+1
     virtual void assign() = 0;
     virtual void push(const std::string & name) = 0;
@@ -168,6 +168,7 @@ public:
     }
 
     virtual void pop() = 0;
+    virtual void peek_pop_pop_push() = 0;
     // PUSH(TS + TS+1)
     virtual void plus() = 0;
     // PUSH(TS - TS+1)
