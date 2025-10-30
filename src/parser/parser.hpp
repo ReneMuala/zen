@@ -327,7 +327,6 @@ BEGIN_PRODUCTION(PRODUCTION_NWHILE)
     static auto composer = get_composer();
     REQUIRE_TERMINAL(TKEYWORD_WHILE)
     composer->begin_while();
-    fmt::println("pragma_ignore_missing_symbols = {}", pragma_ignore_missing_symbols);
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_OPEN, EXPECTED("("))
     REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
     REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))

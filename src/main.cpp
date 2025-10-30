@@ -206,7 +206,6 @@ int main(int argc, char** argv) try
 			}
 		}
         main = {
-			main2()
             print("Click 'Run' or hit CTR+R to execute your ZEN code. Output will appear here.")
         }
     )");

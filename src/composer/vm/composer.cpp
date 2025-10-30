@@ -443,7 +443,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                                                          scope->name, rhs->type->name));
         }
 
-        if (lhs->no_destructor)
+        if (lhs->type->kind == type::kind::heap and lhs->no_destructor)
         {
             fmt::println("no_destructor being assigned {}, shadowing parameter", lhs->label);
             set_local(lhs->label, lhs->type->name);

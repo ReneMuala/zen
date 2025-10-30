@@ -9,6 +9,7 @@ if is_plat("wasm") then
     --add_cxflags([[-sEXPORTED_RUNTIME_METHODS=ccall,cwrap]])
 end
 
+if not is_plat("wasm") then
 target("tests")
     set_languages("c++23")
     set_kind("binary")
@@ -22,6 +23,7 @@ target("tests")
             "src/composer/vm/*.cpp",
             "test/*.cpp"
     )
+end
 
 target("zen")
     set_languages("c++23")
