@@ -665,7 +665,7 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_BODY)
             if (dangling_value)
                 composer->pop();
             composer->push(parser::id);
-            if (TRY_REQUIRE_NON_TERMINAL(NSUFFIX_FUNCTION_CALL, EXPECTED("(<argument(s)>)")))
+            if (TRY_REQUIRE_NON_TERMINAL(NSUFFIX_FUNCTION_CALL))
             {
                 dangling_value = pragma_dangling_return_value;
                 continue;

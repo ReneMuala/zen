@@ -191,7 +191,22 @@ int main(int argc, char** argv) try
 				0
 			}
 		}
+
+		main2 = {
+			_ : unit
+			rows: int = 13
+			for(i: int = 1,rows,2){
+				for(j: int = (rows-i)/2, 1, -1){
+					print(" ")
+				}
+				for(k: int = 1, i){
+					print("*")
+				}
+				print("\n")
+			}
+		}
         main = {
+			main2()
             print("Click 'Run' or hit CTR+R to execute your ZEN code. Output will appear here.")
         }
     )");
