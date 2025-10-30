@@ -155,6 +155,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
     void composer::vm::composer::return_value()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
+
         if (scope->get_return_status() == block_scope::concise_return)
             throw exceptions::semantic_error("cannot return values more than once", _ilc_offset);
         scope->set_return_status(block_scope::concise_return);

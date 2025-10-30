@@ -667,6 +667,8 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_BODY)
             if (TRY_REQUIRE_NON_TERMINAL(NSUFFIX_FUNCTION_CALL))
             {
                 dangling_value = pragma_dangling_return_value;
+                if (dangling_value)
+                    TRY_REQUIRE_NON_TERMINAL(NSUFIXED_VAL);
                 continue;
             }
             TRY_REQUIRE_NON_TERMINAL(NSUFIXED_VAL);
@@ -931,7 +933,7 @@ BEGIN_SYMBOL_BINDING(NSUFIXED_VAL)
           PRODUCTION_NVAL_NOT_VAL() or
           PRODUCTION_NVAL_AND_VALUE() or
           PRODUCTION_NVAL_OR_VALUE() or
-          PRODUCTION_NSUFFIX_VAL_NTERNARY() or PRODUCTION_NSUFFIX_FUNCTION_CALL()
+          PRODUCTION_NSUFFIX_VAL_NTERNARY()// or PRODUCTION_NSUFFIX_FUNCTION_CALL()
         END_SYMBOL_BINDING
 END_BINDINGS
 
