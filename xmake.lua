@@ -1,4 +1,4 @@
-add_rules("mode.debug", "mode.release")
+add_rules("mode.debug", "mode.release","plugin.compile_commands.autoupdate")
 --add_requires("fmt", "asmjit", "libffi")
 add_requires("fmt", "asmjit", "gtest")
 
@@ -21,6 +21,7 @@ target("tests")
     --"src/parser/*.cpp",
             "src/exceptions/*.cpp",
             "src/composer/vm/*.cpp",
+            "src/composer/bttrvm/*.cpp",
             "test/*.cpp"
     )
 end
