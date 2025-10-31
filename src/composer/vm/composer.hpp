@@ -79,7 +79,6 @@ public:
     void lower_or_equal() override;
     void equal() override;
     void not_equal() override;
-    void ternary() override;
 
     void begin_while() override;
     void set_while_condition() override;

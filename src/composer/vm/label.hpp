@@ -8,10 +8,9 @@
 #include "types/stack.hpp"
 
 namespace zen::composer::vm {
-class label {
+struct label {
    std::list<i64> indexes;
    std::optional<i64> bind_address;
-   public:
    void use(std::vector<i64> & code)
    {
       if (code.empty())

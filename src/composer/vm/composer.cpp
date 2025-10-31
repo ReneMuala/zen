@@ -794,46 +794,6 @@ if (top()->is(#T))\
     KAIZEN_DEFINE_RELATIONAL_COMPOSITION(equal, ==, eq);
     KAIZEN_DEFINE_RELATIONAL_COMPOSITION(not_equal, !=, neq)
 
-    void composer::vm::composer::ternary()
-    {
-        KAIZEN_REQUIRE_SCOPE(scope::in_function);
-        if (_stack.size() < 3)
-            throw std::logic_error(fmt::format(
-                "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
-                __FUNCTION__,
-                _stack.size()));
-        const auto scd = pop_operand();
-        const auto fst = pop_operand();
-        const auto condition = pop_operand();
-        push(fst->type);
-        if (not condition->is("bool"))
-            throw exceptions::semantic_error(fmt::format("cannot apply ternary to type \"{}\"", condition->type->name),
-                                             _ilc_offset, "please consider using type casting. Eg. bool(x)");
-        if (not fst->has_same_type_as(*scd))
-            throw exceptions::semantic_error("ternary alternatives differ in type",
-                                             _ilc_offset);
-        label alt, end;
-        code.push_back(go_if_not);
-        code.push_back(condition->address(scope->get_stack_usage()));
-        code.push_back(0);
-        alt.use(code);
-
-        const auto dst = top();
-        push(fst);
-        assign();
-        code.push_back(go);
-        code.push_back(0);
-        end.use(code);
-
-        alt.bind(code);
-        push(dst);
-        push(scd);
-        assign();
-        end.bind(code);
-
-        push(dst);
-    }
-
     void composer::vm::composer::begin_while()
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);

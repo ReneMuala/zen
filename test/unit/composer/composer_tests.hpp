@@ -1084,26 +1084,26 @@ TEST(composer_unit, conditional)
               (std::vector<i64>{hlt, go_if_not, -17, 5, i32_to_i32, -21, -16, go, 3, i32_to_i32, -21, -12, ret,}));
 }
 
-TEST(composer_unit, ternary)
-{
-    using namespace zen;
-    int ilc_offset = 0;
-    const std::unique_ptr<zen::composer::composer> composer = std::make_unique<zen::composer::vm::composer>(ilc_offset);
-    composer->begin("ternary");
-    composer->set_return_type("int");
-    composer->set_parameter("a", "int");
-    composer->set_parameter("b", "int");
-    composer->set_parameter("c", "bool");
-    composer->push("c");
-    composer->push("a");
-    composer->push("b");
-    composer->ternary();
-    composer->return_value();
-    composer->end();
-    EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
-              (std::vector<i64>{hlt, most, -4, go_if_not, -13, 5, i32_to_i32, -4, -21, go, 3, i32_to_i32, -4, -17,
-                  i32_to_i32, -25, -4, most, 4, ret,}));
-}
+// TEST(composer_unit, ternary)
+// {
+//     using namespace zen;
+//     int ilc_offset = 0;
+//     const std::unique_ptr<zen::composer::composer> composer = std::make_unique<zen::composer::vm::composer>(ilc_offset);
+//     composer->begin("ternary");
+//     composer->set_return_type("int");
+//     composer->set_parameter("a", "int");
+//     composer->set_parameter("b", "int");
+//     composer->set_parameter("c", "bool");
+//     composer->push("c");
+//     composer->push("a");
+//     composer->push("b");
+//     composer->ternary();
+//     composer->return_value();
+//     composer->end();
+//     EXPECT_EQ(dynamic_cast<const zen::composer::vm::composer*>(composer.get())->code,
+//               (std::vector<i64>{hlt, most, -4, go_if_not, -13, 5, i32_to_i32, -4, -21, go, 3, i32_to_i32, -4, -17,
+//                   i32_to_i32, -25, -4, most, 4, ret,}));
+// }
 
 TEST(composer_unit, while_)
 {

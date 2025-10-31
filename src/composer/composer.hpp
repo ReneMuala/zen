@@ -191,7 +191,6 @@ public:
     virtual void lower_or_equal() = 0;
     virtual void equal() = 0;
     virtual void not_equal() = 0;
-    virtual void ternary() = 0;
 
     virtual void pre_increment() = 0;
     virtual void pre_decrement() = 0;
