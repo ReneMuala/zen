@@ -157,9 +157,8 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
         if (scope->get_return_status() == block_scope::concise_return)
             throw exceptions::semantic_error("cannot return values more than once", _ilc_offset);
-        if (scope->return_status == block_scope::branched_return and scope->depth() == 1)
+        if (scope->get_return_status() == block_scope::branched_return and not scope->is(scope::in_else))
             throw exceptions::semantic_error("conflicting returns", _ilc_offset, "both the 'if' block and the code after it return values\n\tuse 'else' to make return paths mutually exclusive");
-
         scope->set_return_status(block_scope::concise_return);
         if (not scope->return_data.value->is("unit"))
         {

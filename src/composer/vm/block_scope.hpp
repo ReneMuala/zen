@@ -123,7 +123,7 @@ namespace zen::composer::vm
         {
             if (nested_scope)
             {
-                const i64 nested_scope_usage = nested_scope->__dncd__pop(root_status, state);
+                const i64 nested_scope_usage = nested_scope->__dncd__pop(return_status, state);
                 if (state == found)
                 {
                     delete nested_scope;
@@ -142,16 +142,18 @@ namespace zen::composer::vm
         void update_return_status(enum return_status& root_status) const
         {
             if (type == in_if and return_status == concise_return)
+            {
                 root_status = branched_return;
-            else if (type == in_else_if and return_status == concise_return)
+            } else if (type == in_else_if and return_status == concise_return)
+            {
                 root_status = branched_return;
-            else if (type == in_else and return_status == concise_return and (root_status == branched_return or
-                root_status == concise_return))
+            } else if (type == in_else and return_status == concise_return)
+            {
                 root_status = concise_return;
-            else if (type == in_between_branches && return_status)
+            } else
+            {
                 root_status = return_status;
-            else if(type != in_between_branches)
-                root_status = no_return;
+            }
         }
 
         /// do not call directly
