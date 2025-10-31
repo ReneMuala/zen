@@ -213,5 +213,12 @@ namespace zen::composer::vm
             if (nested_scope) return nested_scope->is(t);
             return (type & t) == t;
         }
+
+        bool in_loop() const
+        {
+            const bool condition = (type & in_for_body) == in_for_body or (type & in_while_body) == in_while_body;
+            if (nested_scope) return condition or nested_scope->in_loop();
+            return condition;
+        }
     };
 }

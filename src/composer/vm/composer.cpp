@@ -159,6 +159,10 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             throw exceptions::semantic_error("cannot return values more than once", _ilc_offset);
         if (scope->get_return_status() == block_scope::branched_return and not scope->is(scope::in_else))
             throw exceptions::semantic_error("conflicting returns", _ilc_offset, "both the 'if' block and the code after it return values\n\tuse 'else' to make return paths mutually exclusive");
+        if (scope->in_loop())
+        {
+            throw exceptions::semantic_error("cannot return inside loop", _ilc_offset, "return value will be overwritten on each iteration\n\trestructure to return after the loop completes");
+        }
         scope->set_return_status(block_scope::concise_return);
         if (not scope->return_data.value->is("unit"))
         {
