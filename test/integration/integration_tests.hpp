@@ -5,6 +5,7 @@
 #pragma once
 #include <gtest/gtest.h>
 #include "parser/parser.hpp"
+#include <chrono>
 
 inline void setup_integration_test(const std::string& code, zen::composer::composer * composer)
 {
@@ -57,7 +58,7 @@ TEST(integration, hello_world)
     {
         composer->push("string.data");
         const auto deref = composer->dereference(composer->top());
-        composer->call(std::to_string(placeholder), 0, composer::call_result::pushed);
+        composer->call(std::to_string(placeholder), 0);
         composer->pop();
         composer->push(deref);
     }
@@ -68,7 +69,7 @@ TEST(integration, hello_world)
         composer->push(deref);
     }
     composer->zen::composer::composer::push<i64>(reinterpret_cast<i64>(stdout), "long");
-    composer->call(std::to_string(write_str), 3, composer::call_result::pushed);
+    composer->call(std::to_string(write_str), 3);
     composer->end();
     composer->link();
 
@@ -81,15 +82,30 @@ TEST(integration, hello_world)
                 0f
             }
         }*/
-        main = {
+        main = {/*
             i: int = 1
             _: unit = print("hello world\n")
-            while(i < 50){
-                _: unit = print("damn it works\n")
+            while(i < 10){
+                _: unit = print("A\n")
                 i = i + 1
+                j: int = 1
+                while(j < 5){
+                    _: unit = print("\tB\n")
+                    j = j + 1
+                    k: int = 1
+                    while(k < 5){
+                        _: unit = print("\t\tC\n")
+                        k = k + 1
+                    }
+                }
+            }
+*/
+            for(i: int = 1, 5){
             }
         })");
+    auto t0 = std::chrono::system_clock::now();
     EXPECT_TRUE(parse());
+    auto t01 = std::chrono::system_clock::now();
     composer->bake();
     const std::list<composer::vm::function> main_functions = composer->functions["main"];
     EXPECT_EQ(main_functions.size(), 1);
@@ -98,6 +114,10 @@ TEST(integration, hello_world)
     stack.push<i64>(0); // returning address
     zen::vm vm1;
     vm1.load(composer->code);
+    auto t1 = std::chrono::system_clock::now();
     vm1.run(stack, main.address);
+    auto t2 = std::chrono::system_clock::now();
+    fmt::println("----------------\n1.compiled in {} ms \n2.ran in {} ms\n----------------", (long long)std::chrono::duration_cast<std::chrono::milliseconds>(t01 - t0).count(),
+        (long long)std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
     EXPECT_TRUE(true);
 }

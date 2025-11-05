@@ -74,7 +74,7 @@ namespace zen::composer
         bool no_destructor = false;
         std::string label;
         bool is_reference = false;
-
+        bool is_negated = false;
         [[nodiscard]] bool is(const std::string & type_name) const
         {
             return type->name == type_name;
@@ -144,25 +144,31 @@ public:
     virtual void set_local(std::string name, const std::string & type) = 0;
     virtual void end() = 0;
     virtual void bake() = 0;
-    // if args count is < 0, it means no assignment is occurring
-    virtual call_result call(const std::string& name, const i8 & args_count, const call_result & mode) = 0;
+    // returns true if the called functions returns a value
+    virtual bool call(const std::string& name, const i8 & args_count) = 0;
     // TS <- TS+1
     virtual void assign() = 0;
     virtual void push(const std::string & name) = 0;
     template <typename native>
-    void push(const native && data, const std::string & type)
+    void push(const native && data, const std::string & type, bool negate = false)
     {
         auto t = get_type(type);
         if constexpr (std::is_same_v<native, value>)
-            _stack.push(std::make_shared<value>(t, data.address));
-        else
+        {
+            auto v = std::make_shared<value>(t, data.address);
+            v->is_negated = negate;
+            _stack.push(v);
+        } else
         {
             const i64 address = (i64)_pool.get<native>(data).get();
-            _stack.emplace(std::make_shared<value>(t, address, value::constant));
+            auto v = std::make_shared<value>(t, address, value::constant);
+            v->is_negated = negate;
+            _stack.emplace(v);
         }
     }
 
     virtual void pop() = 0;
+    virtual void peek_pop_pop_push() = 0;
     // PUSH(TS + TS+1)
     virtual void plus() = 0;
     // PUSH(TS - TS+1)
@@ -177,6 +183,7 @@ public:
     virtual void and_() = 0;
     virtual void or_() = 0;
     virtual void not_() = 0;
+    virtual void negate() = 0;
     // virtual void operation_logic_extract(const symbol & destination, const value & value) = 0;
     virtual void greater() = 0;
     virtual void greater_or_equal() = 0;
@@ -184,7 +191,6 @@ public:
     virtual void lower_or_equal() = 0;
     virtual void equal() = 0;
     virtual void not_equal() = 0;
-    virtual void ternary() = 0;
 
     virtual void pre_increment() = 0;
     virtual void pre_decrement() = 0;
@@ -194,6 +200,7 @@ public:
     virtual void begin_if_then() = 0;
     virtual void else_if_then() = 0;
     virtual void else_then() = 0;
+    virtual void close_branch() = 0;
     virtual void end_if() = 0;
 
     virtual void begin_for() = 0;
@@ -205,6 +212,9 @@ public:
     virtual void begin_while() = 0;
     virtual void set_while_condition() = 0;
     virtual void end_while() = 0;
+
+    virtual void begin_block() = 0;
+    virtual void end_block() = 0;
 
     virtual void using_(const std::string & alias_function, const std::string & original_function) = 0;
     virtual void link() = 0;

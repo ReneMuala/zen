@@ -8,7 +8,7 @@ namespace zen {
     token::token(const enums::token_type& type, std::string&& value, long line, long column): type(type), value(std::move(value)), line(line), column(column)
     {}
 
-    token::token(const enums::token_type& type, long line, long column): type(type), value(std::move(value)), line(line), column(column)
+    token::token(const enums::token_type& type, long line, long column): type(type), line(line), column(column)
     {}
 
     // token::token(const enums::token_type & type, std::string && value): type(type)

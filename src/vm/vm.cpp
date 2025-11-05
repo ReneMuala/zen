@@ -23,7 +23,7 @@ case mul_ ## T:\
             i+=3;\
 break;\
 case div_ ## T:\
-    *address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) / *address<T>(this->code[i + 3], stack);\
+    *address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 3], stack) == 0 ? 0 : *address<T>(this->code[i + 2], stack) / *address<T>(this->code[i + 3], stack);\
 i+=3;\
 break;\
 case mod_ ## T:\
@@ -45,7 +45,7 @@ case mul_ ## T:\
 i+=3;\
 break;\
 case div_ ## T:\
-*address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 2], stack) / *address<T>(this->code[i + 3], stack);\
+*address<T>(this->code[i + 1], stack) = *address<T>(this->code[i + 3], stack) == 0 ? 0 : *address<T>(this->code[i + 2], stack) / *address<T>(this->code[i + 3], stack);\
 i+=3;\
 break;
 
@@ -190,7 +190,7 @@ void zen::vm::run(stack& stack, const i64& entry_point)
         {
             if (false)
             {
-                bool display = true or i == 86;
+                bool display = true;
                 i64 stack_usage_difference = -stack.negative_stack_size - last_stack_usage;
                 if (stack_usage_difference && display)
                     fmt::println("sud = {}", stack_usage_difference);
@@ -332,11 +332,11 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 i += 1;
                 break;
             case go:
-                i += this->code[i + 1] > 0 ? this->code[i + 1] + 1 : this->code[i + 1];
+                i += this->code[i + 1] >= 0 ? this->code[i + 1] + 1 : this->code[i + 1];
                 break;
             case go_if_not:
                 if (not *address<boolean>(this->code[i + 1], stack))
-                    i += this->code[i + 2] > 0 ? this->code[i + 2] + 2 : this->code[i + 2];
+                    i += this->code[i + 2] >= 0 ? this->code[i + 2] + 2 : this->code[i + 2];
                 else
                     i += 2;
                 break;

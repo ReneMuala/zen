@@ -18,6 +18,7 @@ namespace enums
     TPARENTHESIS_OPEN,
     /// )
     TPARENTHESIS_CLOSE,
+    NFUNCTION_BODY,
     /// statement
     NSTAT,
     NGLOBAL_STAT,
@@ -87,7 +88,6 @@ namespace enums
     NSUFFIX_FUNCTION_CALL,
     // (...) = TYPE? {...}
     NSUFFIX_FUNCTION_DEFINITION,
-    NSUFFIX_VAL_NTERNARY,
     /// short number
     TBYTE_NUM,
     /// short number
