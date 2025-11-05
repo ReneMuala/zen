@@ -150,7 +150,7 @@ public:
     virtual void assign() = 0;
     virtual void push(const std::string & name) = 0;
     template <typename native>
-    void push(const native && data, const std::string & type, bool negate = false)
+    void push(const native & data, const std::string & type, bool negate = false)
     {
         auto t = get_type(type);
         if constexpr (std::is_same_v<native, value>)

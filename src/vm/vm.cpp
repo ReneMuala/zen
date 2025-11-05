@@ -4,6 +4,8 @@
 
 #include "vm.hpp"
 
+#include <cfloat>
+#include <charconv>
 #include <iostream>
 #include <ostream>
 #include <stack>
@@ -104,12 +106,45 @@ case (T ## _to_boolean):\
 *address<boolean>(this->code[i + 1], stack) = static_cast<boolean>(*address<T>(this->code[i + 2], stack));\
 i += 2;\
 break;
+/*
+#define KAIZEN_CONVERSION_FROM_T_TO_STRING(T)\
+case T##_to_string:\
+    {\
+        constexpr size_t size = 3 + DBL_MANT_DIG - DBL_MIN_EXP;\
+        char buffer[size]{};\
+        auto result = std::to_chars((char*)buffer, (char*)(buffer + size), value, std::chars_format::fixed);\
+        auto _str = std::string(buffer);\
+        free((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8));\
+        *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str()));\
+        *(i64*)(*address<i64>(this->code[i + 1], stack)) = _str.length();\
+    }\
+i+=2;\
+break;
+ */
+
+#define KAIZEN_CONVERSION_FROM_INTEGER_TO_STRING(T)\
+case T##_to_string:\
+    {\
+        auto _str = std::to_string(*address<T>(this->code[i + 2], stack));\
+        free((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8));\
+        *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str()));\
+        *(i64*)(*address<i64>(this->code[i + 1], stack)) = _str.length();\
+    }\
+i+=2;\
+break;
+
+#define KAIZEN_STRING_CONVERSION_FOR_INTEGER_TYPE(T,A) \
+KAIZEN_CONVERSION_FROM_INTEGER_TO_STRING(T)\
+case string_to_##T:\
+    *address<i64>(this->code[i + 1], stack) = A((char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr, 10);\
+    i+=2;\
+break;
 
 #define KAIZEN_STACK_PUSH_FOR_TYPE(T) \
 case push_ ## T:\
-stack -= sizeof(T); \
-*static_cast<T*>(stack - sizeof(T)) = *address<T>(this->code[i + 1] - (this->code[i + 1] < 0 ? sizeof(T) : 0), stack); \
-i += 1; \
+    stack -= sizeof(T); \
+    *static_cast<T*>(stack - sizeof(T)) = *address<T>(this->code[i + 1] - (this->code[i + 1] < 0 ? sizeof(T) : 0), stack); \
+    i += 1; \
 break;
 
 #define KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(T) \
@@ -128,7 +163,8 @@ void* zen::vm::stack::operator-(const i64& size)
 {
     if (size > -this->negative_stack_size)
     {
-        throw std::runtime_error(fmt::format("zen::vm::stack address out of range: ({} of {})", size, -this->negative_stack_size));
+        throw std::runtime_error(fmt::format("zen::vm::stack address out of range: ({} of {})", size,
+                                             -this->negative_stack_size));
     }
     return reinterpret_cast<void*>(reinterpret_cast<i64>(data) + abs(this->negative_stack_size) - size);
 }
@@ -185,7 +221,8 @@ void zen::vm::run(stack& stack, const i64& entry_point)
     std::vector<i64> stack_usage_deque;
     i64 i = 0;
     i64 last_stack_usage = 0;
-    try {
+    try
+    {
         for (i = entry_point; i < this->code.size(); i++)
         {
             if (false)
@@ -209,24 +246,24 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 auto stack_usage = last_stack_usage;
                 if (display)
                 {
-                    for (const auto & sti : stack_usage_deque)
+                    for (const auto& sti : stack_usage_deque)
                     {
                         fmt::print("\tstack[{}] ", stack_usage);
                         switch (sti)
                         {
                         case 1:
-                            fmt::println("{}",*(i8*)(stack - stack_usage));
+                            fmt::println("{}", *(i8*)(stack - stack_usage));
                             break;
                         case 2:
-                            fmt::println("{}",*(i16*)(stack - stack_usage));
+                            fmt::println("{}", *(i16*)(stack - stack_usage));
                             break;
                         case 4:
-                            fmt::println("{}",*(i32*)(stack - stack_usage));
+                            fmt::println("{}", *(i32*)(stack - stack_usage));
                             break;
                         case 8:
-                            fmt::println("{}",*(i64*)(stack - stack_usage));
+                            fmt::println("{}", *(i64*)(stack - stack_usage));
                             break;
-                        default:break;
+                        default: break;
                         }
                         stack_usage -= sti;
                     }
@@ -240,42 +277,96 @@ void zen::vm::run(stack& stack, const i64& entry_point)
             }
             switch (this->code[i])
             {
-                KAIZEN_STACK_PUSH_FOR_TYPE(i8)
-                KAIZEN_STACK_PUSH_FOR_TYPE(i16)
-                KAIZEN_STACK_PUSH_FOR_TYPE(i32)
-                KAIZEN_STACK_PUSH_FOR_TYPE(i64)
-                KAIZEN_STACK_PUSH_FOR_TYPE(f32)
-                KAIZEN_STACK_PUSH_FOR_TYPE(f64)
-                KAIZEN_STACK_PUSH_FOR_TYPE(boolean)
+            KAIZEN_STACK_PUSH_FOR_TYPE(i8)
+            KAIZEN_STACK_PUSH_FOR_TYPE(i16)
+            KAIZEN_STACK_PUSH_FOR_TYPE(i32)
+            KAIZEN_STACK_PUSH_FOR_TYPE(i64)
+            KAIZEN_STACK_PUSH_FOR_TYPE(f32)
+            KAIZEN_STACK_PUSH_FOR_TYPE(f64)
+            KAIZEN_STACK_PUSH_FOR_TYPE(boolean)
 
-                KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i8)
-                KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i16)
-                KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i32)
-                KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i64)
-                KAIZEN_ARITHMETICS_FOR_FLOAT_TYPE(f32)
-                KAIZEN_ARITHMETICS_FOR_FLOAT_TYPE(f64)
+            KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i8)
+            KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i16)
+            KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i32)
+            KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(i64)
+            KAIZEN_ARITHMETICS_FOR_FLOAT_TYPE(f32)
+            KAIZEN_ARITHMETICS_FOR_FLOAT_TYPE(f64)
 
-                KAIZEN_RELATIONAL_FOR_TYPE(i8)
-                KAIZEN_RELATIONAL_FOR_TYPE(i16)
-                KAIZEN_RELATIONAL_FOR_TYPE(i32)
-                KAIZEN_RELATIONAL_FOR_TYPE(i64)
-                KAIZEN_RELATIONAL_FOR_TYPE(f32)
-                KAIZEN_RELATIONAL_FOR_TYPE(f64)
+            KAIZEN_RELATIONAL_FOR_TYPE(i8)
+            KAIZEN_RELATIONAL_FOR_TYPE(i16)
+            KAIZEN_RELATIONAL_FOR_TYPE(i32)
+            KAIZEN_RELATIONAL_FOR_TYPE(i64)
+            KAIZEN_RELATIONAL_FOR_TYPE(f32)
+            KAIZEN_RELATIONAL_FOR_TYPE(f64)
 
-                KAIZEN_CONVERSION_FOR_TYPE(i8)
-                KAIZEN_CONVERSION_FOR_TYPE(i16)
-                KAIZEN_CONVERSION_FOR_TYPE(i32)
-                KAIZEN_CONVERSION_FOR_TYPE(i64)
-                KAIZEN_CONVERSION_FOR_TYPE(f32)
-                KAIZEN_CONVERSION_FOR_TYPE(f64)
-                    // KAIZEN_CONVERSION_FOR_TYPE(boolean)
-                KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i8)
-                KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i16)
-                KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i32)
-                KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i64)
-                KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(f32)
-                KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(f64)
-                KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(boolean)
+            KAIZEN_CONVERSION_FOR_TYPE(i8)
+            KAIZEN_CONVERSION_FOR_TYPE(i16)
+            KAIZEN_CONVERSION_FOR_TYPE(i32)
+            KAIZEN_CONVERSION_FOR_TYPE(i64)
+            KAIZEN_CONVERSION_FOR_TYPE(f32)
+            KAIZEN_CONVERSION_FOR_TYPE(f64)
+                // KAIZEN_CONVERSION_FOR_TYPE(boolean)
+            KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i8)
+            KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i16)
+            KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i32)
+            KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(i64)
+            KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(f32)
+            KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(f64)
+            KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(boolean)
+
+            case i8_to_string:
+                {
+                    auto _str = std::to_string(*address<i8>(this->code[i + 2], stack));
+                    free((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8));
+                    *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str()));
+                    *(i64*)(*address<i64>(this->code[i + 1], stack)) = _str.length();
+                }
+                i += 2;
+                break;
+            case string_to_i8: *address<i64>(this->code[i + 1], stack) = strtol(
+                    (char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr, 10);
+                i += 2;
+                break;
+            KAIZEN_STRING_CONVERSION_FOR_INTEGER_TYPE(i16, strtol)
+            KAIZEN_STRING_CONVERSION_FOR_INTEGER_TYPE(i32, strtol)
+            KAIZEN_STRING_CONVERSION_FOR_INTEGER_TYPE(i64, strtoll)
+            case f64_to_string:
+                {
+                    constexpr size_t size = 3 + DBL_MANT_DIG - DBL_MIN_EXP;
+                    char buffer[size]{};
+                    auto result = std::to_chars((char*)buffer, (char*)(buffer + size),
+                                                *address<f64>(this->code[i + 2], stack), std::chars_format::general);
+                    auto _str = std::string(buffer);
+                    free((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8));
+                    *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str()));
+                    *(i64*)(*address<i64>(this->code[i + 1], stack)) = _str.length();
+                }
+                i += 2;
+                break;
+            case string_to_f64:
+                *address<f64>(this->code[i + 1], stack) = std::strtod(
+                    (char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr);
+                i += 2;
+                break;
+            case f32_to_string:
+                {
+                    constexpr size_t size = 3 + FLT_MANT_DIG - FLT_MIN_EXP;
+                    char buffer[size]{};
+                    auto result = std::to_chars((char*)buffer, (char*)(buffer + size),
+                                                *address<f32>(this->code[i + 2], stack), std::chars_format::general);
+                    auto _str = std::string(buffer);
+                    free((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8));
+                    *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str()));
+                    *(i64*)(*address<i64>(this->code[i + 1], stack)) = _str.length();
+                }
+                i += 2;
+                break;
+            case string_to_f32:
+                // std::cout << *address<i64>(this->code[i + 1], stack) << " " << *address<i64>(this->code[i + 2], stack) << std::endl;
+                *address<f32>(this->code[i + 1], stack) = std::strtof(
+                    (char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr);
+                i += 2;
+                break;
             case write_str:
                 fwrite((char*)(*address<i64>(this->code[i + 1], stack)), 1,
                        // std::min(*address<i64>(this->code[i + 2], stack), *(i64*)(*address<i64>(this->code[i + 1], stack))),
@@ -305,15 +396,15 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                     i64>(this->code[i + 1], stack)] = 0;
                 i += 3;
                 break;
-                KAIZEN_IO_READ_FOR_SCALAR_TYPE(i8)
-                KAIZEN_IO_READ_FOR_SCALAR_TYPE(i16)
-                KAIZEN_IO_READ_FOR_SCALAR_TYPE(i32)
-                KAIZEN_IO_READ_FOR_SCALAR_TYPE(i64)
-                KAIZEN_IO_READ_FOR_SCALAR_TYPE(f32)
-                KAIZEN_IO_READ_FOR_SCALAR_TYPE(f64)
-                KAIZEN_IO_READ_FOR_SCALAR_TYPE(boolean)
+            KAIZEN_IO_READ_FOR_SCALAR_TYPE(i8)
+            KAIZEN_IO_READ_FOR_SCALAR_TYPE(i16)
+            KAIZEN_IO_READ_FOR_SCALAR_TYPE(i32)
+            KAIZEN_IO_READ_FOR_SCALAR_TYPE(i64)
+            KAIZEN_IO_READ_FOR_SCALAR_TYPE(f32)
+            KAIZEN_IO_READ_FOR_SCALAR_TYPE(f64)
+            KAIZEN_IO_READ_FOR_SCALAR_TYPE(boolean)
 
-                case boolean_and:
+            case boolean_and:
                 *address<boolean>(this->code[i + 1], stack) = *address<boolean>(this->code[i + 2], stack) and *address<
                     boolean>(this->code[i + 3], stack);
                 i += 3;
@@ -335,7 +426,7 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 i += this->code[i + 1] >= 0 ? this->code[i + 1] + 1 : this->code[i + 1];
                 break;
             case go_if_not:
-                if (not *address<boolean>(this->code[i + 1], stack))
+                if (not*address<boolean>(this->code[i + 1], stack))
                     i += this->code[i + 2] >= 0 ? this->code[i + 2] + 2 : this->code[i + 2];
                 else
                     i += 2;
@@ -352,7 +443,7 @@ void zen::vm::run(stack& stack, const i64& entry_point)
             case allocate:
                 *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(malloc(
                     *address<i64>(this->code[i + 2], stack)));
-                if (not *address<i64>(this->code[i + 1], stack))
+                if (not*address<i64>(this->code[i + 1], stack))
                 {
                     throw std::runtime_error(fmt::format("fatal error: out of heap memory (zen vm halted at {})", i));
                 }
@@ -366,7 +457,7 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 *address<i64>(this->code[i + 1], stack) = reinterpret_cast<i64>(realloc(
                     reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)),
                     *address<i64>(this->code[i + 2], stack)));
-                if (not *address<i64>(this->code[i + 1], stack))
+                if (not*address<i64>(this->code[i + 1], stack))
                 {
                     throw std::runtime_error(fmt::format("fatal error: out of heap memory (zen vm halted at {})", i));
                 }
@@ -392,7 +483,8 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 return;
             }
         }
-    } catch (std::exception & e)
+    }
+    catch (std::exception& e)
     {
         fmt::print(stderr, "fatal error: {}\nvm halted at {}", e.what(), i);
     }

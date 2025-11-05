@@ -165,12 +165,15 @@ END_PRODUCTION
 BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
     auto composer = get_composer();
     const std::string name = parser::id;
+fmt::println("0>>{} ", parser::id);
     if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
     {
         parser::type.clear();
     }
+parser::id = name;
+fmt::println("1>>{} ", parser::id);
     REQUIRE_TERMINAL(TPARENTHESIS_OPEN)
-    composer->pop();
+fmt::println("2>>{}", name);
     zen::i8 param_count = 0;
     while (TRY_REQUIRE_NON_TERMINAL(NVAL))
     {
@@ -434,66 +437,37 @@ END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_NUM)
     static auto composer = get_composer();
-    bool negative = false;
-    if (TRY_REQUIRE_TERMINAL(TMINUS))
-        negative = true;
-    if (TRY_REQUIRE_TERMINAL(TPLUS))
-        negative = false;
     using namespace ILC;
     if (TRY_REQUIRE_TERMINAL(TINT_NUM))
     {
         int data = strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10);
-        if (negative)
-        {
-            data = -data;
-        }
-        composer->push<int>(std::move(data), "int", negative);
+        composer->push<int>(std::move(data), "int");
     }
     else if (TRY_REQUIRE_TERMINAL(TBYTE_NUM))
     {
         char data = static_cast<char>(strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10));
-        if (negative)
-        {
-            data = -data;
-        }
-        composer->push<char>(std::move(data), "byte", negative);
+        composer->push<char>(std::move(data), "byte");
     }
     else if (TRY_REQUIRE_TERMINAL(TSHORT_NUM))
     {
         short data = static_cast<short>(strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10));
-        if (negative)
-        {
-            data = -data;
-        }
-        composer->push<short>(std::move(data), "short", negative);
+        composer->push<short>(std::move(data), "short");
     }
     else if (TRY_REQUIRE_TERMINAL(TLONG_NUM))
     {
         long data = strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10);
-        if (negative)
-        {
-            data = -data;
-        }
-        composer->push<long>(std::move(data), "long", negative);
+        composer->push<long>(std::move(data), "long");
     }
     else if (TRY_REQUIRE_TERMINAL(TFLOAT_NUM))
     {
         float data = strtof(tokens[ILC::offset - 1].value.c_str(), nullptr);
-        if (negative)
-        {
-            data = -data;
-        }
-        composer->push<float>(std::move(data), "float", negative);
+        composer->push<float>(std::move(data), "float");
     }
     else
     {
         REQUIRE_TERMINAL(TDOUBLE_NUM)
         double data = strtod(tokens[ILC::offset - 1].value.c_str(), nullptr);
-        if (negative)
-        {
-            data = -data;
-        }
-        composer->push<double>(std::move(data), "double", negative);
+        composer->push<double>(std::move(data), "double");
     }
 END_PRODUCTION
 
@@ -511,6 +485,13 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_NOT_VAL)
     composer->not_();
 END_PRODUCTION
 
+BEGIN_PRODUCTION(PRODUCTION_NVAL_NEGATE_VAL)
+    static auto composer = get_composer();
+    REQUIRE_TERMINAL(TMINUS)
+    REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
+    composer->negate();
+END_PRODUCTION
+
 BEGIN_PRODUCTION(PRODUCTION_NVAL_WITH_PARENTHESIS)
     REQUIRE_TERMINAL(TPARENTHESIS_OPEN)
     REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
@@ -525,30 +506,6 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_LIST)
     }
     while (TRY_REQUIRE_TERMINAL(TCOMMA));
     REQUIRE_TERMINAL_CALLBACK(TBRACKETS_CLOSE, EXPECTED("]"))
-END_PRODUCTION
-
-BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_ID)
-    static auto composer = get_composer();
-    bool negative = false;
-    if (TRY_REQUIRE_TERMINAL(TMINUS))
-        negative = true;
-    if (TRY_REQUIRE_TERMINAL(TPLUS))
-        negative = false;
-    REQUIRE_NON_TERMINAL(NID)
-    try
-    {
-        composer->push(parser::id);
-        if (negative)
-            composer->negate();
-    }
-    catch (const zen::exceptions::semantic_error& e)
-    {
-        if (not pragma_ignore_missing_symbols)
-            throw;
-        if (not pragma_ignore_missing_symbols_data.empty())
-            pragma_ignore_missing_symbols_data += ", ";
-        pragma_ignore_missing_symbols_data += parser::id;
-    }
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NVAL_BOOLEAN)
@@ -723,6 +680,13 @@ BEGIN_PRODUCTION(PRODUCTION_NID)
     }
 END_PRODUCTION
 
+inline bool push_parser_id()
+    {
+        fmt::println("3>>{}", parser::id);
+        get_composer()->push(parser::id);
+    return true;
+    }
+
 BEGIN_BINDINGS
 BEGIN_SYMBOL_BINDING(NOR_VAL)
             PRODUCTION_NVAL_OR_VALUE()
@@ -794,16 +758,17 @@ BEGIN_SYMBOL_BINDING(NVAL)
                 PRODUCTION_NVAL_NOT_VAL() or
                 PRODUCTION_NVAL_AND_VALUE() or
                 PRODUCTION_NVAL_OR_VALUE() or
-                PRODUCTION_NSUFFIX_FUNCTION_CALL() or
+                // PRODUCTION_NSUFFIX_FUNCTION_CALL() or
                 true)
         ) and PRODUCTION_ENDLESS_SUFFIXES()
         END_SYMBOL_BINDING
 
 BEGIN_SYMBOL_BINDING(NSINGLE_VAL_PREDICATE)
             PRODUCTION_NVAL_NOT_VAL() or
+            PRODUCTION_NVAL_NEGATE_VAL() or
             PRODUCTION_NVAL_AS_NUM() or
             PRODUCTION_NVAL_AS_CHAR_ARRAY() or
-        (PRODUCTION_NVAL_AS_ID() and (PRODUCTION_NSUFFIX_FUNCTION_CALL() or true)) or
+            (PRODUCTION_NID() and (PRODUCTION_NSUFFIX_FUNCTION_CALL() or push_parser_id())) or
             PRODUCTION_NVAL_BOOLEAN() or
             PRODUCTION_NVAL_WITH_PARENTHESIS() or
             PRODUCTION_NVAL_AS_LIST()

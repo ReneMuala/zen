@@ -86,13 +86,13 @@ namespace zen
         string_type->add_field("len", get_type("long"));
         string_type->add_field("data", get_type("long"));
         functions = {
-            {"int", {{signature{}, 0}}},
-            {"long", {{signature{}, 0}}},
-            {"short", {{signature{}, 0}}},
-            {"float", {{signature{}, 0}}},
-            {"double", {{signature{}, 0}}},
-            {"bool", {{signature{}, 0}}},
-            {"byte", {{signature{}, 0}}},
+            // {"int", {{signature{}, 0}}},
+            // {"long", {{signature{}, 0}}},
+            // {"short", {{signature{}, 0}}},
+            // {"float", {{signature{}, 0}}},
+            // {"double", {{signature{}, 0}}},
+            // {"bool", {{signature{}, 0}}},
+            // {"byte", {{signature{}, 0}}},
             {"[zenConstructor]", {{signature{string_type}, 0, false}}},
             {"zenCopy", {{signature{unit_type, {string_type, string_type}}, 0, false}}},
             {"[zenDestructor]", {{signature{unit_type, {string_type}}, 0, false}}},
@@ -558,7 +558,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
         std::vector<std::string> tokens = split_name(name);
         if (tokens.empty())
-            throw exceptions::semantic_error(fmt::format("invalid name '{}'", name), _ilc_offset);
+            throw exceptions::semantic_error(fmt::format("invalid name '{}' in function {}", name, scope->name), _ilc_offset);
 
         if (const auto location = scope->get_local(tokens.front()))
             _push_variable(tokens, location);
@@ -748,6 +748,17 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
     KAIZEN_DEFINE_LOGIC_COMPOSITION(or_, or);
     KAIZEN_DEFINE_LOGIC_COMPOSITION(not_, not)
 
+#define KAIZEN_IF_NEGATE_CONSTANT_NEGATE_FOR(T, NT)\
+    if (top()->is(#T))\
+    {\
+        auto val = top();\
+        pop();\
+        const NT* ptr = (NT*)val->address(0);\
+        zen::composer::composer::push<NT>(-*ptr, #T);\
+        top()->is_negated = true;\
+        return;\
+    }
+
 #define KAIZEN_IF_NEGATE_FOR(T, NT)\
 if (top()->is(#T))\
 {\
@@ -782,12 +793,23 @@ if (top()->is(#T))\
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
                 __FUNCTION__,
                 _stack.size()));
-        KAIZEN_IF_NEGATE_FOR(byte, i8);
-        KAIZEN_IF_NEGATE_FOR(short, i16);
-        KAIZEN_IF_NEGATE_FOR(int, i32);
-        KAIZEN_IF_NEGATE_FOR(long, i64);
-        KAIZEN_IF_NEGATE_FOR(float, f32);
-        KAIZEN_IF_NEGATE_FOR(double, f64);
+        if (top()->kind == value::constant)
+        {
+            KAIZEN_IF_NEGATE_CONSTANT_NEGATE_FOR(byte, i8)
+            KAIZEN_IF_NEGATE_CONSTANT_NEGATE_FOR(short, i16)
+            KAIZEN_IF_NEGATE_CONSTANT_NEGATE_FOR(int, i32)
+            KAIZEN_IF_NEGATE_CONSTANT_NEGATE_FOR(long, i64)
+            KAIZEN_IF_NEGATE_CONSTANT_NEGATE_FOR(float, f32)
+            KAIZEN_IF_NEGATE_CONSTANT_NEGATE_FOR(double, f64)
+        } else
+        {
+            KAIZEN_IF_NEGATE_FOR(byte, i8);
+            KAIZEN_IF_NEGATE_FOR(short, i16);
+            KAIZEN_IF_NEGATE_FOR(int, i32);
+            KAIZEN_IF_NEGATE_FOR(long, i64);
+            KAIZEN_IF_NEGATE_FOR(float, f32);
+            KAIZEN_IF_NEGATE_FOR(double, f64);
+        }
         throw exceptions::semantic_error(fmt::format("unsupported operation for type {}", top()->type->name),
                                          _ilc_offset);
     };
@@ -1185,7 +1207,19 @@ if (top()->is(#T))\
         {"long", i64_to_##T},\
         {"float", f32_to_##T},\
         {"double", f64_to_##T},\
-        }
+        {"string", string_to_##T}\
+    }
+
+    #define KAIZEN_CASTER_MAP_FOR_STRING(T)\
+        {\
+        {"byte", i8_to_##T},\
+        {"bool", i8_to_##T},\
+        {"short", i16_to_##T},\
+        {"int", i32_to_##T},\
+        {"long", i64_to_##T},\
+        {"float", f32_to_##T},\
+        {"double", f64_to_##T},\
+    }
 
     std::shared_ptr<composer::value> composer::vm::composer::_push_callee_return_value(
         const signature& sig, const bool construtor_call)
@@ -1285,6 +1319,7 @@ if (top()->is(#T))\
         const auto rhs = pop_operand();
         push(get_type(name));
         const auto lhs = pop_operand(false);
+        // this seems a little stupid, fix it...
         if (lhs->is(name))
         {
             if (const auto caster = caster_set->second.find(rhs->type->name); caster != caster_set->second.end())
@@ -1686,7 +1721,8 @@ if (top()->is(#T))\
             {"int", KAIZEN_CASTER_MAP_FOR(i32)},
             {"long", KAIZEN_CASTER_MAP_FOR(i64)},
             {"float", KAIZEN_CASTER_MAP_FOR(f32)},
-            {"double", KAIZEN_CASTER_MAP_FOR(f64)}
+            {"double", KAIZEN_CASTER_MAP_FOR(f64)},
+            {"string", KAIZEN_CASTER_MAP_FOR_STRING(string)},
         };
 
         if (const auto caster_set = casters.find(name); caster_set != casters.end())
@@ -1694,16 +1730,16 @@ if (top()->is(#T))\
             _call_caster(name, args_count, caster_set);
             return true;
         }
-
         if (const auto func_it = functions.find(name); func_it != functions.end())
         {
-            return _call_function(name, args_count, func_it);
+            auto z = _call_function(name, args_count, func_it);;
+            return z;
         }
         const int name_i32 = strtol(name.c_str(), nullptr, 10);
         if (name_i32 == write_str)
             return _call_instruction_write_str(name, args_count);
         if (name_i32 >= write_i8 and name_i32 <= write_f64)
-            return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 1);
+            return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 2);
         if (name_i32 == allocate || name_i32 == i64_to_i64)
             return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 2);
         if (name_i32 == deallocate)
