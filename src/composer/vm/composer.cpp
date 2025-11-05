@@ -6,6 +6,7 @@
 
 #include <iostream>
 #include <queue>
+#include <ranges>
 #include <sstream>
 
 #include "exceptions/semantic_error.hpp"
@@ -769,6 +770,7 @@ if (top()->is(#T))\
         zen::composer::composer::push<NT>(-1, it->type->name);\
         _call_instruction(mul_ ## NT, 3, 3);\
     }\
+    push(it);\
     return;\
 }
 
@@ -866,7 +868,11 @@ if (top()->is(#T))\
         push(it);\
         zen::composer::composer::push<NT>(1, it->type->name);\
         _call_instruction(add_ ## NT, 3, 3);\
+        push(it->type);\
+        auto copy = top();\
         push(it);\
+        assign();\
+        push(copy);\
     }\
     return;\
 }
@@ -879,6 +885,10 @@ if (top()->is(#T))\
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
                 __FUNCTION__,
                 _stack.size()));
+        if (top()->kind != value::kind::variable)
+        {
+            throw exceptions::semantic_error("invalid operand for increment",_ilc_offset);
+        }
         KAIZEN_IF_PREINCREMENT_FOR(byte, i8);
         KAIZEN_IF_PREINCREMENT_FOR(short, i16);
         KAIZEN_IF_PREINCREMENT_FOR(int, i32);
@@ -910,7 +920,11 @@ if (top()->is(#T))\
         push(it);\
         zen::composer::composer::push<NT>(1, it->type->name);\
         _call_instruction(sub_ ## NT, 3, 3);\
+        push(it->type);\
+        auto copy = top();\
         push(it);\
+        assign();\
+        push(copy);\
     }\
     return;\
 }
@@ -924,6 +938,10 @@ if (top()->is(#T))\
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
                 __FUNCTION__,
                 _stack.size()));
+        if (top()->kind != value::kind::variable)
+        {
+            throw exceptions::semantic_error("invalid operand for decrement",_ilc_offset);
+        }
         KAIZEN_IF_PREDECREMENT_FOR(byte, i8);
         KAIZEN_IF_PREDECREMENT_FOR(short, i16);
         KAIZEN_IF_PREDECREMENT_FOR(int, i32);
@@ -938,13 +956,13 @@ if (top()->is(#T))\
 if (top()->is(#T))\
 {\
     const auto it = top();\
+    pop();\
     push(it->type);\
     auto old = top();\
     push(it);\
     assign();\
     if (it->is_reference)\
     {\
-        pop();\
         push(it->type);\
         const auto _new = top();\
         push(dereference(it));\
@@ -972,6 +990,10 @@ if (top()->is(#T))\
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
                 __FUNCTION__,
                 _stack.size()));
+        if (top()->kind != value::kind::variable)
+        {
+            throw exceptions::semantic_error("invalid operand for increment",_ilc_offset);
+        }
         KAIZEN_IF_POSTINCREMENT_FOR(byte, i8);
         KAIZEN_IF_POSTINCREMENT_FOR(short, i16);
         KAIZEN_IF_POSTINCREMENT_FOR(int, i32);
@@ -986,13 +1008,13 @@ if (top()->is(#T))\
 if (top()->is(#T))\
 {\
     const auto it = top();\
+    pop();\
     push(it->type);\
     auto old = top();\
     push(it);\
     assign();\
     if (it->is_reference)\
     {\
-        pop();\
         push(it->type);\
         const auto _new = top();\
         push(dereference(it));\
@@ -1020,6 +1042,10 @@ if (top()->is(#T))\
                 "[Error: Invalid state] Cannot compose operation {} because stack size {} is below expected",
                 __FUNCTION__,
                 _stack.size()));
+        if (top()->kind != value::kind::variable)
+        {
+            throw exceptions::semantic_error("invalid operand for decrement",_ilc_offset);
+        }
         KAIZEN_IF_POSTDECREMENT_FOR(byte, i8);
         KAIZEN_IF_POSTDECREMENT_FOR(short, i16);
         KAIZEN_IF_POSTDECREMENT_FOR(int, i32);
@@ -1364,6 +1390,25 @@ if (top()->is(#T))\
         }
 
         std::optional<std::reference_wrapper<function>> candidate;
+        for (auto & overload : std::ranges::reverse_view(func_it->second))
+        {
+            if (overload.signature.parameters.size() != arguments.size()) continue;
+            if (arguments.empty())
+            {
+                candidate = overload;
+                break;
+            }
+            for (int i = 0; i < arguments.size(); i++)
+            {
+                if (overload.signature.parameters.at(i) != arguments.at(i)->type)
+                    break;
+                if (i + 1 == arguments.size())
+                    candidate = overload;
+            }
+            if (candidate)
+                break;
+        }
+        /*
         for (auto& overload : func_it->second)
         {
             if (overload.signature.parameters.size() != arguments.size()) continue;
@@ -1382,7 +1427,7 @@ if (top()->is(#T))\
             if (candidate)
                 break;
         }
-
+        */
         if (not candidate)
             throw exceptions::semantic_error(fmt::format("no function overload matched for \'{}\'", name), _ilc_offset);
         return _call_function_overload(arguments, candidate->get(), false);

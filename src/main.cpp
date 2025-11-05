@@ -140,6 +140,10 @@ int main(int argc, char** argv) try
 		}
 
 		print(number: int) = {
+			if(number < 0) {
+				print("-")
+				number = -number
+			}
 			if(number >= 10){
 				part: int = number % 10
 				print(number / 10)
@@ -208,6 +212,11 @@ int main(int argc, char** argv) try
         main = {
             print("Click 'Run' or hit CTR+R to execute your ZEN code. Output will appear here.")
         }
+/*
+	- float format
+	- range clip
+	- duration format
+ */
     )");
 }
 catch (std::exception& e)
