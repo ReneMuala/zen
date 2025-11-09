@@ -47,8 +47,8 @@ T##_to_f32,\
 T##_to_boolean
 
 #define DECL_KAIZEN_STRING_CONVERSION_FOR_TYPE(T) \
-T##_to_string,\
-string_to_##T
+T##_to_str,\
+str_to_##T
 
 #define DECL_KAIZEN_STACK_PUSH_FOR_TYPE(T) \
 push_ ## T
@@ -126,7 +126,8 @@ namespace zen
         DECL_KAIZEN_IO_READ_FOR_TYPE(f64),
         DECL_KAIZEN_IO_READ_FOR_TYPE(str),
         DECL_KAIZEN_IO_READ_FOR_TYPE(boolean),
-
+        add_str,
+        eq_str,
         boolean_and,
         boolean_or,
         boolean_not,

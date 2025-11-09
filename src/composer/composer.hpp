@@ -26,12 +26,19 @@ namespace zen::composer
         [[nodiscard]] std::pair<i64, std::shared_ptr<const type>> get_field(const std::string & name, const i32 & ilc_offset = 0) const
         {
             i64 offset = 0;
+            std::string options;
             for (const auto & [fst, snd] : fields)
             {
                 if (fst == name) return {offset, snd};
                 offset += snd->_size;
+                options += fst + ",";
             }
-            throw exceptions::semantic_error(fmt::format("no such field {} in type {}", name, this->name), ilc_offset);
+            if (not options.empty())
+            {
+                options.pop_back();
+                options="(options: " + options + ")";
+            }
+            throw exceptions::semantic_error(fmt::format("no such field {} in type {}{}", name, this->name, options), ilc_offset);
         }
         void add_field(const std::string & name, const std::shared_ptr<const type> & type)
         {
@@ -117,6 +124,8 @@ public:
     utils::constant_pool _pool;
     std::stack<std::shared_ptr<value>> _stack;
     virtual std::shared_ptr<const type>& get_type(const std::string& name) = 0;
+    virtual void begin_type(std::shared_ptr<type>&) = 0;
+    virtual void end_type(std::shared_ptr<type>&) = 0;
     virtual void push(const std::shared_ptr<const type>& type) = 0;
 
     virtual void reset()

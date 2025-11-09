@@ -23,6 +23,8 @@ public:
     std::unordered_map<std::string, std::list<function>> functions;
     std::unordered_map<std::string, std::shared_ptr<const type>> types;
     std::shared_ptr<const type>& get_type(const std::string& name) override;
+    void begin_type(std::shared_ptr<type>&) override;
+    void end_type(std::shared_ptr<type>&) override;
     std::shared_ptr<value> top();
     void push(const std::shared_ptr<value>&);
     void reset() override;
@@ -34,6 +36,7 @@ public:
     void return_value() override;
     void assume_returned() override;
     void set_return_name(const std::string& name) override;
+    void construct(const std::string& name, const std::shared_ptr<const zen::composer::type>& t);
     void set_local(std::string name, const std::string& type) override;
     void end() override;
     void bake() override;
@@ -98,6 +101,9 @@ public:
     void _link_string_constructor();
     void _link_string_destructor();
     void _link_string_copy();
+    void _link_string_equals();
+    void _link_string_not_equals();
+    void _link_string_plus();
     void link() override;
     std::shared_ptr<value> dereference(const std::shared_ptr<value> & value);
     void begin_block() override;
@@ -110,6 +116,9 @@ protected:
     static i64 get_parameters_size(const signature& sig);
     static i64 get_return_size(const signature& sig);
     void increment_by_one();
+
+public:
+
 };
 
 } // zen

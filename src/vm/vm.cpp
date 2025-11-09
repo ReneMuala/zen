@@ -107,8 +107,8 @@ case (T ## _to_boolean):\
 i += 2;\
 break;
 /*
-#define KAIZEN_CONVERSION_FROM_T_TO_STRING(T)\
-case T##_to_string:\
+#define KAIZEN_CONVERSION_FROM_T_to_str(T)\
+case T##_to_str:\
     {\
         constexpr size_t size = 3 + DBL_MANT_DIG - DBL_MIN_EXP;\
         char buffer[size]{};\
@@ -123,7 +123,7 @@ break;
  */
 
 #define KAIZEN_CONVERSION_FROM_INTEGER_TO_STRING(T)\
-case T##_to_string:\
+case T##_to_str:\
     {\
         auto _str = std::to_string(*address<T>(this->code[i + 2], stack));\
         free((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8));\
@@ -135,7 +135,7 @@ break;
 
 #define KAIZEN_STRING_CONVERSION_FOR_INTEGER_TYPE(T,A) \
 KAIZEN_CONVERSION_FROM_INTEGER_TO_STRING(T)\
-case string_to_##T:\
+case str_to_##T:\
     *address<i64>(this->code[i + 1], stack) = A((char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr, 10);\
     i+=2;\
 break;
@@ -313,24 +313,44 @@ void zen::vm::run(stack& stack, const i64& entry_point)
             KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(f32)
             KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(f64)
             KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(boolean)
-
-            case i8_to_string:
+            case add_str:
                 {
-                    auto _str = std::to_string(*address<i8>(this->code[i + 2], stack));
+                    const i64 new_length = *(i64*)(*address<i64>(this->code[i + 2], stack)) + *(i64*)(*address<i64>(this->code[i + 3], stack));
+                    char * new_str = (char*)malloc(new_length);
+                    free((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8));
+                    strncpy(new_str, (char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), *(i64*)(*address<i64>(this->code[i + 2], stack)));
+                    strncpy(new_str + *(i64*)(*address<i64>(this->code[i + 2], stack)), (char*)*(i64*)(*address<i64>(this->code[i + 3], stack) + 8), *(i64*)(*address<i64>(this->code[i + 3], stack)));
+                    *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = (i64)new_str;
+                    *(i64*)(*address<i64>(this->code[i + 1], stack)) = new_length;
+                }
+                i+=3;
+                break;
+            case eq_str:
+                {
+                    const auto size1 =  *(i64*)*address<i64>(this->code[i + 2], stack);
+                    const auto size2 = *(i64*)*address<i64>(this->code[i + 3], stack);
+                    *address<boolean>(this->code[i + 1], stack) = (size1 == size2) and std::strncmp((char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), (char*)*(i64*)(*address<i64>(this->code[i + 3], stack) + 8), size1) == 0;
+                }
+               i += 3;
+                break;
+            case i8_to_str:
+                {
+                    auto _str = std::string{*address<i8>(this->code[i + 2], stack)};
                     free((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8));
                     *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str()));
                     *(i64*)(*address<i64>(this->code[i + 1], stack)) = _str.length();
                 }
                 i += 2;
                 break;
-            case string_to_i8: *address<i64>(this->code[i + 1], stack) = strtol(
+            case str_to_i8: *address<i64>(this->code[i + 1], stack) = strtol(
                     (char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr, 10);
                 i += 2;
                 break;
-            KAIZEN_STRING_CONVERSION_FOR_INTEGER_TYPE(i16, strtol)
+            case i16_to_str: { auto _str = std::to_string(*address<i16>(this->code[i + 2], stack)); free((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8)); *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str())); *(i64*)(*address<i64>(this->code[i + 1], stack)) = _str.length(); } i+=2; break; case str_to_i16: *address<i64>(this->code[i + 1], stack) = strtol((char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr, 10);                i += 2;
+                break;
             KAIZEN_STRING_CONVERSION_FOR_INTEGER_TYPE(i32, strtol)
             KAIZEN_STRING_CONVERSION_FOR_INTEGER_TYPE(i64, strtoll)
-            case f64_to_string:
+            case f64_to_str:
                 {
                     constexpr size_t size = 3 + DBL_MANT_DIG - DBL_MIN_EXP;
                     char buffer[size]{};
@@ -343,12 +363,12 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 }
                 i += 2;
                 break;
-            case string_to_f64:
+            case str_to_f64:
                 *address<f64>(this->code[i + 1], stack) = std::strtod(
                     (char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr);
                 i += 2;
                 break;
-            case f32_to_string:
+            case f32_to_str:
                 {
                     constexpr size_t size = 3 + FLT_MANT_DIG - FLT_MIN_EXP;
                     char buffer[size]{};
@@ -361,7 +381,7 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 }
                 i += 2;
                 break;
-            case string_to_f32:
+            case str_to_f32:
                 // std::cout << *address<i64>(this->code[i + 1], stack) << " " << *address<i64>(this->code[i + 2], stack) << std::endl;
                 *address<f32>(this->code[i + 1], stack) = std::strtof(
                     (char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr);

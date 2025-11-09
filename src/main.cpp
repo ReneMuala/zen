@@ -63,6 +63,19 @@ void define_print_string(zen::composer::vm::composer* composer)
 	composer->zen::composer::composer::push<zen::i64>(reinterpret_cast<zen::i64>(stdout), "long");
 	composer->call(std::to_string(zen::write_str), 3);
 	composer->end();
+
+	composer->begin("println");
+	composer->set_parameter("string", "string");
+	composer->push("string");
+	composer->call("print", 1);
+	composer->zen::composer::composer::push<zen::string*>(zen::string::from_string("\n"), "string");
+	composer->call("print", 1);
+	composer->end();
+
+	composer->begin("println");
+	composer->zen::composer::composer::push<zen::string*>(zen::string::from_string("\n"), "string");
+	composer->call("print", 1);
+	composer->end();
 }
 
 #define KAIZEN_DEFINE_PRINT_FOR(T,NT)\
@@ -73,6 +86,33 @@ void define_print_string(zen::composer::vm::composer* composer)
 	composer->push("x");\
 	composer->zen::composer::composer::push<zen::i64>(reinterpret_cast<zen::i64>(stdout), "long");\
 	composer->call(std::to_string(zen::write_##NT), 2);\
+	composer->end();\
+	\
+	composer->begin("println");\
+	composer->set_parameter("x", #T);\
+	composer->push("x");\
+	composer->call("print", 1);\
+	composer->zen::composer::composer::push<zen::string*>(zen::string::from_string("\n"), "string");\
+	composer->call("print", 1);\
+	composer->end();\
+}
+
+	#define KAIZEN_DEFINE_PRINT_AS_STRING_FOR(T,NT)\
+	void define_print_##T(zen::composer::vm::composer* composer)\
+{\
+	composer->begin("print");\
+	composer->set_parameter("x", #T);\
+	composer->push("x");\
+	composer->call("string", 1);\
+	composer->call("print", 1);\
+	composer->end();\
+	\
+	composer->begin("println");\
+	composer->set_parameter("x", #T);\
+	composer->push("x");\
+	composer->call("print", 1);\
+	composer->zen::composer::composer::push<zen::string*>(zen::string::from_string("\n"), "string");\
+	composer->call("print", 1);\
 	composer->end();\
 }
 
@@ -90,14 +130,22 @@ void define_print_bool(zen::composer::vm::composer* composer)
 	composer->call("print", 1);
 	composer->end_if();
 	composer->end();
+
+	composer->begin("println");
+	composer->set_parameter("x", "bool");
+	composer->push("x");
+	composer->call("print", 1);
+	composer->zen::composer::composer::push<zen::string*>(zen::string::from_string("\n"), "string");
+	composer->call("print", 1);
+	composer->end();
 }
 
 KAIZEN_DEFINE_PRINT_FOR(byte, i8)
-KAIZEN_DEFINE_PRINT_FOR(short, i16)
-KAIZEN_DEFINE_PRINT_FOR(int, i32)
-KAIZEN_DEFINE_PRINT_FOR(long, i64)
-KAIZEN_DEFINE_PRINT_FOR(float, f32)
-KAIZEN_DEFINE_PRINT_FOR(double, f64)
+KAIZEN_DEFINE_PRINT_AS_STRING_FOR(short, i16)
+KAIZEN_DEFINE_PRINT_AS_STRING_FOR(int, i32)
+KAIZEN_DEFINE_PRINT_AS_STRING_FOR(long, i64)
+KAIZEN_DEFINE_PRINT_AS_STRING_FOR(float, f32)
+KAIZEN_DEFINE_PRINT_AS_STRING_FOR(double, f64)
 
 bool EMSCRIPTEN_KEEPALIVE zen_run(const char* code)
 try
@@ -171,53 +219,6 @@ int main(int argc, char** argv) try
 {
 	zen_run(R"(
         sum(x:int, y:int) = int(x+y)
-		println() = {
-			print("\n")
-		}
-
-		println(string: string) = {
-			print(string)
-			print("\n")
-		}
-
-		print(number: int) = {
-			if(number < 0) {
-				print("-")
-				number = -number
-			}
-			if(number >= 10){
-				part: int = number % 10
-				print(number / 10)
-				print(part)
-			} else{
-				if(number == 1){
-					print("1")
-				} else if(number == 2) {
-					print("2")
-				} else if(number == 3) {
-					print("3")
-				} else if(number == 4) {
-					print("4")
-				} else if(number == 5) {
-					print("5")
-				} else if(number == 6) {
-					print("6")
-				} else if(number == 7) {
-					print("7")
-				} else if(number == 8) {
-					print("8")
-				} else if(number == 9) {
-					print("9")
-				} else {
-					print("0")
-				}
-			}
-		}
-
-		println(int: int) = {
-			print(int)
-			print("\n")
-		}
 
 		rect(lines: int, cols: int) = {
 			for(l: int = 1, lines){
@@ -250,9 +251,31 @@ int main(int argc, char** argv) try
 				print("\n")
 			}
 		}
+
+		_size(this: string) = long {
+			this.len
+		}
+
+		class point {
+			x: double
+			y: double
+		}
+
         main = {
-			a: string = string(65b)
-            print("Click 'Run' or hit CTR+R to execute your ZEN code. Output will appear here.")
+/*
+			pt : point
+			pt.x = 1.5
+			pt.y = 2.78
+			ptx: double  = pt.x
+			pty: double  = pt.y
+			println(ptx)
+			println(pty)
+			println(pt.x)
+			println(pt.y)
+			println("hello" == "world")
+			println("hello" != "world")
+*/
+		    print("Click 'Run' or hit CTR+R to execute your ZEN code. Output will appear here.")
         }
 /*
 	- float format
