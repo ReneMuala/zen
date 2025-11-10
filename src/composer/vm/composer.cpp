@@ -184,7 +184,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         scope->return_data.name = name;
     }
 
-    void composer::vm::composer::construct(const std::string& name, const std::shared_ptr<const zen::composer::type>& t)
+    void composer::vm::composer::construct(const std::shared_ptr<const zen::composer::type>& t)
     {
         if (const auto func_it = functions.find("[zenConstructor]"); func_it != functions.end())
         {
@@ -192,11 +192,8 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             {
                 if (zen_allocator.signature.type == t)
                 {
-                    push(name);
-                    // will push 8 bytes (result of the call)
                     _call_function_overload({}, zen_allocator, true); // , call_result::pushed_from_constructor;
                     return;
-                    // _call_instruction(i64_to_i64, 2, 2);
                 }
             }
             throw zen::exceptions::semantic_error(fmt::format("no constructor found for type {}", t->name),
@@ -226,7 +223,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             code.push_back(-t->get_size());
             if (t->kind == type::heap and not no_construtor_mode)
             {
-                construct(name, t);
+                construct(t);
             }
         }
     }
@@ -289,7 +286,13 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         {
             if (field.second->kind == type::kind::heap)
             {
-                construct("<return>." + field.first, field.second);
+                set_local("pointer", "long");
+                construct(field.second);
+                push("<return>." + field.first);
+                top()->type = get_type("long");
+                top()->is_reference = true;
+                push("pointer");
+                assign();
             }
         }
         assume_returned();
@@ -301,12 +304,54 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         {
             if (field.second->kind == type::kind::heap)
             {
-                push("<return>." + field.first);
+                push("it." + field.first);
                 call("[zenDestructor]", 1);
             }
         }
         push("it");
         call(std::to_string(zen::deallocate), 1);
+        end();
+
+        begin("operator=");
+        set_parameter("a", type->name);
+        set_parameter("b", type->name);
+        for (const auto& field : type->fields)
+        {
+            push("a." + field.first);
+            push("b." + field.first);
+            assign();
+        }
+        end();
+
+        begin("operator==");
+        set_return_type("bool");
+        set_parameter("a", type->name);
+        set_parameter("b", type->name);
+        push("<return>");
+        zen::composer::composer::push<boolean>(true,"bool");
+        assign();
+        for (const auto& field : type->fields)
+        {
+            push("<return>");
+            push("<return>");
+            push("a." + field.first);
+            push("b." + field.first);
+            equal();
+            and_();
+            assign();
+        }
+        assume_returned();
+        end();
+
+        begin("operator!=");
+        set_return_type("bool");
+        set_parameter("a", type->name);
+        set_parameter("b", type->name);
+        push("a");
+        push("b");
+        call("operator==", 2);
+        not_();
+        return_value();
         end();
     }
 
@@ -497,23 +542,6 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                                                  lhs->type->name, rhs->type->name));
         }
         const bool dereference_assignment = lhs->is_reference or rhs->is_reference;
-        if (dereference_assignment)
-        {
-            if (not lhs->is_reference)
-            {
-                push("<long>");
-                const auto new_lhs = top();
-                assign_reference(new_lhs, lhs);
-                lhs = new_lhs;
-            }
-            if (not rhs->is_reference)
-            {
-                push("<long>");
-                const auto new_rhs = top();
-                assign_reference(new_rhs, rhs);
-                rhs = new_rhs;
-            }
-        }
 
         if (lhs->type->kind == type::kind::heap and lhs->no_destructor)
         {
@@ -521,40 +549,52 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             set_local(lhs->label, lhs->type->name);
             lhs = scope->get_local(lhs->label);
         }
-        if (dereference_assignment)
-            code.push_back(copy);
-        else if (rhs->is("short"))
-            code.push_back(zen::i16_to_i16);
-        else if (rhs->is("int"))
-            code.push_back(zen::i32_to_i32);
-        else if (rhs->is("long"))
-            code.push_back(zen::i64_to_i64);
-        else if (lhs->is("float"))
-            code.push_back(zen::f32_to_f32);
-        else if (lhs->is("double"))
-            code.push_back(zen::f64_to_f64);
-        else if ((lhs->is("byte") or lhs->is("bool")))
-            code.push_back(zen::i8_to_i8);
-        // else if (lhs->type->kind == type::heap)
-        // code.push_back(zen::i64_to_i64);
-        else
+        if (lhs->type->kind == type::kind::stack)
         {
-            try
+            if (dereference_assignment)
             {
-                push(lhs);
-                push(rhs);
-                call("operator=", 2);
-                return;
+                if (not lhs->is_reference)
+                {
+                    push("<long>");
+                    const auto new_lhs = top();
+                    assign_reference(new_lhs, lhs);
+                    lhs = new_lhs;
+                }
+                if (not rhs->is_reference)
+                {
+                    push("<long>");
+                    const auto new_rhs = top();
+                    assign_reference(new_rhs, rhs);
+                    rhs = new_rhs;
+                }
             }
-            catch (std::exception& _)
+            if (dereference_assignment)
+                code.push_back(copy);
+            else if (rhs->is("short"))
+                code.push_back(zen::i16_to_i16);
+            else if (rhs->is("int"))
+                code.push_back(zen::i32_to_i32);
+            else if (rhs->is("long"))
+                code.push_back(zen::i64_to_i64);
+            else if (lhs->is("float"))
+                code.push_back(zen::f32_to_f32);
+            else if (lhs->is("double"))
+                code.push_back(zen::f64_to_f64);
+            else if ((lhs->is("byte") or lhs->is("bool")))
+                code.push_back(zen::i8_to_i8);
+            else throw exceptions::semantic_error(fmt::format("stack type {} is not supported for assignment", lhs->type->name), _ilc_offset);
+            code.push_back(lhs->address(scope->get_stack_usage()));
+            code.push_back(rhs->address(scope->get_stack_usage()));
+            if (dereference_assignment)
             {
+                code.push_back((i64)_pool.get<i64>(lhs->type->get_size()).get());
             }
         }
-        code.push_back(lhs->address(scope->get_stack_usage()));
-        code.push_back(rhs->address(scope->get_stack_usage()));
-        if (dereference_assignment)
+        else
         {
-            code.push_back((i64)_pool.get<i64>(lhs->type->get_size()).get());
+            push(lhs);
+            push(rhs);
+            call("operator=", 2);
         }
     }
 
@@ -586,10 +626,14 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         val->offset = item.first;
         val->type = item.second;
         // fmt::println("{}: {} [{}]", name, val.type->name, val.offset);
+        // if this is a reference to an object's field
         if (tokens.size() > 1)
         {
-            push(val->type);
+            // create a pointer
+            push(get_type("long"));
+            top()->type = val->type;
             top()->is_reference = true;
+            // pointer = object + field_offset
             code.push_back(zen::add_i64);
             code.push_back(top()->address(scope->get_stack_usage()));
             code.push_back(location->address(scope->get_stack_usage()));
@@ -616,7 +660,6 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         if (tokens.empty())
             throw exceptions::semantic_error(fmt::format("invalid name '{}' in function {}", name, scope->name),
                                              _ilc_offset);
-
         if (const auto location = scope->get_local(tokens.front()))
             _push_variable(tokens, location);
         else if (name.starts_with("<return>") && scope->return_data.value)
@@ -737,6 +780,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             } else\
                 throw exceptions::semantic_error(fmt::format(\
                                                          "cannot apply "#I" to for types \"{}\" and \"{}\"", lhs->type->name, rhs->type->name), _ilc_offset, "please consider using type casting. Eg. bool(x)");\
+            code.push_back(top()->address(scope->get_stack_usage()));\
             code.push_back(lhs->address(scope->get_stack_usage()));\
             code.push_back(rhs->address(scope->get_stack_usage()));\
         } else {\
@@ -760,7 +804,12 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
     else if (rhs->is("double")) \
         code.push_back(zen::F##_f64);
 
-#define KAIZEN_DEFINE_RELATIONAL_COMPOSITION(N, A, I)\
+#define KAIZEN_IF_RELATIONAL_CHAIN_EQUALITY(F)\
+    KAIZEN_IF_RELATIONAL_CHAIN(F)\
+    else if (rhs->is("bool")) \
+        code.push_back(zen::F##_i8);
+
+#define KAIZEN_DEFINE_RELATIONAL_COMPOSITION(N, A, I, CH)\
     void composer::vm::composer::N()\
     {\
         KAIZEN_REQUIRE_SCOPE(scope::in_function);\
@@ -774,7 +823,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             push("<bool>");\
             if (lhs->has_same_type_as(*rhs))\
             {\
-                KAIZEN_IF_RELATIONAL_CHAIN(I)\
+                CH(I)\
                 else\
                     throw exceptions::semantic_error(fmt::format(\
                                                          "cannot compare ("#A") type \"{}\"", lhs->type->name), _ilc_offset);\
@@ -813,14 +862,20 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
 
     std::shared_ptr<composer::value> composer::vm::composer::dereference(const std::shared_ptr<value>& value)
     {
-        push(get_type("long"));
+        push(value->type);
         const auto destination = top();
         pop();
-        self_assign_reference(destination);
+        push(get_type("long"));
+        const auto pointer = top();
+        pop();
+        assign_reference(pointer, destination);
         code.push_back(zen::copy);
-        code.push_back(destination->address(scope->get_stack_usage()));
+        code.push_back(pointer->address(scope->get_stack_usage()));
         code.push_back(value->address(scope->get_stack_usage()));
         code.push_back((i64)_pool.get<i64>(value->type->get_size()).get());
+        scope->use_stack(-pointer->type->get_size());
+        code.push_back(most);
+        code.push_back(pointer->type->get_size());
         return destination;
     }
 
@@ -918,12 +973,12 @@ if (top()->is(#T))\
                                          _ilc_offset);
     };
 
-    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(greater, >, gt);
-    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(greater_or_equal, >=, gte);
-    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(lower, <, lt);
-    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(lower_or_equal, <=, lte);
-    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(equal, ==, eq);
-    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(not_equal, !=, neq)
+    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(greater, >, gt, KAIZEN_IF_RELATIONAL_CHAIN);
+    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(greater_or_equal, >=, gte, KAIZEN_IF_RELATIONAL_CHAIN);
+    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(lower, <, lt, KAIZEN_IF_RELATIONAL_CHAIN);
+    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(lower_or_equal, <=, lte, KAIZEN_IF_RELATIONAL_CHAIN);
+    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(equal, ==, eq, KAIZEN_IF_RELATIONAL_CHAIN_EQUALITY);
+    KAIZEN_DEFINE_RELATIONAL_COMPOSITION(not_equal, !=, neq, KAIZEN_IF_RELATIONAL_CHAIN_EQUALITY);
 
     void composer::vm::composer::begin_while()
     {
@@ -1332,8 +1387,7 @@ if (top()->is(#T))\
         {
             if (construtor_call)
             {
-                auto result = pop_operand(false);
-                return result;
+                return nullptr;
             }
             if (sig.type->kind == type::heap)
             // this will allocate data when no assignment is present in a call to a method that returns an object
@@ -1372,7 +1426,6 @@ if (top()->is(#T))\
         {
             if (value->type->kind == type::kind::stack)
             {
-                const auto deref = (value->is_reference) ? dereference(value) : nullptr;
                 if (value->is("byte"))
                     code.push_back(zen::push_i8);
                 else if (value->is("bool"))
@@ -1389,13 +1442,7 @@ if (top()->is(#T))\
                     code.push_back(zen::push_i64);
                 else
                     throw exceptions::semantic_error("unknown scalar type", _ilc_offset);
-                if (value->is_reference)
-                {
-                    code.push_back(deref->address(scope->get_stack_usage()));
-                } else
-                {
-                    code.push_back(value->address(scope->get_stack_usage()));
-                }
+                code.push_back(value->address(scope->get_stack_usage()));
                 scope->use_stack(value->type->get_size());
             }
             else
@@ -1485,7 +1532,7 @@ if (top()->is(#T))\
     bool composer::vm::composer::_call_function(const std::string& name, const i8& args_count,
                                                 const std::unordered_map<
                                                     std::string, std::list<function>>::iterator&
-                                                func_it)
+                                                func_it, std::shared_ptr<value> & caster_arg_buffer)
     {
         std::deque<std::shared_ptr<value>> arguments;
         for (int i = 0; i < args_count; i++)
@@ -1493,6 +1540,7 @@ if (top()->is(#T))\
             auto value = pop_operand(false);
             if (value->type->kind == type::kind::heap and value->kind == value::kind::constant)
             {
+                code.push_back(placeholder);
                 /// TODO: optimize using the same logic as [rr]
                 set_local("[cha]", value->type->name);
                 push("[cha]");
@@ -1501,16 +1549,14 @@ if (top()->is(#T))\
                 const auto ptr = top();
                 assign_reference(ptr, value);
                 ptr->type = value->type;
-                ptr->is_reference = true;
-                try
-                {
-                    call("operator=", 2);
-                }
-                catch (const std::exception& e)
-                {
-                    std::cerr << e.what() << std::endl;
-                }
+                ptr->is_reference = false;
+                call("operator=", 2);
                 value = cha;
+                code.push_back(placeholder);
+            }
+            else if (value->is_reference)
+            {
+                value = dereference(value);
             }
             arguments.push_front(value);
         }
@@ -1555,7 +1601,13 @@ if (top()->is(#T))\
         }
         */
         if (not candidate)
+        {
+            if (arguments.size() == 1)
+            {
+                caster_arg_buffer = arguments.at(0);
+            }
             throw exceptions::semantic_error(fmt::format("no function overload matched for \'{}\'", name), _ilc_offset);
+        }
         return _call_function_overload(arguments, candidate->get(), false);
     }
 
@@ -1596,7 +1648,7 @@ if (top()->is(#T))\
         std::stack<std::shared_ptr<value>> args;
         for (int i = 0; i < args_count; i++)
         {
-            auto v = pop_operand(false);
+            auto v = pop_operand();
             args.push(v);
         }
         code.push_back(name);
@@ -1733,16 +1785,12 @@ if (top()->is(#T))\
         push("to.data");
         call(std::to_string(zen::deallocate), 1);
         end_if();
-
         set_local("data", "long");
+        code.push_back(placeholder);
         push("data");
-        {
-            push("from.len");
-            const auto deref = dereference(top());
-            pop();
-            push(deref);
-        }
+        push("from.len");
         call(std::to_string(zen::allocate), 2);
+        code.push_back(placeholder);
 
         push("data");
         {
@@ -1903,14 +1951,25 @@ if (top()->is(#T))\
             {"double", KAIZEN_CASTER_MAP_FOR(f64)},
             {"string", KAIZEN_CASTER_MAP_FOR_STRING(str)},
         };
-
+        // deez will allow us to have functions and casters with the same name
+        std::shared_ptr<value> caster_arg_buffer;
         if (const auto func_it = functions.find(name); func_it != functions.end())
         {
-            auto z = _call_function(name, args_count, func_it);;
-            return z;
+            try
+            {
+                return _call_function(name, args_count, func_it, caster_arg_buffer);
+            } catch (exceptions::semantic_error& e)
+            {
+                if (not casters.contains(name))
+                {
+                    throw e;
+                }
+            }
         }
         if (const auto caster_set = casters.find(name); caster_set != casters.end())
         {
+            if (caster_arg_buffer)
+                push(caster_arg_buffer);
             _call_caster(name, args_count, caster_set);
             return true;
         }

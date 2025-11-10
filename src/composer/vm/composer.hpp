@@ -36,7 +36,7 @@ public:
     void return_value() override;
     void assume_returned() override;
     void set_return_name(const std::string& name) override;
-    void construct(const std::string& name, const std::shared_ptr<const zen::composer::type>& t);
+    void construct(const std::shared_ptr<const zen::composer::type>& t);
     void set_local(std::string name, const std::string& type) override;
     void end() override;
     void bake() override;
@@ -68,7 +68,7 @@ public:
                                  bool construtor_call);
     bool _call_function(const std::string& name, const i8& args_count,
                         const std::unordered_map<std::string, std::list<function>>::iterator&
-                        func_it);
+                        func_it, std::shared_ptr<value> & caster_arg_buffer);
     bool _call_instruction_write_str(const std::string& name, const i8& args_count);
     bool _call_instruction(const zen::instruction& instruction, const i8& args_count, const i8& expected_args_count);
     bool call(const std::string& name, const i8& args_count) override;

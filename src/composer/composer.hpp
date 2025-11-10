@@ -172,7 +172,7 @@ public:
             const i64 address = (i64)_pool.get<native>(data).get();
             auto v = std::make_shared<value>(t, address, value::constant);
             v->is_negated = negate;
-            _stack.emplace(v);
+            _stack.push(v);
         }
     }
 

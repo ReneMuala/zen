@@ -465,7 +465,7 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                     *address<i64>(this->code[i + 2], stack)));
                 if (not*address<i64>(this->code[i + 1], stack))
                 {
-                    throw std::runtime_error(fmt::format("fatal error: out of heap memory (zen vm halted at {})", i));
+                    throw std::runtime_error(fmt::format("fatal error: out of heap memory (zen vm halted at {}) should allocate {} byte(s)", i, *address<i64>(this->code[i + 2], stack)));
                 }
                 i += 2;
                 break;
@@ -485,7 +485,8 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 break;
             case copy:
                 // fmt::println("*({}){} = {}", *address<i64>(this->code[i + 3], stack), *address<i64>(this->code[i + 1], stack), *address<i64>(this->code[i + 2], stack));
-                // fmt::println("copy({},{},{})", *address<i64>(this->code[i + 1], stack), *address<i64>(this->code[i + 2], stack),*address<i64>(this->code[i + 3], stack));
+                // fmt::print("copy({},{},{}) ", *address<i64>(this->code[i + 1], stack), *address<i64>(this->code[i + 2], stack),*address<i64>(this->code[i + 3], stack));
+                // fmt::println("[i]: {}", i);
                 memcpy(reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)),
                        reinterpret_cast<void*>(*address<i64>(this->code[i + 2], stack)),
                        *address<i64>(this->code[i + 3], stack));

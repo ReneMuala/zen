@@ -58,6 +58,7 @@ namespace enums
     NSINGLE_VAL_PREDICATE,
     /// suffixed value
     NSUFIXED_VAL,
+    NENDLESS_SUFIXES,
     /// used for OR
     NSEVENTH_PRIORITY_RHS_VAL,
     /// used for AND

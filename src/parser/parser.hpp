@@ -238,7 +238,7 @@ REQUIRE_NON_TERMINAL(NID)
             name+="<=";
         } else if (TRY_REQUIRE_TERMINAL(TGREATER))
         {
-            name+="<";
+            name+=">";
         } else if (TRY_REQUIRE_TERMINAL(TGREATER_OR_EQUAL))
         {
             name+=">=";
@@ -665,7 +665,7 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_BODY)
             {
                 dangling_value = pragma_dangling_return_value;
                 if (dangling_value)
-                    TRY_REQUIRE_NON_TERMINAL(NSUFIXED_VAL);
+                    TRY_REQUIRE_NON_TERMINAL(NENDLESS_SUFIXES);
                 continue;
             }
             TRY_REQUIRE_NON_TERMINAL(NSUFIXED_VAL);
@@ -917,6 +917,10 @@ BEGIN_SYMBOL_BINDING(NFIRST_PRIORITY_RHS_VAL)
             PRODUCTION_NVAL_MOD_VALUE() or
             true))
       END_SYMBOL_BINDING
+
+BEGIN_SYMBOL_BINDING(NENDLESS_SUFIXES)
+    PRODUCTION_ENDLESS_SUFFIXES()
+END_SYMBOL_BINDING
 
 BEGIN_SYMBOL_BINDING(NSUFIXED_VAL)
           PRODUCTION_NVAL_SLASH_VALUE() or

@@ -217,6 +217,7 @@ inline void setup_integration_test(const std::string& code, zen::composer::compo
 
 int main(int argc, char** argv) try
 {
+#ifdef KAIZEN_WASM
 	zen_run(R"(
         sum(x:int, y:int) = int(x+y)
 
@@ -255,26 +256,12 @@ int main(int argc, char** argv) try
 		_size(this: string) = long {
 			this.len
 		}
-
-		class point {
-			x: double
-			y: double
-		}
+class point {
+	x: double
+	y: double
+}
 
         main = {
-/*
-			pt : point
-			pt.x = 1.5
-			pt.y = 2.78
-			ptx: double  = pt.x
-			pty: double  = pt.y
-			println(ptx)
-			println(pty)
-			println(pt.x)
-			println(pt.y)
-			println("hello" == "world")
-			println("hello" != "world")
-*/
 		    print("Click 'Run' or hit CTR+R to execute your ZEN code. Output will appear here.")
         }
 /*
@@ -283,6 +270,70 @@ int main(int argc, char** argv) try
 	- duration format
  */
     )");
+#else
+zen_run(R"(
+class person {
+	name: string
+	surname: string
+	age: int
+	registered: bool
+}
+
+sum(x: int, y: int) = int {
+	x + y
+}
+
+person(name: string, age: int) = person {
+	p: person
+	p.name = name
+	p.age = age
+	p
+}
+
+test_value_equality = bool {
+	1b == 1b &&
+	1s == 1s &&
+	1i == 1i &&
+	1 == 1 &&
+	1l == 1l &&
+	1.5f == 1.5f &&
+	1.5d == 1.5d &&
+	"1" == "1" &&
+	person("Zendaya", 20) == person("Zendaya", 20) &&
+	1 != 2 &&
+	1s != 2s &&
+	1i != 2i &&
+	1 != 2 &&
+	1l != 2l &&
+	1.5f != 2.5f &&
+	1.5d != 2.5d &&
+	"1" != "2" &&
+	person("Zendaya", 20) != person("Zenia", 20)
+}
+
+class Point {
+	x: double
+	y: double
+}
+
+operator >(a: Point, b: Point) = bool {
+	(a.x > b.x && a.y > b.y)
+}
+
+string(pt: Point) = string("")
+
+main = {
+	s: string
+	s = "Hello World!"
+	println(s)
+	if(test_value_equality()){
+		println("[test_value_equality: PASSED]")
+	} else {
+		println("[test_value_equality: FAILED]")
+	}
+}
+)");
+#endif
 }
 catch (std::exception& e)
 {
