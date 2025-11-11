@@ -668,7 +668,7 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_BODY)
                     TRY_REQUIRE_NON_TERMINAL(NENDLESS_SUFIXES);
                 continue;
             }
-            TRY_REQUIRE_NON_TERMINAL(NSUFIXED_VAL);
+            TRY_REQUIRE_NON_TERMINAL(NENDLESS_SUFIXES);
             dangling_value = true;
             break;
         }

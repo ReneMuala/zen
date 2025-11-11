@@ -317,7 +317,7 @@ class Point {
 }
 
 operator >(a: Point, b: Point) = bool {
-	(a.x > b.x && a.y > b.y)
+	a.x > b.x && a.y > b.y
 }
 
 string(pt: Point) = string("")
