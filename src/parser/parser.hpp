@@ -497,34 +497,34 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_AS_NUM)
     using namespace ILC;
     if (TRY_REQUIRE_TERMINAL(TINT_NUM))
     {
-        int data = strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10);
-        composer->push<int>(std::move(data), "int");
+        const int data = strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10);
+        composer->push<zen::i32>(data, "int");
     }
     else if (TRY_REQUIRE_TERMINAL(TBYTE_NUM))
     {
-        char data = static_cast<char>(strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10));
-        composer->push<char>(std::move(data), "byte");
+        const char data = static_cast<char>(strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10));
+        composer->push<zen::i8>(data, "byte");
     }
     else if (TRY_REQUIRE_TERMINAL(TSHORT_NUM))
     {
-        short data = static_cast<short>(strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10));
-        composer->push<short>(std::move(data), "short");
+        const short data = static_cast<short>(strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10));
+        composer->push<zen::i16>(data, "short");
     }
     else if (TRY_REQUIRE_TERMINAL(TLONG_NUM))
     {
-        long data = strtol(tokens[ILC::offset - 1].value.c_str(), nullptr, 10);
-        composer->push<long>(std::move(data), "long");
+        const zen::i64 data = strtoll(tokens[ILC::offset - 1].value.c_str(), nullptr, 10);
+        composer->push<zen::i64>(data, "long");
     }
     else if (TRY_REQUIRE_TERMINAL(TFLOAT_NUM))
     {
-        float data = strtof(tokens[ILC::offset - 1].value.c_str(), nullptr);
-        composer->push<float>(std::move(data), "float");
+        const zen::f32 data = strtof(tokens[ILC::offset - 1].value.c_str(), nullptr);
+        composer->push<zen::f32>(data, "float");
     }
     else
     {
         REQUIRE_TERMINAL(TDOUBLE_NUM)
-        double data = strtod(tokens[ILC::offset - 1].value.c_str(), nullptr);
-        composer->push<double>(std::move(data), "double");
+        const zen::f64 data = strtod(tokens[ILC::offset - 1].value.c_str(), nullptr);
+        composer->push<zen::f64>(data, "double");
     }
 END_PRODUCTION
 
@@ -570,11 +570,11 @@ BEGIN_PRODUCTION(PRODUCTION_NVAL_BOOLEAN)
     if (not TRY_REQUIRE_TERMINAL(TKEYWORD_TRUE))
     {
         REQUIRE_TERMINAL(TKEYWORD_FALSE)
-        composer->push<bool>(false, "bool");
+        composer->push<zen::boolean>(false, "bool");
     }
     else
     {
-        composer->push<bool>(true, "bool");
+        composer->push<zen::boolean>(true, "bool");
     }
 END_PRODUCTION
 
