@@ -467,6 +467,7 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 {
                     throw std::runtime_error(fmt::format("fatal error: out of heap memory (zen vm halted at {}) should allocate {} byte(s)", i, *address<i64>(this->code[i + 2], stack)));
                 }
+                std::memset((void*)*address<i64>(this->code[i + 1], stack), 0, *address<i64>(this->code[i + 2], stack));
                 i += 2;
                 break;
             case deallocate:
