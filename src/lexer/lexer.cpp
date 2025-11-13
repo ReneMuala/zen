@@ -35,8 +35,8 @@ zen::token zen::lexer::next_number()
                 e_mode = true;
                 type = enums::TDOUBLE_NUM;
                 getchar();
-                if (it == '-')
-                    value += '-';
+                if (it == '-' or it == '+')
+                    value += it;
                 else if (isdigit(it))
                     continue;
                 else
