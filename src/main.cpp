@@ -297,6 +297,9 @@ test_value_equality = bool {
 	1 == 1 &&
 	1l == 1l &&
 	1.5f == 1.5f &&
+	3e-10f == 3e-10f &&
+	3e-10d == 3e-10d &&
+	3e-10 == 3e-10 &&
 	1.5d == 1.5d &&
 	"1" == "1" &&
 	person("Zendaya", 20) == person("Zendaya", 20) &&
@@ -306,6 +309,9 @@ test_value_equality = bool {
 	1 != 2 &&
 	1l != 2l &&
 	1.5f != 2.5f &&
+	3e-10f != 3e10f &&
+	3e-10d != 3e10d &&
+	3e-10 != 3e10 &&
 	1.5d != 2.5d &&
 	"1" != "2" &&
 	person("Zendaya", 20) != person("Zenia", 20)

@@ -18,6 +18,7 @@ zen::token zen::lexer::next_number()
 {
     std::string value;
     auto type = enums::TINT_NUM;
+    bool e_mode = false;
     restart:
     do
     {
@@ -27,8 +28,28 @@ zen::token zen::lexer::next_number()
             continue;
         }
         value += it;
+        if (it == 'e')
+        {
+            if (not e_mode)
+            {
+                e_mode = true;
+                type = enums::TDOUBLE_NUM;
+                getchar();
+                if (it == '-')
+                    value += '-';
+                else if (isdigit(it))
+                    continue;
+                else
+                    break;
+            }
+            else
+            {
+                type = enums::TERROR;
+                break;
+            }
+        }
         getchar();
-    } while (isdigit(it) or it == '_');
+    } while (isdigit(it) or it == '_' or it == 'e');
     if (it == '.' and type == enums::TINT_NUM)
     {
         type = enums::TDOUBLE_NUM;
@@ -43,22 +64,22 @@ zen::token zen::lexer::next_number()
         type = enums::TDOUBLE_NUM;
         getchar();
     }
-    else if (it == 'b' and type == enums::TINT_NUM)
+    else if (it == 'b' and type == enums::TINT_NUM and not e_mode)
     {
         type = enums::TBYTE_NUM;
         getchar();
     }
-    else if (it == 's' and type == enums::TINT_NUM)
+    else if (it == 's' and type == enums::TINT_NUM and not e_mode)
     {
         type = enums::TSHORT_NUM;
         getchar();
     }
-    else if (it == 'i' and type == enums::TINT_NUM)
+    else if (it == 'i' and type == enums::TINT_NUM and not e_mode)
     {
         type = enums::TINT_NUM;
         getchar();
     }
-    else if (it == 'l' and type == enums::TINT_NUM)
+    else if (it == 'l' and type == enums::TINT_NUM and not e_mode)
     {
         type = enums::TLONG_NUM;
         getchar();
