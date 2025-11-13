@@ -331,10 +331,10 @@ zen::token zen::lexer::next_id_or_keyword()
             type = enums::TKEYWORD_TRUE;
         else if (value == "false")
             type = enums::TKEYWORD_FALSE;
-        else if (value == "break")
-            type = enums::TKEYWORD_BREAK;
-        else if (value == "continue")
-            type = enums::TKEYWORD_CONTINUE;
+        // else if (value == "break")
+        //     type = enums::TKEYWORD_BREAK;
+        // else if (value == "continue")
+        //     type = enums::TKEYWORD_CONTINUE;
         else if (value == "class")
             type = enums::TKEYWORD_CLASS;
         else if (value == "static")
