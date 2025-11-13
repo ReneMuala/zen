@@ -83,8 +83,8 @@ namespace zen
             {"byte", std::make_shared<type>("byte", 1)},
             {"string", string_type},
         };
-        string_type->add_field("len", get_type("long"));
-        string_type->add_field("data", get_type("long"));
+        string_type->add_field("len", get_type("long"), 0);
+        string_type->add_field("data", get_type("long"), 0);
         functions = {
             {"[zenConstructor]", {{signature{string_type}, 0, false}}},
             {"operator=", {{signature{unit_type, {string_type, string_type}}, 0, false}}},
@@ -273,10 +273,12 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                                                  "type redefinition \"{}\"", type->name), _ilc_offset);
         }
         types.emplace(type->name, type);
+        class_ = type;
     }
 
-    void composer::vm::composer::end_type(std::shared_ptr<type>& type)
+    void composer::vm::composer::end_type()
     {
+        auto type = class_;
         begin("[zenConstructor]");
         set_return_type(type->name);
         push("<return>");
@@ -328,7 +330,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         set_parameter("a", type->name);
         set_parameter("b", type->name);
         push("<return>");
-        zen::composer::composer::push<boolean>(true,"bool");
+        zen::composer::composer::push<boolean>(true, "bool");
         assign();
         for (const auto& field : type->fields)
         {
@@ -353,6 +355,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         not_();
         return_value();
         end();
+        class_.reset();
     }
 
     void composer::vm::composer::bake()
@@ -582,7 +585,8 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                 code.push_back(zen::f64_to_f64);
             else if ((lhs->is("byte") or lhs->is("bool")))
                 code.push_back(zen::i8_to_i8);
-            else throw exceptions::semantic_error(fmt::format("stack type {} is not supported for assignment", lhs->type->name), _ilc_offset);
+            else throw exceptions::semantic_error(
+                fmt::format("stack type {} is not supported for assignment", lhs->type->name), _ilc_offset);
             code.push_back(lhs->address(scope->get_stack_usage()));
             code.push_back(rhs->address(scope->get_stack_usage()));
             if (dereference_assignment)
@@ -664,16 +668,18 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             _push_variable(tokens, location);
         else if (name.starts_with("<return>") && scope->return_data.value)
             _push_variable(tokens, scope->return_data.value);
-        else if (const auto function = functions.find(tokens.front()); function != functions.end())
-            _push_function();
         else if (name.starts_with("<") and name.ends_with(">"))
             _push_temporary_value(name);
+        else if (class_ and not name.starts_with("this."))
+        {
+            push("this." + name);
+        }
         else
             throw exceptions::semantic_error(fmt::format(
-                                                 "no such symbol {}", name), _ilc_offset,
+                                                 "no such symbol {}", tokens.front()), _ilc_offset,
                                              fmt::format(
                                                  "please define it in the respective scope. Eg. {0}: T = V // with T & V being it's type and value respectively.",
-                                                 name));
+                                                 tokens.front()));
     }
 
 #define KAIZEN_IF_ARITHMETICS_CHAIN(F)\
@@ -1532,9 +1538,14 @@ if (top()->is(#T))\
     bool composer::vm::composer::_call_function(const std::string& name, const i8& args_count,
                                                 const std::unordered_map<
                                                     std::string, std::list<function>>::iterator&
-                                                func_it, std::shared_ptr<value> & caster_arg_buffer)
+                                                func_it, std::shared_ptr<value>& caster_arg_buffer)
     {
         std::deque<std::shared_ptr<value>> arguments;
+        std::shared_ptr<value> this_;
+        if (func_it->first.contains('.'))
+        {
+            this_ = pop_operand();
+        }
         for (int i = 0; i < args_count; i++)
         {
             auto value = pop_operand(false);
@@ -1560,7 +1571,10 @@ if (top()->is(#T))\
             }
             arguments.push_front(value);
         }
-
+        if (this_)
+        {
+            arguments.push_front(this_);
+        }
         std::optional<std::reference_wrapper<function>> candidate;
         for (auto& overload : std::ranges::reverse_view(func_it->second))
         {
@@ -1606,7 +1620,8 @@ if (top()->is(#T))\
             {
                 caster_arg_buffer = arguments.at(0);
             }
-            throw exceptions::semantic_error(fmt::format("no function overload matched for \'{}\'", name), _ilc_offset);
+            throw exceptions::semantic_error(fmt::format("no function overload matched for \'{}\'", func_it->first),
+                                             _ilc_offset);
         }
         return _call_function_overload(arguments, candidate->get(), false);
     }
@@ -1658,6 +1673,35 @@ if (top()->is(#T))\
             args.pop();
         }
         return false;
+    }
+
+    std::optional<std::unordered_map<std::string, std::list<composer::vm::function>>::iterator>
+    composer::vm::composer::fetch_function(const std::string& name)
+    {
+        if (not name.empty() and std::isdigit(name.front()))
+        {
+            return std::nullopt;
+        }
+        if (not name.contains('.'))
+        {
+            if (const auto func_it = functions.find(name); func_it != functions.end())
+                return func_it;
+            if (class_)
+                return fetch_function("this." + name);
+        }
+        else if (name.length() >= 3)
+        {
+            const auto object = name.substr(0, name.find_last_of('.'));
+            const auto function = name.substr(name.find_last_of('.') + 1);
+            push(object);
+            std::string method = top()->type->name + "." + function;
+            if (const auto func_it = functions.find(method); func_it != functions.end())
+            {
+                return func_it;
+            }
+            pop();
+        }
+        return std::nullopt;
     }
 
     void composer::vm::composer::end_for()
@@ -1953,19 +1997,22 @@ if (top()->is(#T))\
         };
         // deez will allow us to have functions and casters with the same name
         std::shared_ptr<value> caster_arg_buffer;
-        if (const auto func_it = functions.find(name); func_it != functions.end())
+        if (const auto func_it = fetch_function(name); func_it)
         {
             try
             {
-                return _call_function(name, args_count, func_it, caster_arg_buffer);
-            } catch (exceptions::semantic_error& e)
+                return _call_function(name, args_count, func_it.value(), caster_arg_buffer);
+            }
+            catch (exceptions::semantic_error& e)
             {
                 if (not casters.contains(name))
                 {
+                    fmt::println("no such caster {}\n\n\n", name);
                     throw e;
                 }
             }
         }
+
         if (const auto caster_set = casters.find(name); caster_set != casters.end())
         {
             if (caster_arg_buffer)

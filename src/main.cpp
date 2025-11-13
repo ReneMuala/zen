@@ -168,6 +168,7 @@ try
 	composer->link();
 	setup_parser_test(std::string(code));
 	parse();
+	// composer->bake();
 	const std::list<zen::composer::vm::function> main_functions = composer->functions["main"];
 	if (main_functions.empty())
 	{
@@ -277,6 +278,28 @@ class person {
 	surname: string
 	age: int
 	registered: bool
+	father: person
+	getAge = int {
+		this.age
+	}
+
+	getName = string {
+		this.name
+	}
+
+	getAge2 = int {
+		age
+	}
+
+	displayName = {
+		println(name)
+	}
+
+	greet = {
+		println("Hi, im " + name)
+		displayName()
+		println(string(getAge()))
+	}
 }
 
 sum(x: int, y: int) = int {
@@ -339,6 +362,9 @@ main = {
 	} else {
 		println("[test_value_equality: FAILED]")
 	}
+
+	p: person = person("Zendaya", 10)
+	p.greet()
 }
 )");
 #endif

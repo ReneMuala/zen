@@ -18,6 +18,7 @@ namespace enums
     TPARENTHESIS_OPEN,
     /// )
     TPARENTHESIS_CLOSE,
+    NCLASS_FIELD,
     NFUNCTION_BODY,
     /// statement
     NSTAT,

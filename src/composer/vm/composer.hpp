@@ -22,9 +22,10 @@ public:
     std::vector<i64> code;
     std::unordered_map<std::string, std::list<function>> functions;
     std::unordered_map<std::string, std::shared_ptr<const type>> types;
+    std::shared_ptr<type> class_;
     std::shared_ptr<const type>& get_type(const std::string& name) override;
     void begin_type(std::shared_ptr<type>&) override;
-    void end_type(std::shared_ptr<type>&) override;
+    void end_type() override;
     std::shared_ptr<value> top();
     void push(const std::shared_ptr<value>&);
     void reset() override;
@@ -71,6 +72,8 @@ public:
                         func_it, std::shared_ptr<value> & caster_arg_buffer);
     bool _call_instruction_write_str(const std::string& name, const i8& args_count);
     bool _call_instruction(const zen::instruction& instruction, const i8& args_count, const i8& expected_args_count);
+    std::optional<std::unordered_map<std::string, std::list<function>>::iterator> fetch_function(
+        const std::string& name);
     bool call(const std::string& name, const i8& args_count) override;
     void and_() override;
     void or_() override;

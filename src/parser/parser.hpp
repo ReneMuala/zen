@@ -14,9 +14,7 @@
 
 using namespace enums;
 extern std::vector<zen::token> tokens;
-static bool pragma_ignore_missing_symbols = false;
 static bool pragma_dangling_return_value = false;
-static std::string pragma_ignore_missing_symbols_data;
 
 // namespace parser
 // {
@@ -43,7 +41,7 @@ namespace parser
 
     // state_t state = STATEMENT;
     inline std::string id, type, value;
-
+    std::shared_ptr<zen::composer::type> class_;
     inline void reset()
     {
         id.clear();
@@ -66,36 +64,33 @@ BEGIN_PRODUCTION(PRODUCTION_NCLASS)
     auto composer = get_composer();
     REQUIRE_TERMINAL(TKEYWORD_CLASS)
     REQUIRE_NON_TERMINAL_CALLBACK(NID, EXPECTED("ID"))
-    auto name = parser::id;
-    auto type = std::make_shared<zen::composer::type>(name, 0, zen::composer::type::kind::heap);
-    composer->begin_type(type);
+    parser::class_ = std::make_shared<zen::composer::type>(parser::id, 0, zen::composer::type::kind::heap);
+    composer->begin_type(parser::class_);
     if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
     {
         parser::type.clear();
     }
     REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
     bool is_static;
-    while (TRY_REQUIRE_TERMINAL(TID))
-    {
-        std::string field_name = tokens.at(ILC::offset-1).value;
-        // type->add_field(parser::id, )
-        if (TRY_REQUIRE_TERMINAL(TCOLON))
-        {
-            parser::type.clear();
-            REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
-            type->add_field(field_name, composer->get_type(parser::type));
-            if (TRY_REQUIRE_TERMINAL(TEQU))
-            {
-                REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
-            }
-        }
-        else
-        {
-            REQUIRE_NON_TERMINAL_CALLBACK(NSUFFIX_FUNCTION_DEFINITION, EXPECTED("FUNCTION"))
-        }
-    }
+    while (TRY_REQUIRE_NON_TERMINAL(NCLASS_FIELD) or TRY_REQUIRE_NON_TERMINAL(NFUNCTION_DEFINITION))
+    {}
     REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
-    composer->end_type(type);
+    composer->end_type();
+    parser::class_.reset();
+END_PRODUCTION
+
+BEGIN_PRODUCTION(PRODUCTION_NCLASS_FIELD)
+    auto composer = get_composer();
+    REQUIRE_TERMINAL(TID)
+    std::string field_name = tokens.at(ILC::offset-1).value;
+    REQUIRE_TERMINAL(TCOLON)
+    parser::type.clear();
+    REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
+    if (not parser::class_)
+    {
+        throw zen::exceptions::semantic_error("cannot create class field outside of class", ILC::offset);
+    }
+    parser::class_->add_field(field_name, composer->get_type(parser::type), ILC::offset);
 END_PRODUCTION
 
 BEGIN_PRODUCTION(PRODUCTION_NIF)
@@ -203,55 +198,64 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_DEFINITION)
     // provides parser::id
 REQUIRE_NON_TERMINAL(NID)
 
-    std::string name = parser::id;
-    if (name == "operator")
+    std::string function_name = parser::id;
+    if (function_name == "operator")
     {
+        if (parser::class_)
+        {
+            throw zen::exceptions::semantic_error("cannot define operator in class scope", ILC::offset);
+        }
         if (TRY_REQUIRE_TERMINAL(TEQU))
         {
-            name+="=";
+            function_name+="=";
         } else if (TRY_REQUIRE_TERMINAL(TEQUAL))
         {
-            name+="==";
+            function_name+="==";
         } else if (TRY_REQUIRE_TERMINAL(TNOT_EQUAL))
         {
-            name+="!=";
+            function_name+="!=";
         } else if (TRY_REQUIRE_TERMINAL(TPLUS))
         {
-            name+="+";
+            function_name+="+";
         } else if (TRY_REQUIRE_TERMINAL(TMINUS))
         {
-            name+="-";
+            function_name+="-";
         } else if (TRY_REQUIRE_TERMINAL(TTIMES))
         {
-            name+="*";
+            function_name+="*";
         } else if (TRY_REQUIRE_TERMINAL(TSLASH))
         {
-            name+="/";
+            function_name+="/";
         } else if (TRY_REQUIRE_TERMINAL(TMODULO))
         {
-            name+="%";
+            function_name+="%";
         } else if (TRY_REQUIRE_TERMINAL(TLOWER))
         {
-            name+="<";
+            function_name+="<";
         } else if (TRY_REQUIRE_TERMINAL(TLOWER_OR_EQUAL))
         {
-            name+="<=";
+            function_name+="<=";
         } else if (TRY_REQUIRE_TERMINAL(TGREATER))
         {
-            name+=">";
+            function_name+=">";
         } else if (TRY_REQUIRE_TERMINAL(TGREATER_OR_EQUAL))
         {
-            name+=">=";
+            function_name+=">=";
         }  else if (TRY_REQUIRE_TERMINAL(TNOT))
         {
-            name+="!";
+            function_name+="!";
         } else if (TRY_REQUIRE_TERMINAL(TAND))
         {
-            name+="&&";
+            function_name+="&&";
         } else if (TRY_REQUIRE_TERMINAL(TOR))
         {
-            name+="||";
+            function_name+="||";
         }
+    }
+    if (parser::class_)
+    {
+        function_name = parser::class_->name + "." + function_name;
+        parameters.emplace_front("this", parser::class_->name);
     }
 
     if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
@@ -260,7 +264,7 @@ REQUIRE_NON_TERMINAL(NID)
     }
     if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
     {
-        composer->begin(name);
+        composer->begin(function_name);
         begin_function_invoked = true;
         bool first_it = true;
         do
@@ -289,7 +293,7 @@ REQUIRE_NON_TERMINAL(NID)
     REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
     if (not begin_function_invoked)
     {
-        composer->begin(parser::id);
+        composer->begin(function_name);
     }
     parser::type.clear();
     if (TRY_REQUIRE_NON_TERMINAL(NTYPE))
@@ -302,21 +306,7 @@ REQUIRE_NON_TERMINAL(NID)
         parameters.clear();
         if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
         {
-            pragma_ignore_missing_symbols = true;
-            pragma_ignore_missing_symbols_data.clear();
-            const int offset_before = ILC::offset;
             REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
-            pragma_ignore_missing_symbols = false;
-            if (ILC::offset - offset_before == 1 and ILC::chain[ILC::offset - 1] == TID)
-            {
-                composer->set_return_name(parser::id);
-            }
-            else if (not pragma_ignore_missing_symbols_data.empty())
-            {
-                throw zen::exceptions::semantic_error(fmt::format(
-                                                          "no such symbol(s) {}", pragma_ignore_missing_symbols_data),
-                                                      ILC::offset);
-            }
             REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
         }
     }
@@ -603,13 +593,10 @@ END_PRODUCTION
 BEGIN_PRODUCTION(PRODUCTION_NVARIABLE_DEFINITION)
     static auto composer = get_composer();
     // provides parser::id
-    pragma_ignore_missing_symbols = true;
     if (not TRY_REQUIRE_NON_TERMINAL(NID))
     {
-        pragma_ignore_missing_symbols = false;
         ROLLBACK_PRODUCTION();
     }
-    pragma_ignore_missing_symbols = false;
     const auto name = parser::id;
     REQUIRE_TERMINAL(TCOLON)
     parser::type.clear();
@@ -660,7 +647,6 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_BODY)
         {
             if (dangling_value)
                 composer->pop();
-            composer->push(parser::id);
             if (TRY_REQUIRE_NON_TERMINAL(NSUFFIX_FUNCTION_CALL))
             {
                 dangling_value = pragma_dangling_return_value;
@@ -668,6 +654,7 @@ BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_BODY)
                     TRY_REQUIRE_NON_TERMINAL(NENDLESS_SUFIXES);
                 continue;
             }
+            composer->push(parser::id);
             TRY_REQUIRE_NON_TERMINAL(NENDLESS_SUFIXES);
             dangling_value = true;
             break;
@@ -776,8 +763,12 @@ BEGIN_SYMBOL_BINDING(NSUFFIX_FUNCTION_CALL)
             PRODUCTION_NSUFFIX_FUNCTION_CALL()
         END_SYMBOL_BINDING
 
-BEGIN_SYMBOL_BINDING(NSUFFIX_FUNCTION_DEFINITION)
+BEGIN_SYMBOL_BINDING(NFUNCTION_DEFINITION)
     PRODUCTION_NFUNCTION_DEFINITION()
+END_SYMBOL_BINDING
+
+BEGIN_SYMBOL_BINDING(NCLASS_FIELD)
+    PRODUCTION_NCLASS_FIELD()
 END_SYMBOL_BINDING
 
 BEGIN_SYMBOL_BINDING(NGLOBAL_STAT)
