@@ -89,7 +89,7 @@ namespace enums
     /// function call
     NSUFFIX_FUNCTION_CALL,
     // (...) = TYPE? {...}
-    NSUFFIX_FUNCTION_DEFINITION,
+    NFUNCTION_DEFINITION,
     /// short number
     TBYTE_NUM,
     /// short number
