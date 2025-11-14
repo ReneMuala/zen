@@ -68,6 +68,7 @@ namespace zen
     {
         zen::composer::composer::reset();
         code = {hlt};
+        class_.reset();
 
         auto string_type = std::make_shared<type>("string", 0, type::kind::heap);
         auto unit_type = std::make_shared<type>("unit", 0);
@@ -1586,7 +1587,7 @@ if (top()->is(#T))\
             }
             for (int i = 0; i < arguments.size(); i++)
             {
-                if (overload.signature.parameters.at(i) != arguments.at(i)->type)
+                if (not(overload.signature.parameters.at(i) == arguments.at(i)->type))
                     break;
                 if (i + 1 == arguments.size())
                     candidate = overload;
@@ -1594,6 +1595,7 @@ if (top()->is(#T))\
             if (candidate)
                 break;
         }
+
         /*
         for (auto& overload : func_it->second)
         {
@@ -2007,7 +2009,6 @@ if (top()->is(#T))\
             {
                 if (not casters.contains(name))
                 {
-                    fmt::println("no such caster {}\n\n\n", name);
                     throw e;
                 }
             }
