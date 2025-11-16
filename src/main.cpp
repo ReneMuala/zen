@@ -49,13 +49,13 @@ void define_print_string(zen::composer::vm::composer* composer)
 	composer->begin("print");
 	composer->set_parameter("string", "string");
 	{
-		composer->push("string.data");
+		composer->push("string.[data]");
 		const auto deref = composer->dereference(composer->top());
 		composer->pop();
 		composer->push(deref);
 	}
 	{
-		composer->push("string.len");
+		composer->push("string.[len]");
 		const auto deref = composer->dereference(composer->top());
 		composer->pop();
 		composer->push(deref);
@@ -278,7 +278,6 @@ class person {
 	surname: string
 	age: int
 	registered: bool
-	father: person
 	getAge = int {
 		this.age
 	}
@@ -364,7 +363,15 @@ main = {
 	}
 
 	p: person = person("Zendaya", 10)
-	p.greet()
+	println(p.name.len())
+	println(p.name.empty())
+	for(i: long = 0l, p.name.len() - 1l){
+		print(p.name.at(i))
+	}
+	println()
+	println(p.name.slice(4l,9l))
+	println(p.name.sub(4l,3l))
+	println(p.name.su)
 }
 )");
 #endif

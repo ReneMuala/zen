@@ -225,11 +225,11 @@ void zen::vm::run(stack& stack, const i64& entry_point)
     {
         for (i = entry_point; i < this->code.size(); i++)
         {
-            if (false)
+            if constexpr (constexpr bool KEEP_TRACK_OF_STACK = false)
             {
-                bool display = true;
+                constexpr bool DISPLAY_STACK = false;
                 i64 stack_usage_difference = -stack.negative_stack_size - last_stack_usage;
-                if (stack_usage_difference && display)
+                if (stack_usage_difference && DISPLAY_STACK)
                     fmt::println("sud = {}", stack_usage_difference);
 
                 if (stack_usage_difference > 0)
@@ -244,7 +244,7 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 }
                 last_stack_usage = -stack.negative_stack_size;
                 auto stack_usage = last_stack_usage;
-                if (display)
+                if (DISPLAY_STACK)
                 {
                     for (const auto& sti : stack_usage_deque)
                     {

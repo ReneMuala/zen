@@ -21,9 +21,9 @@ public:
     std::unique_ptr<function_scope> scope;
     std::vector<i64> code;
     std::unordered_map<std::string, std::list<function>> functions;
-    std::unordered_map<std::string, std::shared_ptr<const type>> types;
+    std::unordered_map<std::string, std::shared_ptr<type>> types;
     std::shared_ptr<type> class_;
-    std::shared_ptr<const type>& get_type(const std::string& name) override;
+    std::shared_ptr<type>& get_type(const std::string& name) override;
     void begin_type(std::shared_ptr<type>&) override;
     void end_type() override;
     std::shared_ptr<value> top();
@@ -37,11 +37,12 @@ public:
     void return_value() override;
     void assume_returned() override;
     void set_return_name(const std::string& name) override;
-    void construct(const std::shared_ptr<const zen::composer::type>& t);
+    void construct(const std::shared_ptr<const zen::composer::type>& t, bool allocate);
     void set_local(std::string name, const std::string& type) override;
     void end() override;
     void bake() override;
     void assign() override;
+    void _report_field_not_found(const std::string& name, const std::shared_ptr<type>& type);
     void _push_variable(const std::vector<std::string> & tokens, const std::shared_ptr<value>& location);
     void _push_function();
     void _push_temporary_value(const std::string& type_name);
@@ -107,6 +108,7 @@ public:
     void _link_string_equals();
     void _link_string_not_equals();
     void _link_string_plus();
+    void _link_string_methods();
     void link() override;
     std::shared_ptr<value> dereference(const std::shared_ptr<value> & value);
     void begin_block() override;
@@ -115,7 +117,7 @@ protected:
     void self_assign_reference(const std::shared_ptr<value>& value);
     void assign_reference(const std::shared_ptr<value>& to, const std::shared_ptr<value>& from);
     std::shared_ptr<value> pop_operand(bool allow_dereferencing = true);
-    void push(const std::shared_ptr<const type>& type) override;
+    void push(const std::shared_ptr<type>& type) override;
     static i64 get_parameters_size(const signature& sig);
     static i64 get_return_size(const signature& sig);
     void increment_by_one();

@@ -22,23 +22,17 @@ namespace zen::composer
         } kind;
         const std::string name;
         std::shared_ptr<type> base;
-        std::vector<std::pair<std::string, std::shared_ptr<const type>>> fields;
-        [[nodiscard]] std::pair<i64, std::shared_ptr<const type>> get_field(const std::string & name, const i32 & ilc_offset = 0) const
+        std::vector<std::pair<std::string, std::shared_ptr<type>>> fields;
+        [[nodiscard]] std::optional<std::pair<i64, std::shared_ptr<type>>> get_field(const std::string & name) const
         {
             i64 offset = 0;
-            std::string options;
+            std::string hint;
             for (const auto & [fst, snd] : fields)
             {
-                if (fst == name) return {offset, snd};
+                if (fst == name) return {{offset, snd}};
                 offset += snd->_size;
-                options += fst + ",";
             }
-            if (not options.empty())
-            {
-                options.pop_back();
-                options="(options: " + options + ")";
-            }
-            throw exceptions::semantic_error(fmt::format("no such field {} in type {}{}", name, this->name, options), ilc_offset);
+            return {};
         }
 
         bool has_relation(const type & t) const
@@ -59,11 +53,11 @@ namespace zen::composer
             return false;
         }
 
-        void add_field(const std::string & name, const std::shared_ptr<const type> & type, const int offset)
+        void add_field(const std::string & name, const std::shared_ptr<type> & type, const int offset)
         {
             if (type->has_relation(*this))
                 throw exceptions::semantic_error("infinite-sized type", offset, fmt::format("class '{}' contains itself as a field (directly or indirectly).\n\tuse a wrapper in the cycle to break infinite size", this->name));
-            _size += type->_size;
+            _size += type->get_full_size();
             fields.emplace_back(name, type);
         }
         explicit operator const std::string&() const { return name; }
@@ -98,7 +92,7 @@ namespace zen::composer
         };
         kind kind;
         i64 offset;
-        std::shared_ptr<const type> type;
+        std::shared_ptr<type> type;
         bool no_destructor = false;
         std::string label;
         bool is_reference = false;
@@ -115,12 +109,12 @@ namespace zen::composer
         {
             return kind == kind::constant or kind == kind::fake_constant ? _address : _address - st_point;
         }
-        explicit value(const std::shared_ptr<const composer::type> & type, const i64 & address, const enum kind & kind = variable) :
+        explicit value(const std::shared_ptr<composer::type> & type, const i64 & address, const enum kind & kind = variable) :
             kind(kind), offset(0), type(type), _address(address)
         {
         }
 
-        explicit  value(const std::string& label, const std::shared_ptr<const composer::type> & type, const i64 & address) : value(type, address)
+        explicit  value(const std::string& label, const std::shared_ptr<composer::type> & type, const i64 & address) : value(type, address)
         {
             this->label = label;
         }
@@ -130,8 +124,8 @@ namespace zen::composer
 
     struct signature
     {
-        std::shared_ptr<const type> type;
-        std::vector<std::shared_ptr<const composer::type>> parameters {};
+        std::shared_ptr<type> type;
+        std::vector<std::shared_ptr<composer::type>> parameters {};
 
         bool operator==(const signature& other) const
         {
@@ -144,10 +138,10 @@ public:
     int & _ilc_offset;
     utils::constant_pool _pool;
     std::stack<std::shared_ptr<value>> _stack;
-    virtual std::shared_ptr<const type>& get_type(const std::string& name) = 0;
+    virtual std::shared_ptr<type>& get_type(const std::string& name) = 0;
     virtual void begin_type(std::shared_ptr<type>&) = 0;
     virtual void end_type() = 0;
-    virtual void push(const std::shared_ptr<const type>& type) = 0;
+    virtual void push(const std::shared_ptr<type>& type) = 0;
 
     virtual void reset()
     {

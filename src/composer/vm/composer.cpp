@@ -22,7 +22,7 @@
                 {\
                     try\
                     {\
-                        /*fmt::println("[zenDestructor]({}):{}", local->label, __LINE__);*/\
+                        /*fmt::println("[zenDestructor]({}):{} in {}", local->label, __LINE__, scope->name);*/\
                         push(local);\
                         call("[zenDestructor]",1);\
                     } catch (const std::exception & e)\
@@ -84,10 +84,10 @@ namespace zen
             {"byte", std::make_shared<type>("byte", 1)},
             {"string", string_type},
         };
-        string_type->add_field("len", get_type("long"), 0);
-        string_type->add_field("data", get_type("long"), 0);
+        string_type->add_field("[len]", get_type("long"), 0);
+        string_type->add_field("[data]", get_type("long"), 0);
         functions = {
-            {"[zenConstructor]", {{signature{string_type}, 0, false}}},
+            {"[zenConstructor]", {{signature{string_type, {get_type("bool")}}, 0, false}}},
             {"operator=", {{signature{unit_type, {string_type, string_type}}, 0, false}}},
             {"operator+", {{signature{string_type, {string_type, string_type}}, 0, false}}},
             {"operator==", {{signature{get_type("bool"), {string_type, string_type}}, 0, false}}},
@@ -185,7 +185,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         scope->return_data.name = name;
     }
 
-    void composer::vm::composer::construct(const std::shared_ptr<const zen::composer::type>& t)
+    void composer::vm::composer::construct(const std::shared_ptr<const zen::composer::type>& t, bool allocate)
     {
         if (const auto func_it = functions.find("[zenConstructor]"); func_it != functions.end())
         {
@@ -193,7 +193,10 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             {
                 if (zen_allocator.signature.type == t)
                 {
-                    _call_function_overload({}, zen_allocator, true); // , call_result::pushed_from_constructor;
+                    zen::composer::composer::push<zen::boolean>(allocate, "bool");
+                    auto arg0 = top();
+                    pop();
+                    _call_function_overload({arg0}, zen_allocator, true); // , call_result::pushed_from_constructor;
                     return;
                 }
             }
@@ -211,7 +214,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
     {
         KAIZEN_REQUIRE_SCOPE(scope::in_function);
         std::string no_constructor = "::noConstructor";
-        std::shared_ptr<const zen::composer::type> t;
+        std::shared_ptr<zen::composer::type> t;
         const bool no_construtor_mode = type.ends_with(no_constructor);
         if (no_construtor_mode)
             t = get_type(type.substr(0, type.length() - no_constructor.size()));
@@ -224,7 +227,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             code.push_back(-t->get_size());
             if (t->kind == type::heap and not no_construtor_mode)
             {
-                construct(t);
+                construct(t, true);
             }
         }
     }
@@ -256,7 +259,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             _stack.pop();
     }
 
-    std::shared_ptr<const composer::type>& composer::vm::composer::get_type(const std::string& name)
+    std::shared_ptr<composer::type>& composer::vm::composer::get_type(const std::string& name)
     {
         if (types.contains(name))
         {
@@ -282,35 +285,36 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         auto type = class_;
         begin("[zenConstructor]");
         set_return_type(type->name);
+        set_parameter("allocate", "bool");
+        push("allocate");
+        begin_if_then();
         push("<return>");
+        auto return_ = top();
         zen::composer::composer::push<i64>(type->get_full_size(), "long");
         call(std::to_string(zen::allocate), 2);
+        end_if();
+        /*
+        i64 offset = 0;
         for (const auto& field : type->fields)
         {
             if (field.second->kind == type::kind::heap)
             {
                 set_local("pointer", "long");
-                construct(field.second);
-                push("<return>." + field.first);
-                top()->type = get_type("long");
-                top()->is_reference = true;
                 push("pointer");
-                assign();
+                code.push_back(zen::add_i64);
+                code.push_back(top()->address(scope->get_stack_usage()));
+                code.push_back(return_->address(scope->get_stack_usage()));
+                code.push_back((i64)_pool.get<i64>(offset).get());
+                pop();
+                // construct(field.second, false); // right now this is useless as nested objects will always do the same (allocate memory and initialize fields with zero)
             }
-        }
+            offset += field.second->get_full_size();
+        }*/
         assume_returned();
         end();
 
         begin("[zenDestructor]");
         set_parameter("it", type->name);
-        for (const auto& field : type->fields)
-        {
-            if (field.second->kind == type::kind::heap)
-            {
-                push("it." + field.first);
-                call("[zenDestructor]", 1);
-            }
-        }
         push("it");
         call(std::to_string(zen::deallocate), 1);
         end();
@@ -586,8 +590,9 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                 code.push_back(zen::f64_to_f64);
             else if ((lhs->is("byte") or lhs->is("bool")))
                 code.push_back(zen::i8_to_i8);
-            else throw exceptions::semantic_error(
-                fmt::format("stack type {} is not supported for assignment", lhs->type->name), _ilc_offset);
+            else
+                throw exceptions::semantic_error(
+                    fmt::format("stack type {} is not supported for assignment", lhs->type->name), _ilc_offset);
             code.push_back(lhs->address(scope->get_stack_usage()));
             code.push_back(rhs->address(scope->get_stack_usage()));
             if (dereference_assignment)
@@ -601,6 +606,33 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             push(rhs);
             call("operator=", 2);
         }
+    }
+
+    void composer::vm::composer::_report_field_not_found(const std::string& name, const std::shared_ptr<type>& type)
+    {
+        std::string hint;
+        for (const auto& field : type->fields)
+        {
+            if (not field.first.starts_with('['))
+            {
+                hint += fmt::format("\n\t- {}:{}", field.first, field.second->name);
+            }
+        }
+        const auto prefix = type->name + ".";
+        for (const auto& function : functions)
+        {
+            if (function.first.starts_with(prefix))
+            {
+                hint += fmt::format("\n\t- {}(...)", function.first.substr((prefix.length())));
+            }
+        }
+
+        if (not hint.empty())
+        {
+            hint = "options:" + hint + ",";
+        }
+        throw exceptions::semantic_error(fmt::format("no such field {} in type {}", name, type->name), _ilc_offset,
+                                         hint);
     }
 
     std::vector<std::string> split_name(const std::string& name)
@@ -619,33 +651,43 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
     void composer::vm::composer::_push_variable(const std::vector<std::string>& tokens,
                                                 const std::shared_ptr<value>& location)
     {
-        std::shared_ptr<value> val = std::make_shared<value>(*location);
-        std::pair<i64, std::shared_ptr<const type>> item = {0, val->type};
-        for (int i = 1; i < tokens.size(); ++i)
-        {
-            const auto [fst, snd] = item.second->get_field(tokens[i], _ilc_offset);
-            item.first += fst;
-            item.second = snd;
-            val->no_destructor = false;
-        }
-        val->offset = item.first;
-        val->type = item.second;
-        // fmt::println("{}: {} [{}]", name, val.type->name, val.offset);
-        // if this is a reference to an object's field
         if (tokens.size() > 1)
         {
-            // create a pointer
+            std::shared_ptr<value> val = std::make_shared<value>(*location);
+            std::pair<i64, std::shared_ptr<type>> item = {0, val->type};
+            for (int i = 1; i < tokens.size(); ++i)
+            {
+                /*
+                * if (not hint.empty())
+                {
+                    hint = "\n\toptions:" + hint + ",";
+                }
+                throw exceptions::semantic_error(fmt::format("no such field {} in type {}{}", name, this->name, hint), ilc_offset);
+
+                 */
+                if (const auto field = item.second->get_field(tokens[i]))
+                {
+                    item.first += field->first;
+                    item.second = field->second;
+                }
+                else
+                {
+                    _report_field_not_found(tokens[i], item.second);
+                }
+            }
+            val->offset = item.first;
+            val->type = item.second;
+
             push(get_type("long"));
             top()->type = val->type;
             top()->is_reference = true;
-            // pointer = object + field_offset
             code.push_back(zen::add_i64);
             code.push_back(top()->address(scope->get_stack_usage()));
             code.push_back(location->address(scope->get_stack_usage()));
             code.push_back((i64)(_pool.get<i64>(val->offset).get()));
         }
         else
-            push(val);
+            push(location);
     }
 
     void composer::vm::composer::_push_function()
@@ -1512,7 +1554,10 @@ if (top()->is(#T))\
         const std::deque<std::shared_ptr<value>>& arguments, function& func, const bool construtor_call)
     {
         const auto returned = _push_callee_return_value(func.signature, construtor_call);
-        // }
+        if (arguments.size() != func.signature.parameters.size())
+        {
+            throw exceptions::semantic_error(fmt::format("<KAIZEN-INTERNAL-API> bad overload calling"), _ilc_offset);
+        }
         _push_callee_arguments(arguments);
         const bool returned_result = returned and not construtor_call;
         if (returned_result)
@@ -1545,7 +1590,7 @@ if (top()->is(#T))\
         std::shared_ptr<value> this_;
         if (func_it->first.contains('.'))
         {
-            this_ = pop_operand();
+            this_ = pop_operand(false); // this is always an object do we dont need to dereference it
         }
         for (int i = 0; i < args_count; i++)
         {
@@ -1566,7 +1611,8 @@ if (top()->is(#T))\
                 value = cha;
                 code.push_back(placeholder);
             }
-            else if (value->is_reference)
+            else if (value->type->kind == type::kind::stack and value->is_reference)
+            // deference fields only if they are stack allocated since nested objects are stored in a contiguous memory block
             {
                 value = dereference(value);
             }
@@ -1741,27 +1787,34 @@ if (top()->is(#T))\
         auto& zen_constructors = functions.at("[zenConstructor]");
         for (auto& zen_constructor : zen_constructors)
         {
-            if (zen_constructor.signature.type->name == "string" and not zen_constructor.defined)
+            if (zen_constructor.signature.type->name == "string" and zen_constructor.signature.parameters.size() == 1
+                and zen_constructor.signature.parameters.at(0)->name ==
+                "bool" and not zen_constructor.defined)
                 undefined_version = zen_constructor;
         }
 
         if (not undefined_version)
-            return;
-
+        {
+            throw exceptions::semantic_error("[zenConstructor] for string not found", _ilc_offset);
+        }
         begin("[zenConstructor]");
         undefined_version->get().address = scope->definition.get().address;
         for (auto& label : undefined_version->get().labels)
             label.bind(code);
         set_return_type("string");
+        set_parameter("allocate", "bool"); // ignored since string has no object fields
+        push("allocate");
+        begin_if_then();
         push("<return>");
         zen::composer::composer::push<i64>(get_type("string")->get_full_size(), "long");
         call(std::to_string(zen::allocate), 2);
+        end_if();
 
-        push("<return>.len");
+        push("<return>.[len]");
         zen::composer::composer::push<i64>(0, "long");
         assign();
 
-        push("<return>.data");
+        push("<return>.[data]");
         zen::composer::composer::push<i64>(0, "long");
         assign();
         assume_returned();
@@ -1779,19 +1832,21 @@ if (top()->is(#T))\
                 undefined_version = zen_destructor;
         }
         if (not undefined_version)
-            return;
+        {
+            throw exceptions::semantic_error("[zenDestructor] for string not found", _ilc_offset);
+        }
 
         begin("[zenDestructor]");
         undefined_version->get().address = scope->definition.get().address;
         for (auto& label : undefined_version->get().labels)
             label.bind(code);
         set_parameter("it", "string");
-        push("it.data");
+        push("it.[data]");
         call("bool", 1);
         begin_if_then();
         push("<int>");
         {
-            push("it.data");
+            push("it.[data]");
             const auto deref = dereference(top());
             pop();
             push(deref);
@@ -1813,8 +1868,11 @@ if (top()->is(#T))\
                 overload.signature.parameters.at(1)->name == "string" and not overload.defined)
                 undefined_version = overload;
         }
+
         if (not undefined_version)
-            return;
+        {
+            throw exceptions::semantic_error("operator= for string not found", _ilc_offset);
+        }
 
         begin("operator=");
         undefined_version->get().address = scope->definition.get().address;
@@ -1822,44 +1880,44 @@ if (top()->is(#T))\
             label.bind(code);
         set_parameter("to", "string");
         set_parameter("from", "string");
-        push("to.data");
+        push("to.[data]");
         // push("bool");
         // call("bool", 1, zen::composer::call_result::pushed);
         zen::composer::composer::push<i64>(0, "long");
         not_equal();
         begin_if_then();
-        push("to.data");
+        push("to.[data]");
         call(std::to_string(zen::deallocate), 1);
         end_if();
         set_local("data", "long");
         code.push_back(placeholder);
         push("data");
-        push("from.len");
+        push("from.[len]");
         call(std::to_string(zen::allocate), 2);
         code.push_back(placeholder);
 
         push("data");
         {
-            push("from.data");
+            push("from.[data]");
             const auto deref = dereference(top());
             pop();
             push(deref);
         }
         {
-            push("from.len");
+            push("from.[len]");
             const auto deref = dereference(top());
             pop();
             push(deref);
         }
         call(std::to_string(zen::copy), 3);
 
-        push("to.data");
+        push("to.[data]");
         push("data");
         assign();
 
 
-        push("to.len");
-        push("from.len");
+        push("to.[len]");
+        push("from.[len]");
         assign();
         end();
     }
@@ -1875,7 +1933,9 @@ if (top()->is(#T))\
                 undefined_version = overload;
         }
         if (not undefined_version)
-            return;
+        {
+            throw exceptions::semantic_error("operator== for string not found", _ilc_offset);
+        }
         begin("operator==");
         undefined_version->get().address = scope->definition.get().address;
         for (auto& label : undefined_version->get().labels)
@@ -1949,6 +2009,187 @@ if (top()->is(#T))\
         end();
     }
 
+    void composer::vm::composer::_link_string_methods()
+    {
+        class_ = get_type("string");
+
+        begin("string.len");
+        set_return_type("long");
+        set_parameter("this", "string");
+        push("this.[len]");
+        return_value();
+        end();
+
+        begin("string.empty");
+        set_return_type("bool");
+        set_parameter("this", "string");
+        push("this.[len]");
+        zen::composer::composer::push<i64>(0, "long");
+        equal();
+        return_value();
+        end();
+
+        begin("string.at");
+        set_return_type("byte");
+        set_parameter("this", "string");
+        set_parameter("pos", "long");
+        push("pos");
+        push("this.[len]");
+        lower();
+        begin_if_then();
+        push(get_type("long"));
+        auto ptr = top();
+        push("this.[data]");
+        push("pos");
+        plus();
+        assign();
+        push("<return>");
+        push(ptr);
+        ptr->is_reference = true;
+        ptr->type = get_type("byte");
+        assign();
+        assume_returned();
+        close_branch();
+        else_then();
+        zen::composer::composer::push<i8>(0, "byte");
+        return_value();
+        end_if();
+        end();
+
+        begin("string.slice");
+        set_return_type("string");
+        set_parameter("this", "string");
+        set_parameter("from", "long");
+        set_parameter("to", "long");
+        push("from");
+        zen::composer::composer::push<i64>(0, "long");
+        lower();
+        begin_if_then();
+        push("from");
+        zen::composer::composer::push<i64>(0, "long");
+        assign();
+        end_if();
+        push("to");
+        push("this.[len]");
+        greater_or_equal();
+        begin_if_then();
+        push("to");
+        push("this.[len]");
+        assign();
+        end_if();
+        set_local("len", "long");
+        push("len");
+        push("to");
+        push("from");
+        minus();
+        assign();
+
+        push("len");
+        zen::composer::composer::push<i64>(0, "long");
+        greater();
+        begin_if_then();
+        {
+            set_local("sub", "string");
+            push("sub");
+            const auto sub = top();
+            sub->no_destructor = true;
+            pop();
+            push(get_type("long"));
+            auto ptr = top();
+            push("this.[data]");
+            push("from");
+            plus();
+            assign();
+            push("sub.[data]");
+            push(ptr);
+            assign();
+
+            push("sub.[len]");
+            push("len");
+            assign();
+
+            push("sub");
+            return_value();
+        }
+        close_branch();
+        else_then();
+        {
+            assume_returned(); // because if automatic resource allocation this will leave the return buffer empty
+        }
+        end_if();
+        end();
+
+        begin("string.sub");
+        set_return_type("string");
+        set_parameter("this", "string");
+        set_parameter("from", "long");
+        set_parameter("len", "long");
+        push("from");
+        push("from");
+        push("len");
+        plus();
+        call("this.slice", 2);
+        return_value();
+        end();
+
+
+        // begin("string.num");
+        // set_return_type("bool");
+        // set_parameter("this", "string");
+        // push("this.[len]");
+        // zen::composer::composer::push<i64>(0,"long");
+        // equal();
+        // return_value();
+        // end();
+
+
+        /*
+        {"string.has", {{signature{get_type("bool"), {string_type}}, 0, false}}},
+        {"string.trim", {{signature{unit_type, {string_type}}, 0, false}}},
+        {"string.upper", {{signature{unit_type, {string_type}}, 0, false}}},
+        {"string.lower", {{signature{unit_type, {string_type}}, 0, false}}},
+        {"string.swap", {{signature{unit_type, {string_type, string_type}}, 0, false}}},
+        {"string.slice", {{signature{string_type, {get_type("long"), get_type("long")}}, 0, false}}},
+        {"string.starts", {{signature{get_type("bool"), {string_type}}, 0, false}}},
+        {"string.ends", {{signature{get_type("bool"), {string_type}}, 0, false}}},
+        {"string.first", {{signature{get_type("long"), {string_type}}, 0, false}}},
+        {"string.last", {{signature{get_type("long"), {string_type}}, 0, false}}},
+        {"string.count", {{signature{get_type("long"), {string_type}}, 0, false}}},
+        {"string.at", {{signature{get_type("byte"), {string_type}}, 0, false}}},
+        {"string.reverse", {{signature{unit_type, {string_type}}, 0, false}}},
+        {"string.repeat", {{signature{unit_type, {get_type("long")}}, 0, false}}},
+        {"string.capitalize", {{signature{unit_type, {}}, 0, false}}},
+        {"string.title", {{signature{unit_type, {}}, 0, false}}},
+        {"string.shift", {{signature{get_type("bool"), {string_type}}, 0, false}}},
+        {"string.shift", {{signature{get_type("bool"), {}}, 0, false}}},
+        {"string.shift", {{signature{get_type("bool"), {long}}, 0, false}}},
+        {"string.pop", {{signature{get_type("bool"), {string}}, 0, false}}},
+        {"string.pop", {{signature{get_type("bool"), {long}}, 0, false}}},
+        {"string.pop", {{signature{get_type("bool"), {}}, 0, false}}},
+
+        {"string.num", {{signature{get_type("bool"), {}}, 0, false}}},
+        if (c >= '0' && c <= '9') {
+        return 1; // Non-zero value indicates true
+    } else {
+        return 0; // Zero indicates false
+    }
+        {"string.nums", {{signature{get_type("bool"), {}}, 0, false}}},
+        {"string.letter", {{signature{get_type("bool"), {}}, 0, false}}},
+        {"string.letters", {{signature{get_type("bool"), {}}, 0, false}}},
+        {"string.mix", {{signature{get_type("bool"), {}}, 0, false}}},
+        {"string.mixed", {{signature{get_type("bool"), {}}, 0, false}}},
+        {"string.space", {{signature{get_type("bool"), {}}, 0, false}}},
+        {"string.spaces", {{signature{get_type("bool"), {}}, 0, false}}},
+        {"string.control", {{signature{get_type("bool"), {}}, 0, false}}},
+        {"string.controls", {{signature{get_type("bool"), {}}, 0, false}}},
+        {"string.symbol", {{signature{get_type("bool"), {}}, 0, false}}},
+        {"string.symbols", {{signature{get_type("bool"), {}}, 0, false}}},
+        {"string.visible", {{signature{get_type("bool"), {}}, 0, false}}},
+        {"string.visibles", {{signature{get_type("bool"), {}}, 0, false}}},
+        */
+        class_.reset();
+    }
+
     void composer::vm::composer::link()
     {
         KAIZEN_REQUIRE_GLOBAL_SCOPE();
@@ -1958,6 +2199,7 @@ if (top()->is(#T))\
         _link_string_equals();
         _link_string_not_equals();
         _link_string_plus();
+        _link_string_methods();
     }
 
     void composer::vm::composer::self_assign_reference(const std::shared_ptr<value>& value)
@@ -1976,7 +2218,7 @@ if (top()->is(#T))\
         code.push_back(from->address(scope->get_stack_usage()));
     }
 
-    void composer::vm::composer::push(const std::shared_ptr<const type>& type)
+    void composer::vm::composer::push(const std::shared_ptr<type>& type)
     {
         _stack.emplace(std::make_shared<value>(type, scope->get_stack_usage(), value::temporary));
         code.push_back(most);

@@ -69,7 +69,7 @@ namespace zen::composer::vm
             }
         }
 
-        void set_local(const std::string& name, const std::shared_ptr<const zen::composer::type>& t,
+        void set_local(const std::string& name, const std::shared_ptr<zen::composer::type>& t,
                        const i64& stack_usage)
         {
             if (nested_scope)
