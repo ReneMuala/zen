@@ -511,5 +511,3 @@ void zen::vm::run(stack& stack, const i64& entry_point)
         fmt::print(stderr, "fatal error: {}\nvm halted at {}", e.what(), i);
     }
 }
-
-
