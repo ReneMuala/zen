@@ -1,39 +1,41 @@
 #pragma once
 #include <functional>
 #include <vector>
+#include <memory>
 
-struct derivation_history_t {
+#define END_ILC_CODEGEN };
+
+#define BEGIN_ILC_CODEGEN(NAME)                                                      \
+  struct NAME {                                                              \
+  /** @brief Compilation time, indicates the ILC compilation time, should be   \
+   * incremented when the chain content changes  */                            \
+  unsigned short compilation_id{0};                                     \
+  /** @brief The chain to be parsed */ std::vector<SYMBOL> chain{};     \
+  /** @brief The size of the chain, should be updated with chain.size() when   \
+   * @a chain content's change*/                                               \
+   size_t chain_size{0};                                                 \
+  /** @brief Indicates the offset of the compilation @warning When getting the \
+   * value of an index after REQUIRE_X(...) always do chain[offset-1], because \
+   * offset gets incremented after REQUIRE*/                                   \
+  int offset{0}; \
+  static std::shared_ptr<NAME> make(){ return std::make_unique<NAME>();  }
+
+#if defined(BEGIN_ILC_CODEGEN)
+
+struct derivation_history_t
+{
   /// indicates the last compilation time in wich this producion was used
   unsigned short compilation_id{0};
   /// indicates the offset starting from the beginning the token chain
   int offset{-1};
 };
 
-inline bool CHECK_DERIVATION_HISTORY(derivation_history_t &history);
-inline void CLEAR_DERIVATION_HISTORY(derivation_history_t &history);
+inline bool CHECK_DERIVATION_HISTORY(derivation_history_t& history);
+inline void CLEAR_DERIVATION_HISTORY(derivation_history_t& history);
 
-inline bool HANDLE_TERMINAL(int);               // definined with
-                                                // BEGIN_BINDINGS
+inline bool HANDLE_TERMINAL(int); // definined with
+// BEGIN_BINDINGS
 constexpr inline bool HANDLE_NON_TERMINAL(int); // definined with BEGIN_BINDINGS
-
-#define END_ILC_CODEGEN
-
-#define BEGIN_ILC_CODEGEN                                                      \
-  namespace ILC {                                                              \
-  /** @brief Compilation time, indicates the ILC compilation time, should be   \
-   * incremented when the chain content changes  */                            \
-  static unsigned short compilation_id{0};                                     \
-  /** @brief The chain to be parsed */ static std::vector<SYMBOL> chain{};     \
-  /** @brief The size of the chain, should be updated with chain.size() when   \
-   * @a chain content's change*/                                               \
-  static size_t chain_size{0};                                                 \
-  /** @brief Indicates the offset of the compilation @warning When getting the \
-   * value of an index after REQUIRE_X(...) always do chain[offset-1], because \
-   * offset gets incremented after REQUIRE*/                                   \
-  static int offset{0};                                                        \
-  }
-
-#if defined(BEGIN_ILC_CODEGEN)
 
 #define BEGIN_BINDINGS                                                         \
   constexpr inline bool HANDLE_NON_TERMINAL(int _SYMBOL) {                     \
@@ -50,20 +52,20 @@ constexpr inline bool HANDLE_NON_TERMINAL(int); // definined with BEGIN_BINDINGS
     }                                                                          \
     }                                                                          \
     inline bool HANDLE_TERMINAL(int symbol) {                                  \
-      if (ILC::offset < ILC::chain_size and                                    \
-          ILC::chain[ILC::offset] == symbol) {                                 \
-        ILC::offset++;                                                         \
+      if (offset < chain_size and                                    \
+          chain[offset] == symbol) {                                 \
+        offset++;                                                         \
         return true;                                                           \
       }                                                                        \
       return false;                                                            \
     }                                                                          \
     inline bool CHECK_DERIVATION_HISTORY(derivation_history_t &history) {      \
       static bool found;                                                       \
-      found = history.offset >= ILC::offset and                                \
-              history.compilation_id == ILC::compilation_id;                   \
+      found = history.offset >= offset and                                \
+              history.compilation_id == compilation_id;                   \
       if (not found) {                                                         \
-        history.offset = ILC::offset;                                          \
-        history.compilation_id = ILC::compilation_id;                          \
+        history.offset = offset;                                          \
+        history.compilation_id = compilation_id;                          \
       }                                                                        \
       return found;                                                            \
     }                                                                          \
@@ -82,7 +84,7 @@ constexpr inline bool HANDLE_NON_TERMINAL(int); // definined with BEGIN_BINDINGS
     static derivation_history_t HISTORY;                                       \
     if (CHECK_DERIVATION_HISTORY(HISTORY))                                     \
       return false;                                                            \
-    const size_t OFFSETC = ILC::offset;
+    const size_t OFFSETC = offset;
 
 #define END_PRODUCTION                                                         \
   CLEAR_DERIVATION_HISTORY(HISTORY);                                           \
@@ -93,7 +95,7 @@ constexpr inline bool HANDLE_NON_TERMINAL(int); // definined with BEGIN_BINDINGS
 #define TRY_REQUIRE_NON_TERMINAL(I) HANDLE_NON_TERMINAL(I)
 
 #define ROLLBACK_PRODUCTION()                                                  \
-  ILC::offset = OFFSETC;                                                       \
+  offset = OFFSETC;                                                       \
   return false;
 
 #define REQUIRE_TERMINAL(I)                                                    \

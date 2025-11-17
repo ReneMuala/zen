@@ -1,6 +1,6 @@
 add_rules("mode.debug", "mode.release","plugin.compile_commands.autoupdate")
 --add_requires("fmt", "asmjit", "libffi")
-add_requires("fmt", "asmjit", "gtest")
+add_requires("fmt", "gtest")
 
 if is_plat("wasm") then
     add_cxflags([[-DKAIZEN_WASM]])
@@ -30,7 +30,7 @@ target("zen")
     set_languages("c++23")
     set_kind("binary")
     --add_packages("fmt", "asmjit", "libffi")
-    add_packages("fmt", "asmjit")
+    add_packages("fmt")
     add_includedirs("src/", "libs/")
     add_files(
             "src/*.cpp",

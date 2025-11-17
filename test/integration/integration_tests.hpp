@@ -7,18 +7,11 @@
 #include "parser/parser.hpp"
 #include <chrono>
 
-inline void setup_integration_test(const std::string& code, zen::composer::composer * composer)
-{
-    assert(composer);
-    composer->reset();
-    setup_parser_test(code);
-}
-
 TEST(integration, empty_main)
 {
-    const auto composer = dynamic_cast<zen::composer::vm::composer*>(get_composer());
-    setup_integration_test(R"(main = {})", composer);
-    EXPECT_TRUE(parse());
+    auto parser = setup_parser(R"(main = {})");
+	zen::composer::vm::composer* composer = static_cast<zen::composer::vm::composer*>(parser->composer.get());
+    EXPECT_TRUE(parser->parse());
     EXPECT_EQ(composer->code, (std::vector<i64>{hlt, ret}));
     zen::vm::stack stack;
     stack.push<i64>(0);
@@ -30,9 +23,9 @@ TEST(integration, empty_main)
 
 TEST(integration, add_numbers)
 {
-    const auto composer = dynamic_cast<zen::composer::vm::composer*>(get_composer());
-    setup_integration_test(R"(add(a: int, b: int, c: int) = int { a + b + c })", composer);
-    EXPECT_TRUE(parse());
+    auto parser = setup_parser(R"(add(a: int, b: int, c: int) = int { a + b + c })");
+	zen::composer::vm::composer* composer = static_cast<zen::composer::vm::composer*>(parser->composer.get());
+    EXPECT_TRUE(parser->parse());
     EXPECT_EQ(composer->code, (std::vector<i64>{hlt, most, -4, add_i32, -4, -20, -16, most, -4, add_i32, -4, -28, -8, i32_to_i32, -32, -4, most, 8, ret,}));
     zen::vm::stack stack;
     stack.push<i32>(0); // return value
@@ -50,30 +43,7 @@ TEST(integration, add_numbers)
 
 TEST(integration, hello_world)
 {
-    const auto composer = dynamic_cast<zen::composer::vm::composer*>(get_composer());
-    composer->reset();
-
-    composer->begin("print");
-    composer->set_parameter("string", "string");
-    {
-        composer->push("string.data");
-        const auto deref = composer->dereference(composer->top());
-        composer->call(std::to_string(placeholder), 0);
-        composer->pop();
-        composer->push(deref);
-    }
-    {
-        composer->push("string.len");
-        const auto deref = composer->dereference(composer->top());
-        composer->pop();
-        composer->push(deref);
-    }
-    composer->zen::composer::composer::push<i64>(reinterpret_cast<i64>(stdout), "long");
-    composer->call(std::to_string(write_str), 3);
-    composer->end();
-    composer->link();
-
-    setup_parser_test(R"(
+    auto parser =     setup_parser(R"(
         /*sum(x: int, y: int) = int(x+y)
         div(y: float, z: float) = float {
             if(z != 0f){
@@ -103,8 +73,32 @@ TEST(integration, hello_world)
             for(i: int = 1, 5){
             }
         })");
+    zen::composer::vm::composer* composer = static_cast<zen::composer::vm::composer*>(parser->composer.get());
+    composer->reset();
+
+    composer->begin("print");
+    composer->set_parameter("string", "string");
+    {
+        composer->push("string.data");
+        const auto deref = composer->dereference(composer->top());
+        composer->call(std::to_string(placeholder), 0);
+        composer->pop();
+        composer->push(deref);
+    }
+    {
+        composer->push("string.len");
+        const auto deref = composer->dereference(composer->top());
+        composer->pop();
+        composer->push(deref);
+    }
+    composer->zen::composer::composer::push<i64>(reinterpret_cast<i64>(stdout), "long");
+    composer->call(std::to_string(write_str), 3);
+    composer->end();
+    composer->link();
+
+
     auto t0 = std::chrono::system_clock::now();
-    EXPECT_TRUE(parse());
+    EXPECT_TRUE(parser->parse());
     auto t01 = std::chrono::system_clock::now();
     composer->bake();
     const std::list<composer::vm::function> main_functions = composer->functions["main"];

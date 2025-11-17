@@ -24,24 +24,16 @@ void EMSCRIPTEN_KEEPALIVE zen_sum(int a, int b)
 	fmt::print("{} + {} = {}\n", a, b, a + b);
 }
 
-void EMSCRIPTEN_KEEPALIVE zen_reset()
+inline void setup_parser(const std::shared_ptr<parser>& parser,const std::string& code)
 {
-	get_composer()->reset();
-}
-
-inline void setup_parser_test(const std::string& code)
-{
-	ILC::chain.clear();
-	tokens.clear();
-	parser::reset();
 	std::stringstream stream(code);
 	zen::lexer lexer(stream);
 	while (auto token = lexer.next())
 	{
-		ILC::chain.push_back(token->type);
+		parser->chain.push_back(token->type);
 		tokens.emplace_back(token.value());
 	}
-	ILC::chain_size = ILC::chain.size();
+	parser->chain_size = parser->chain.size();
 }
 
 void define_print_string(zen::composer::vm::composer* composer)
@@ -155,7 +147,8 @@ try
 		fmt::println("[zen_compile] called with null argument.");
 		return false;
 	}
-	zen::composer::vm::composer* composer = dynamic_cast<zen::composer::vm::composer*>(get_composer());
+	auto parser = parser::make();
+	zen::composer::vm::composer* composer = static_cast<zen::composer::vm::composer*>(parser->composer.get());
 	composer->reset();
 	define_print_string(composer);
 	define_print_bool(composer);
@@ -166,8 +159,8 @@ try
 	define_print_float(composer);
 	define_print_double(composer);
 	composer->link();
-	setup_parser_test(std::string(code));
-	parse();
+	setup_parser(parser,std::string(code));
+	parser->parse();
 	// composer->bake();
 	const std::list<zen::composer::vm::function> main_functions = composer->functions["main"];
 	if (main_functions.empty())
@@ -208,12 +201,6 @@ void print_zen_string(void* str)
 		printf("%c", *(char*)((char*)str + sizeof(zen::i64) + i++));
 	}
 	// printf("(%d bytes)", len);
-}
-
-inline void setup_integration_test(const std::string& code, zen::composer::composer* composer)
-{
-	composer->reset();
-	setup_parser_test(code);
 }
 
 int main(int argc, char** argv) try
@@ -370,8 +357,9 @@ main = {
 	}
 	println()
 	println(p.name.slice(4l,9l))
-	println(p.name.sub(4l,3l))
-	println(p.name.su)
+	p.name = p.name.sub(4l,3l)
+	println(p.name)
+	//println(p.name.su)
 }
 )");
 #endif
