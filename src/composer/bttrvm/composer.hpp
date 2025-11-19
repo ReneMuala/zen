@@ -15,7 +15,7 @@ struct scope {
 };
 
 struct context {
-  std::shared_ptr<scope> scope;
+  std::shared_ptr<struct scope> scope;
   std::vector<i64> code;
   static std::shared_ptr<context> make();
   static void push(const std::shared_ptr<context> &ctt);

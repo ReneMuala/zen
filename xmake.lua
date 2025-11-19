@@ -1,4 +1,4 @@
-add_rules("mode.debug", "mode.release","plugin.compile_commands.autoupdate")
+add_rules("mode.debug", "mode.release", "plugin.compile_commands.autoupdate")
 --add_requires("fmt", "asmjit", "libffi")
 add_requires("fmt", "gtest")
 
@@ -10,36 +10,36 @@ if is_plat("wasm") then
 end
 
 if not is_plat("wasm") then
-target("tests")
+    target("tests")
     set_languages("c++23")
     set_kind("binary")
     add_packages("fmt", "asmjit", "gtest")
     add_includedirs("src/", "libs/")
     add_files(
-            "src/lexer/*.cpp",
-            "src/vm/*.cpp",
-    --"src/parser/*.cpp",
-            "src/exceptions/*.cpp",
-            "src/composer/vm/*.cpp",
-            "src/composer/bttrvm/*.cpp",
-            "test/*.cpp"
+        "src/lexer/*.cpp",
+        "src/vm/*.cpp",
+        --"src/parser/*.cpp",
+        "src/exceptions/*.cpp",
+        "src/composer/vm/*.cpp",
+        "src/composer/bttrvm/*.cpp",
+        "test/*.cpp"
     )
 end
 
 target("zen")
-    set_languages("c++23")
-    set_kind("binary")
-    --add_packages("fmt", "asmjit", "libffi")
-    add_packages("fmt")
-    add_includedirs("src/", "libs/")
-    add_files(
-            "src/*.cpp",
-            "src/lexer/*.cpp",
-            "src/vm/*.cpp",
-            --"src/parser/*.cpp",
-            "src/exceptions/*.cpp",
-            "src/composer/vm/*.cpp"
-    )
+set_languages("c++23")
+set_kind("binary")
+--add_packages("fmt", "asmjit", "libffi")
+add_packages("fmt")
+add_includedirs("src/", "libs/")
+add_files(
+    "src/*.cpp",
+    "src/lexer/*.cpp",
+    "src/vm/*.cpp",
+    --"src/parser/*.cpp",
+    "src/exceptions/*.cpp",
+    "src/composer/vm/*.cpp"
+)
 --
 -- If you want to known more usage about xmake, please see https://xmake.io
 --
@@ -108,4 +108,3 @@ target("zen")
 --
 -- @endcode
 --
-

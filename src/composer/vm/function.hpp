@@ -9,7 +9,7 @@ namespace zen::composer::vm
 {
     struct function
     {
-        signature signature;
+        struct signature signature;
         i64 address;
         bool defined = true;
         std::vector<global_label> labels;

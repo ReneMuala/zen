@@ -404,6 +404,11 @@ main = {
 	println(p.name.slice(4l,9l))
 	p.name = p.name.sub(4l,3l)
 	println(p.name)
+	sum: int = 0
+	for(i: int = 1, 1_000_000){
+	    sum = sum + i
+	}
+	println(sum)
 	//println(p.name.su)
 }
 )");

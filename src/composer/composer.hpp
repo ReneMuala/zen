@@ -92,7 +92,7 @@ namespace zen::composer
         };
         kind kind;
         i64 offset;
-        std::shared_ptr<type> type;
+        std::shared_ptr<struct type> type;
         bool no_destructor = false;
         std::string label;
         bool is_reference = false;
@@ -124,7 +124,7 @@ namespace zen::composer
 
     struct signature
     {
-        std::shared_ptr<type> type;
+        std::shared_ptr<struct composer::type> type;
         std::vector<std::shared_ptr<composer::type>> parameters {};
 
         bool operator==(const signature& other) const
