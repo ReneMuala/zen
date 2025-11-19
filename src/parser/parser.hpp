@@ -13,7 +13,6 @@
 
 using namespace enums;
 extern std::vector<zen::token> tokens;
-static bool pragma_dangling_return_value = false;
 
 // namespace parser
 // {
@@ -22,6 +21,7 @@ typedef enums::token_type SYMBOL;
 
 BEGIN_ILC_CODEGEN(parser)
 #define EXPECTED(ITEM) [this]() { throw zen::exceptions::syntax_error(ITEM, offset); }
+bool pragma_dangling_return_value = false;
 
     std::string id, type, value;
     std::shared_ptr<zen::composer::type> class_;
@@ -865,7 +865,7 @@ END_SYMBOL_BINDING
         return offset == chain_size;
     }
 
-END_ILC_CODEGEN
+END_ILC_CODEGEN(parser)
 
 
 // }

@@ -26,6 +26,7 @@ void EMSCRIPTEN_KEEPALIVE zen_sum(int a, int b)
 
 inline void setup_parser(const std::shared_ptr<parser>& parser,const std::string& code)
 {
+	tokens.clear();
 	std::stringstream stream(code);
 	zen::lexer lexer(stream);
 	while (auto token = lexer.next())
@@ -240,10 +241,6 @@ int main(int argc, char** argv) try
 				print("\n")
 			}
 		}
-
-		_size(this: string) = long {
-			this.len
-		}
 class point {
 	x: double
 	y: double
@@ -259,6 +256,54 @@ class point {
  */
     )");
 #else
+	zen_run(R"(
+        sum(x:int, y:int) = int(x+y)
+
+		rect(lines: int, cols: int) = {
+			for(l: int = 1, lines){
+				for(c: int = 1, cols){
+					print("*")
+				}
+				println()
+			}
+		}
+
+		divide(x: int, y: int) = int {
+			if(y != 0){
+				x/y
+			} else {
+				println("[detected division by 0]")
+				0
+			}
+		}
+
+		main2 = {
+			_ : unit
+			rows: int = 13
+			for(i: int = 1,rows,2){
+				for(j: int = (rows-i)/2, 1, -1){
+					print(" ")
+				}
+				for(k: int = 1, i){
+					print("*")
+				}
+				print("\n")
+			}
+		}
+class point {
+	x: double
+	y: double
+}
+
+        main = {
+		    print("Click 'Run' or hit CTR+R to execute your ZEN code. Output will appear here.")
+        }
+/*
+	- float format
+	- range clip
+	- duration format
+ */
+    )");
 zen_run(R"(
 class person {
 	name: string
@@ -362,6 +407,10 @@ main = {
 	//println(p.name.su)
 }
 )");
+
+	zen_run(R"( main = { println("hello world") } )");
+	zen_run(R"( main = { println("hello world") } )");
+	zen_run(R"( main = { println("hello world") } )");
 #endif
 }
 catch (std::exception& e)

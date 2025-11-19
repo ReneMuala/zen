@@ -3,13 +3,13 @@
 #include <vector>
 #include <memory>
 
-#define END_ILC_CODEGEN };
+#define END_ILC_CODEGEN(NAME) }; unsigned long long NAME::compilation_id = 0;
 
 #define BEGIN_ILC_CODEGEN(NAME)                                                      \
   struct NAME {                                                              \
   /** @brief Compilation time, indicates the ILC compilation time, should be   \
    * incremented when the chain content changes  */                            \
-  unsigned short compilation_id{0};                                     \
+  static unsigned long long compilation_id;                                     \
   /** @brief The chain to be parsed */ std::vector<SYMBOL> chain{};     \
   /** @brief The size of the chain, should be updated with chain.size() when   \
    * @a chain content's change*/                                               \
@@ -25,7 +25,7 @@
 struct derivation_history_t
 {
   /// indicates the last compilation time in wich this producion was used
-  unsigned short compilation_id{0};
+  unsigned long long compilation_id{0};
   /// indicates the offset starting from the beginning the token chain
   int offset{-1};
 };
