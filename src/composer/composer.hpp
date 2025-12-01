@@ -170,9 +170,11 @@ public:
     virtual void bake() = 0;
     // returns true if the called functions returns a value
     virtual bool call(const std::string& name, const i8 & args_count) = 0;
+    virtual bool call_method(const std::string& dot_method, const i8 & args_count) = 0;
     // TS <- TS+1
     virtual void assign() = 0;
     virtual void push(const std::string & name) = 0;
+    virtual void access(const std::string & dot_fields) = 0;
     template <typename native>
     void push(const native & data, const std::string & type, bool negate = false)
     {

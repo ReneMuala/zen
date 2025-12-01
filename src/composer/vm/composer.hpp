@@ -47,6 +47,7 @@ public:
     void _push_function();
     void _push_temporary_value(const std::string& type_name);
     void push(const std::string& name) override;
+    void access(const std::string& dot_fields) override;
     void pop() override;
     void peek_pop_pop_push() override;
     void begin_if_then() override;
@@ -76,6 +77,7 @@ public:
     std::optional<std::unordered_map<std::string, std::list<function>>::iterator> fetch_function(
         const std::string& name);
     bool call(const std::string& name, const i8& args_count) override;
+    bool call_method(const std::string& dot_method, const i8& args_count) override;
     void and_() override;
     void or_() override;
     void not_() override;

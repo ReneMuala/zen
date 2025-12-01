@@ -382,6 +382,21 @@ operator >(a: Point, b: Point) = bool {
 	a.x > b.x && a.y > b.y
 }
 
+class chained {
+	a = chained {
+		println("a")
+		this
+	}
+	b = chained {
+		println("b")
+		this
+	}
+	c = chained {
+		println("c")
+		this
+	}
+}
+
 string(pt: Point) = string("")
 
 main = {
@@ -410,6 +425,9 @@ main = {
 	}
 	println(sum)
 	//println(p.name.su)
+
+	ch : chained
+	ch.a().b().c()
 }
 )");
 

@@ -31,6 +31,15 @@ class global_label {
       }
       bind_address = code.size();
    }
+
+   void bind(std::vector<i64> & code, const i64 & bind_address)
+   {
+      for (const auto & index : indexes)
+      {
+         code[index] = bind_address;
+      }
+      this->bind_address = bind_address;
+   }
 };
 
 } // _private

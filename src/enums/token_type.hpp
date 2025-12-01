@@ -60,6 +60,7 @@ namespace enums
     /// suffixed value
     NSUFIXED_VAL,
     NENDLESS_SUFIXES,
+    NSUFFIX_METHOD_CALL,
     /// used for OR
     NSEVENTH_PRIORITY_RHS_VAL,
     /// used for AND

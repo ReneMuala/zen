@@ -254,6 +254,20 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
             code.push_back(most_delta);
         }
         code.push_back(zen::ret);
+        for (auto & f : functions.at(scope->name))
+        {
+            if (not f.defined && f.signature == scope->definition.get().signature)
+            {
+                for (auto & l : f.labels)
+                {
+                    l.bind(code, scope->definition.get().address);
+                }
+                f.address = scope->definition.get().address;
+                f.labels.clear();
+                f.defined = true;
+                break;
+            }
+        }
         scope = nullptr;
         while (not _stack.empty())
             _stack.pop();
@@ -278,6 +292,13 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         }
         types.emplace(type->name, type);
         class_ = type;
+
+        // declare auto generated functions
+        functions["operator="].emplace_back(signature{get_type("unit"), {class_, class_}}, 0, false);
+        functions["operator=="].emplace_back(signature{get_type("bool"), {class_, class_}}, 0, false);
+        functions["operator!="].emplace_back(signature{get_type("bool"), {class_, class_}}, 0, false);
+        functions["[zenDestructor]"].emplace_back(signature{get_type("unit"), {class_}}, 0, false);
+        functions["[zenConstructor]"].emplace_back(signature{class_, {get_type("bool")}}, 0, false);
     }
 
     void composer::vm::composer::end_type()
@@ -723,6 +744,25 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                                              fmt::format(
                                                  "please define it in the respective scope. Eg. {0}: T = V // with T & V being it's type and value respectively.",
                                                  tokens.front()));
+    }
+
+    void composer::vm::composer::access(const std::string& dot_fields)
+    {
+        KAIZEN_REQUIRE_SCOPE(scope::in_function);
+        if (_stack.empty())
+        {
+            throw exceptions::semantic_error(fmt::format(
+                                                 "<KAIZEN-INTERNAL-API> Cannot compose operation {} because stack size {} is below expected",
+                                                 __FUNCTION__, _stack.size()), _ilc_offset);
+        }
+        std::vector<std::string> tokens = split_name(dot_fields);
+        if (tokens.size() <= 1)
+            throw exceptions::semantic_error(fmt::format("invalid field '{}' in function {}", dot_fields, scope->name),
+                                             _ilc_offset);
+        const auto location = top();
+        pop();
+        tokens.erase(tokens.begin(), tokens.begin() + 1);
+        _push_variable(tokens, location);
     }
 
 #define KAIZEN_IF_ARITHMETICS_CHAIN(F)\
@@ -1566,7 +1606,7 @@ if (top()->is(#T))\
         }
         code.push_back(zen::call);
         code.push_back(func.address);
-        if (not func.address)
+        if (not func.defined)
         {
             global_label lab;
             lab.use(code);
@@ -1783,24 +1823,7 @@ if (top()->is(#T))\
 
     void composer::vm::composer::_link_string_constructor()
     {
-        std::optional<std::reference_wrapper<function>> undefined_version;
-        auto& zen_constructors = functions.at("[zenConstructor]");
-        for (auto& zen_constructor : zen_constructors)
-        {
-            if (zen_constructor.signature.type->name == "string" and zen_constructor.signature.parameters.size() == 1
-                and zen_constructor.signature.parameters.at(0)->name ==
-                "bool" and not zen_constructor.defined)
-                undefined_version = zen_constructor;
-        }
-
-        if (not undefined_version)
-        {
-            throw exceptions::semantic_error("[zenConstructor] for string not found", _ilc_offset);
-        }
         begin("[zenConstructor]");
-        undefined_version->get().address = scope->definition.get().address;
-        for (auto& label : undefined_version->get().labels)
-            label.bind(code);
         set_return_type("string");
         set_parameter("allocate", "bool"); // ignored since string has no object fields
         push("allocate");
@@ -1823,23 +1846,7 @@ if (top()->is(#T))\
 
     void composer::vm::composer::_link_string_destructor()
     {
-        std::optional<std::reference_wrapper<function>> undefined_version;
-        auto& zen_destructors = functions.at("[zenDestructor]");
-        for (auto& zen_destructor : zen_destructors)
-        {
-            if (zen_destructor.signature.parameters.size() == 1 and zen_destructor.signature.parameters.at(0)->name ==
-                "string" and not zen_destructor.defined)
-                undefined_version = zen_destructor;
-        }
-        if (not undefined_version)
-        {
-            throw exceptions::semantic_error("[zenDestructor] for string not found", _ilc_offset);
-        }
-
         begin("[zenDestructor]");
-        undefined_version->get().address = scope->definition.get().address;
-        for (auto& label : undefined_version->get().labels)
-            label.bind(code);
         set_parameter("it", "string");
         push("it.[data]");
         call("bool", 1);
@@ -1860,24 +1867,7 @@ if (top()->is(#T))\
 
     void composer::vm::composer::_link_string_copy()
     {
-        std::optional<std::reference_wrapper<function>> undefined_version;
-        auto& overloads = functions.at("operator=");
-        for (auto& overload : overloads)
-        {
-            if (overload.signature.parameters.size() == 2 and overload.signature.parameters.at(0)->name == "string" and
-                overload.signature.parameters.at(1)->name == "string" and not overload.defined)
-                undefined_version = overload;
-        }
-
-        if (not undefined_version)
-        {
-            throw exceptions::semantic_error("operator= for string not found", _ilc_offset);
-        }
-
         begin("operator=");
-        undefined_version->get().address = scope->definition.get().address;
-        for (auto& label : undefined_version->get().labels)
-            label.bind(code);
         set_parameter("to", "string");
         set_parameter("from", "string");
         push("to.[data]");
@@ -1924,22 +1914,7 @@ if (top()->is(#T))\
 
     void composer::vm::composer::_link_string_equals()
     {
-        std::optional<std::reference_wrapper<function>> undefined_version;
-        auto& overloads = functions.at("operator==");
-        for (auto& overload : overloads)
-        {
-            if (overload.signature.parameters.size() == 2 and overload.signature.parameters.at(0)->name == "string" and
-                overload.signature.parameters.at(1)->name == "string" and not overload.defined)
-                undefined_version = overload;
-        }
-        if (not undefined_version)
-        {
-            throw exceptions::semantic_error("operator== for string not found", _ilc_offset);
-        }
         begin("operator==");
-        undefined_version->get().address = scope->definition.get().address;
-        for (auto& label : undefined_version->get().labels)
-            label.bind(code);
         set_return_type("bool");
         set_parameter("a", "string");
         set_parameter("b", "string");
@@ -1955,20 +1930,7 @@ if (top()->is(#T))\
 
     void composer::vm::composer::_link_string_not_equals()
     {
-        std::optional<std::reference_wrapper<function>> undefined_version;
-        auto& overloads = functions.at("operator!=");
-        for (auto& overload : overloads)
-        {
-            if (overload.signature.parameters.size() == 2 and overload.signature.parameters.at(0)->name == "string" and
-                overload.signature.parameters.at(1)->name == "string" and not overload.defined)
-                undefined_version = overload;
-        }
-        if (not undefined_version)
-            return;
         begin("operator!=");
-        undefined_version->get().address = scope->definition.get().address;
-        for (auto& label : undefined_version->get().labels)
-            label.bind(code);
         set_return_type("bool");
         set_parameter("a", "string");
         set_parameter("b", "string");
@@ -1982,20 +1944,7 @@ if (top()->is(#T))\
 
     void composer::vm::composer::_link_string_plus()
     {
-        std::optional<std::reference_wrapper<function>> undefined_version;
-        auto& overloads = functions.at("operator==");
-        for (auto& overload : overloads)
-        {
-            if (overload.signature.parameters.size() == 2 and overload.signature.parameters.at(0)->name == "string" and
-                overload.signature.parameters.at(1)->name == "string" and not overload.defined)
-                undefined_version = overload;
-        }
-        if (not undefined_version)
-            return;
         begin("operator+");
-        undefined_version->get().address = scope->definition.get().address;
-        for (auto& label : undefined_version->get().labels)
-            label.bind(code);
         set_return_type("string");
         set_parameter("a", "string");
         set_parameter("b", "string");
@@ -2277,6 +2226,17 @@ if (top()->is(#T))\
         if (name_i32 == placeholder)
             return _call_instruction(static_cast<zen::instruction>(name_i32), args_count, 0);
         throw exceptions::semantic_error(fmt::format("function \"{}\" was not found", name), _ilc_offset);
+    }
+
+    bool composer::vm::composer::call_method(const std::string& dot_method, const i8& args_count)
+    {
+        std::shared_ptr<value> caster_arg_buffer;
+        const std::string method = top()->type->name + dot_method;
+        if (const auto func_it = functions.find(method); func_it != functions.end())
+        {
+            return _call_function("", args_count, func_it, caster_arg_buffer);
+        }
+        throw exceptions::semantic_error(fmt::format("method \"{}\" was not found", dot_method), _ilc_offset);
     }
 
     i64 composer::vm::composer::get_parameters_size(const signature& sig)

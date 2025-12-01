@@ -21,7 +21,7 @@ typedef enums::token_type SYMBOL;
 
 BEGIN_ILC_CODEGEN(parser)
 #define EXPECTED(ITEM) [this]() { throw zen::exceptions::syntax_error(ITEM, offset); }
-bool pragma_dangling_return_value = false;
+    bool pragma_dangling_return_value = false;
 
     std::string id, type, value;
     std::shared_ptr<zen::composer::type> class_;
@@ -161,6 +161,27 @@ bool pragma_dangling_return_value = false;
         }
         REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
         pragma_dangling_return_value = composer->call(name, param_count);
+    END_PRODUCTION
+
+    BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_METHOD_CALL)
+        const std::string name = id;
+        if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
+        {
+            type.clear();
+        }
+        id = name;
+        REQUIRE_TERMINAL(TPARENTHESIS_OPEN)
+        zen::i8 param_count = 0;
+        while (TRY_REQUIRE_NON_TERMINAL(NVAL))
+        {
+            param_count++;
+            if (not TRY_REQUIRE_TERMINAL(TCOMMA))
+            {
+                break;
+            }
+        }
+        REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
+        pragma_dangling_return_value = composer->call_method(name, param_count);
     END_PRODUCTION
 
     BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_DEFINITION)
@@ -634,6 +655,21 @@ bool pragma_dangling_return_value = false;
             composer->post_decrement();
     END_PRODUCTION
 
+    BEGIN_PRODUCTION(PRODUCTION_NMEMBER_ACCESS)
+        REQUIRE_TERMINAL(TDOT);
+        id.clear();
+        do
+        {
+            REQUIRE_TERMINAL_CALLBACK(TID, EXPECTED("identifier"))
+            id += "." + tokens[offset - 1].value;
+        }
+        while (TRY_REQUIRE_TERMINAL(TDOT));
+        if (not TRY_REQUIRE_NON_TERMINAL(NSUFFIX_METHOD_CALL))
+        {
+            composer->access(id);
+        }
+    END_PRODUCTION
+
     BEGIN_PRODUCTION(PRODUCTION_NID)
         id.clear();
         REQUIRE_TERMINAL(TID)
@@ -650,14 +686,14 @@ bool pragma_dangling_return_value = false;
         }
     END_PRODUCTION
 
-inline bool push_parser_id()
+    inline bool push_parser_id()
     {
         composer->push(id);
-    return true;
+        return true;
     }
 
-BEGIN_BINDINGS
-BEGIN_SYMBOL_BINDING(NOR_VAL)
+    BEGIN_BINDINGS
+    BEGIN_SYMBOL_BINDING(NOR_VAL)
             PRODUCTION_NVAL_OR_VALUE()
         END_SYMBOL_BINDING
 
@@ -852,9 +888,13 @@ END_SYMBOL_BINDING
           PRODUCTION_NVAL_EQUAL_VALUE() or
           PRODUCTION_NVAL_NOT_EQUAL_VALUE() or
           PRODUCTION_NVAL_AND_VALUE() or
-          PRODUCTION_NVAL_OR_VALUE()
+          PRODUCTION_NVAL_OR_VALUE() or
+        PRODUCTION_NMEMBER_ACCESS()
           // PRODUCTION_NSUFFIX_FUNCTION_CALL()
         END_SYMBOL_BINDING
+    BEGIN_SYMBOL_BINDING(NSUFFIX_METHOD_CALL)
+        PRODUCTION_NSUFFIX_METHOD_CALL()
+    END_SYMBOL_BINDING
     END_BINDINGS
 
     inline bool parse()
