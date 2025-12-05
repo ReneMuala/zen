@@ -4,7 +4,7 @@
 #include <optional>
 #include "lexer/lexer.hpp"
 #include "parser/parser.hpp"
-
+#include "builder/function.hpp"
 #include <vm/vm.hpp>
 #include <sstream>
 #include "utils/utils.hpp"
@@ -162,7 +162,7 @@ try
 	composer->link();
 	setup_parser(parser,std::string(code));
 	parser->parse();
-	// composer->bake();
+	composer->bake();
 	const std::list<zen::composer::vm::function> main_functions = composer->functions["main"];
 	if (main_functions.empty())
 	{
@@ -256,185 +256,17 @@ class point {
  */
     )");
 #else
-	zen_run(R"(
-        sum(x:int, y:int) = int(x+y)
 
-		rect(lines: int, cols: int) = {
-			for(l: int = 1, lines){
-				for(c: int = 1, cols){
-					print("*")
-				}
-				println()
-			}
-		}
-
-		divide(x: int, y: int) = int {
-			if(y != 0){
-				x/y
-			} else {
-				println("[detected division by 0]")
-				0
-			}
-		}
-
-		main2 = {
-			_ : unit
-			rows: int = 13
-			for(i: int = 1,rows,2){
-				for(j: int = (rows-i)/2, 1, -1){
-					print(" ")
-				}
-				for(k: int = 1, i){
-					print("*")
-				}
-				print("\n")
-			}
-		}
-class point {
-	x: double
-	y: double
-}
-
-        main = {
-		    print("Click 'Run' or hit CTR+R to execute your ZEN code. Output will appear here.")
-        }
-/*
-	- float format
-	- range clip
-	- duration format
- */
-    )");
-zen_run(R"(
-class person {
-	name: string
-	surname: string
-	age: int
-	registered: bool
-	getAge = int {
-		this.age
-	}
-
-	getName = string {
-		this.name
-	}
-
-	getAge2 = int {
-		age
-	}
-
-	displayName = {
-		println(name)
-	}
-
-	greet = {
-		println("Hi, im " + name)
-		displayName()
-		println(string(getAge()))
-	}
-}
-
-sum(x: int, y: int) = int {
-	x + y
-}
-
-person(name: string, age: int) = person {
-	p: person
-	p.name = name
-	p.age = age
-	p
-}
-
-test_value_equality = bool {
-	1b == 1b &&
-	1s == 1s &&
-	1i == 1i &&
-	1 == 1 &&
-	1l == 1l &&
-	1.5f == 1.5f &&
-	3e-10f == 3e-10f &&
-	3e-10d == 3e-10d &&
-	3e-10 == 3e-10 &&
-	3e10 == 3e+10 &&
-	1.5d == 1.5d &&
-	"1" == "1" &&
-	person("Zendaya", 20) == person("Zendaya", 20) &&
-	1 != 2 &&
-	1s != 2s &&
-	1i != 2i &&
-	1 != 2 &&
-	1l != 2l &&
-	1.5f != 2.5f &&
-	3e-10f != 3e10f &&
-	3e-10d != 3e10d &&
-	3e-10 != 3e10 &&
-	3e-10 != 3e+10 &&
-	1.5d != 2.5d &&
-	"1" != "2" &&
-	person("Zendaya", 20) != person("Zenia", 20)
-}
-
-class Point {
-	x: double
-	y: double
-}
-
-operator >(a: Point, b: Point) = bool {
-	a.x > b.x && a.y > b.y
-}
-
-class chained {
-	a = chained {
-		println("a")
-		this
-	}
-	b = chained {
-		println("b")
-		this
-	}
-	c = chained {
-		println("c")
-		this
-	}
-}
-
-string(pt: Point) = string("")
-
-main = {
-	s: string
-	s = "Hello World!"
-	println(s)
-	if(test_value_equality()){
-		println("[test_value_equality: PASSED]")
-	} else {
-		println("[test_value_equality: FAILED]")
-	}
-
-	p: person = person("Zendaya", 10)
-	println(p.name.len())
-	println(p.name.empty())
-	for(i: long = 0l, p.name.len() - 1l){
-		print(p.name.at(i))
-	}
-	println()
-	println(p.name.slice(4l,9l))
-	p.name = p.name.sub(4l,3l)
-	println(p.name)
-	sum: int = 0
-	for(i: int = 1, 1_000_000){
-	    sum = sum + i
-	}
-	println(sum)
-	//println(p.name.su)
-
-	ch : chained
-	ch.a().b().c()
-}
-)");
-
-	zen_run(R"( main = { println("hello world") } )");
-	zen_run(R"( main = { println("hello world") } )");
-	zen_run(R"( main = { println("hello world") } )");
-#endif
+	const auto fb = zen::builder::function::create(true);
+	auto _r = fb->set_return(zen::builder::function::_int());
+	auto _a = fb->set_parameter(zen::builder::function::_int(), "a");
+	auto _b = fb->set_parameter(zen::builder::function::_int(), "b");
+	fb->add(_r, _a, _b);
+	auto _x = fb->set_local(zen::builder::function::_short(),"x");
+	auto _y = fb->set_local(zen::builder::function::_short(),"y");
+	auto _z = fb->set_local(zen::builder::function::_short(),"z");
+	fb->add(_z, _x, _y);
+	#endif
 }
 catch (std::exception& e)
 {

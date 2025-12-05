@@ -166,7 +166,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
         scope->set_return_status(block_scope::concise_return);
         if (not scope->return_data.value->is("unit"))
         {
-            const auto rhs = pop_operand();
+            const auto rhs = pop_operand(false);
             push(scope->return_data.value);
             push(rhs);
             assign();
@@ -1630,11 +1630,13 @@ if (top()->is(#T))\
         std::shared_ptr<value> this_;
         if (func_it->first.contains('.'))
         {
-            this_ = pop_operand(false); // this is always an object do we dont need to dereference it
+            this_ = pop_operand(false); // this is always an object so we dont need to dereference it
         }
+        std::string args_types;
         for (int i = 0; i < args_count; i++)
         {
             auto value = pop_operand(false);
+            args_types += fmt::format("{},", value->type->name);
             if (value->type->kind == type::kind::heap and value->kind == value::kind::constant)
             {
                 code.push_back(placeholder);
@@ -1657,6 +1659,10 @@ if (top()->is(#T))\
                 value = dereference(value);
             }
             arguments.push_front(value);
+        }
+        if (not args_types.empty())
+        {
+            args_types.pop_back();
         }
         if (this_)
         {
@@ -1708,7 +1714,7 @@ if (top()->is(#T))\
             {
                 caster_arg_buffer = arguments.at(0);
             }
-            throw exceptions::semantic_error(fmt::format("no function overload matched for \'{}\'", func_it->first),
+            throw exceptions::semantic_error(fmt::format("no function overload matched for \'{}({})\'", func_it->first, args_types),
                                              _ilc_offset);
         }
         return _call_function_overload(arguments, candidate->get(), false);
@@ -2231,12 +2237,28 @@ if (top()->is(#T))\
     bool composer::vm::composer::call_method(const std::string& dot_method, const i8& args_count)
     {
         std::shared_ptr<value> caster_arg_buffer;
+        decltype(_stack) temp;
+        fmt::println("top -> {}", top()->type->name);
+        for (int i = 0; i < args_count; i++)
+        {
+            temp.push(top());
+            pop();
+        }
         const std::string method = top()->type->name + dot_method;
+        fmt::println("call {}", method);
+        for (int i = 0; i < args_count; i++)
+        {
+            push(temp.top());
+            temp.pop();
+        }
+        fmt::println("top -> {}", top()->type->name);
         if (const auto func_it = functions.find(method); func_it != functions.end())
         {
-            return _call_function("", args_count, func_it, caster_arg_buffer);
+            const auto r =  _call_function(method, args_count, func_it, caster_arg_buffer);
+            fmt::println(":::: top {} # {}", top()->type->name, _stack.size());
+            return r;
         }
-        throw exceptions::semantic_error(fmt::format("method \"{}\" was not found", dot_method), _ilc_offset);
+        throw exceptions::semantic_error(fmt::format("method \"{}\" was not found", method), _ilc_offset);
     }
 
     i64 composer::vm::composer::get_parameters_size(const signature& sig)
