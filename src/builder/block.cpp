@@ -7,9 +7,9 @@ namespace zen::builder
 {
     std::shared_ptr<block> block::create(const enum type type)
     {
-        auto it = std::make_unique<block>();
+        std::shared_ptr<block> it = std::make_shared<block>();
         it->type = type;
-        return std::move(it);
+        return it;
     }
 
     std::shared_ptr<value> block::get_local(const std::string& name)
@@ -78,11 +78,9 @@ namespace zen::builder
     void block::__dncd__push(std::shared_ptr<block> scope)
     {
         if (nested_scope)
-            nested_scope->__dncd__push(std::move(scope));
+            nested_scope->__dncd__push(scope);
         else
-        {
-            nested_scope = std::move(scope);
-        }
+            nested_scope = scope;
     }
 
     decltype(block::locals)& block::___dncd__deepest_locals()

@@ -11,8 +11,16 @@
 
 namespace zen::builder {
 struct label {
+   types::stack::i64 id;
    std::list<types::stack::i64> indexes;
    std::optional<types::stack::i64> bind_address;
+
+   static std::shared_ptr<label> create()
+   {
+      static types::stack::i64 id = 0;
+      return std::make_shared<label>(id++);
+   }
+
    void use(std::vector<types::stack::i64> & code)
    {
       if (code.empty())
@@ -30,6 +38,11 @@ struct label {
          code[index] = static_cast<types::stack::i64>(code.size()) - index - 1;
       }
       bind_address = code.size();
+   }
+
+   bool bound() const
+   {
+      return bind_address.has_value();
    }
 };
 

@@ -53,12 +53,12 @@ namespace zen::builder
     std::shared_ptr<type> function::_string()
     {
         static auto t = type::create("string", 8);
-        t->add_field("[len]", _long(), 0);
-        t->add_field("[data]", _long(), 0);
+        t->add_field("[len]", _long(), /* offset */ 0 );
+        t->add_field("[data]", _long(), /* offset */ 0  );
         return t;
     }
 
-    std::shared_ptr<block> function::get_scope()
+    std::shared_ptr<block> function::get_scope() const
     {
         if (!scope)
         {
@@ -72,17 +72,18 @@ namespace zen::builder
         return it;
     }
 
-     std::shared_ptr<zen::builder::function> function::create(const bool& logging)
+    std::shared_ptr<zen::builder::function> function::create(utils::constant_pool& pool, const i64& offset,
+                                                             const bool& logging)
     {
-        auto it = std::make_shared<function>();
+        auto it = std::make_shared<function>(pool, offset);
         it->logging = logging;
         it->signature = std::make_shared<zen::builder::signature>();
         it->scope = builder::block::create(scope::in_function);
         return it;
     }
 
-     std::shared_ptr<value> function::set_parameter(const std::shared_ptr<zen::builder::type>& t,
-                                                    const std::string& name)
+    std::shared_ptr<value> function::set_parameter(const std::shared_ptr<zen::builder::type>& t,
+                                                   const std::string& name)
     {
         signature->parameters.push_back(t);
         auto sym = set_local(t, name, true);
@@ -90,41 +91,60 @@ namespace zen::builder
         return sym;
     }
 
-     std::shared_ptr<value> function::set_return(const std::shared_ptr<zen::builder::type>& t)
+    std::shared_ptr<value> function::set_return(const std::shared_ptr<zen::builder::type>& t)
     {
-        if (scope->get_stack_usage())
+        std::shared_ptr<block> scp = get_scope();
+        if (scp->get_stack_usage())
         {
             throw exceptions::semantic_error("return type cannot be set after params", offset);
         }
         signature->type = t;
-        auto v = std::make_shared<value>(
-                    t, scope->get_stack_usage() - /* jump callee IP */static_cast<types::stack::i64>(sizeof(types::stack::i64)));
-        scope->use_stack(t->get_size());
-        return v;
+        ret = std::make_shared<value>(
+            t, scp->get_stack_usage() - /* jump callee IP */static_cast<types::stack::i64>(sizeof(
+                types::stack::i64)));
+        ret->label = "@ret";
+        scp->use_stack(t->get_size());
+        return ret;
     }
 
-    std::shared_ptr<value> function::set_local(const std::shared_ptr<zen::builder::type>& t, const std::string& name, const bool param)
+    std::shared_ptr<value> function::set_local(const std::shared_ptr<zen::builder::type>& t, const std::string& name,
+                                               const bool param)
     {
-        const auto & scp = get_scope();
-        const types::stack::i64 address = scp->get_stack_usage() - (param ? /* jump callee IP */static_cast<types::stack::i64>(sizeof(types::stack::i64)) : 0);
+        const auto& scp = get_scope();
+        const types::stack::i64 address = scp->get_stack_usage() - (param
+                                                                        ? /* jump callee IP */static_cast<
+                                                                            types::stack::i64>(sizeof(
+                                                                            types::stack::i64))
+                                                                        : 0);
         scp->use_stack(t->get_size());
         if (not param)
-        gen<most>(t->get_size());
+            gen<most>(-t->get_size());
         const auto sym = std::make_shared<value>(name, t, address);
-        scope->locals[name].push_back(sym);
+        scp->locals[name].push_back(sym);
         return sym;
     }
 
-    inline void assert_same_type(const char * verb, const std::shared_ptr<value>& _1, const std::shared_ptr<value>& _2, const i64& offset)
+    inline void assert_same_type(const char* verb, const std::shared_ptr<value>& _1, const std::shared_ptr<value>& _2,
+                                 const i64& offset)
     {
         if (not _1->has_same_type_as(*_2))
         {
-            throw exceptions::semantic_error(fmt::format("cannot {} {} to {}", verb, _1->type->name, _2->type->name), offset);
+            throw exceptions::semantic_error(fmt::format("cannot {} {} to {}", verb, _2->type->name, _1->type->name),
+                                             offset);
+        }
+    }
+
+    inline void assert_type(const char* verb, const std::shared_ptr<value>& _1, const std::shared_ptr<type>& _t,
+                            const i64& offset)
+    {
+        if (*_1->type != *_t)
+        {
+            throw exceptions::semantic_error(fmt::format("cannot {} {} to {}", verb, _t->name, _1->type->name), offset);
         }
     }
 
     void function::add(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
-        const std::shared_ptr<value>& rhs)
+                       const std::shared_ptr<value>& rhs)
     {
         assert_same_type("add", lhs, rhs, offset);
         assert_same_type("assign", lhs, r, offset);
@@ -141,6 +161,441 @@ namespace zen::builder
         else if (lhs->is(_double()))
             gen<add_f64>(r, lhs, rhs);
         else
-            throw exceptions::semantic_error("usupported type", offset);
+            throw exceptions::semantic_error("unsupported type", offset);
+    }
+
+    void function::sub(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+                       const std::shared_ptr<value>& rhs)
+    {
+        assert_same_type("subtract", lhs, rhs, offset);
+        assert_same_type("assign", lhs, r, offset);
+        if (lhs->is(_byte()))
+            gen<sub_i8>(r, lhs, rhs);
+        else if (lhs->is(_short()))
+            gen<sub_i16>(r, lhs, rhs);
+        else if (lhs->is(_int()))
+            gen<sub_i32>(r, lhs, rhs);
+        else if (lhs->is(_long()))
+            gen<sub_i64>(r, lhs, rhs);
+        else if (lhs->is(_float()))
+            gen<sub_f32>(r, lhs, rhs);
+        else if (lhs->is(_double()))
+            gen<sub_f64>(r, lhs, rhs);
+        else
+            throw exceptions::semantic_error("unsupported type", offset);
+    }
+
+    void function::mul(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+                       const std::shared_ptr<value>& rhs)
+    {
+        assert_same_type("multiply", lhs, rhs, offset);
+        assert_same_type("assign", lhs, r, offset);
+        if (lhs->is(_byte()))
+            gen<mul_i8>(r, lhs, rhs);
+        else if (lhs->is(_short()))
+            gen<mul_i16>(r, lhs, rhs);
+        else if (lhs->is(_int()))
+            gen<mul_i32>(r, lhs, rhs);
+        else if (lhs->is(_long()))
+            gen<mul_i64>(r, lhs, rhs);
+        else if (lhs->is(_float()))
+            gen<mul_f32>(r, lhs, rhs);
+        else if (lhs->is(_double()))
+            gen<mul_f64>(r, lhs, rhs);
+        else
+            throw exceptions::semantic_error("unsupported type", offset);
+    }
+
+    void function::div(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+                       const std::shared_ptr<value>& rhs)
+    {
+        assert_same_type("divide", lhs, rhs, offset);
+        assert_same_type("assign", lhs, r, offset);
+        if (lhs->is(_byte()))
+            gen<div_i8>(r, lhs, rhs);
+        else if (lhs->is(_short()))
+            gen<div_i16>(r, lhs, rhs);
+        else if (lhs->is(_int()))
+            gen<div_i32>(r, lhs, rhs);
+        else if (lhs->is(_long()))
+            gen<div_i64>(r, lhs, rhs);
+        else if (lhs->is(_float()))
+            gen<div_f32>(r, lhs, rhs);
+        else if (lhs->is(_double()))
+            gen<div_f64>(r, lhs, rhs);
+        else
+            throw exceptions::semantic_error("unsupported type", offset);
+    }
+
+    void function::mod(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+                       const std::shared_ptr<value>& rhs)
+    {
+        assert_same_type("mod", lhs, rhs, offset);
+        assert_same_type("assign", lhs, r, offset);
+        if (lhs->is(_byte()))
+            gen<mod_i8>(r, lhs, rhs);
+        else if (lhs->is(_short()))
+            gen<mod_i16>(r, lhs, rhs);
+        else if (lhs->is(_int()))
+            gen<mod_i32>(r, lhs, rhs);
+        else if (lhs->is(_long()))
+            gen<mod_i64>(r, lhs, rhs);
+        else
+            throw exceptions::semantic_error("unsupported type", offset);
+    }
+
+    void function::equal(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+                         const std::shared_ptr<value>& rhs)
+    {
+        assert_same_type("compare", lhs, rhs, offset);
+        assert_type("assign", r, _bool(), offset);
+        if (lhs->is(_byte()))
+            gen<eq_i8>(r, lhs, rhs);
+        else if (lhs->is(_short()))
+            gen<eq_i16>(r, lhs, rhs);
+        else if (lhs->is(_int()))
+            gen<eq_i32>(r, lhs, rhs);
+        else if (lhs->is(_long()))
+            gen<eq_i64>(r, lhs, rhs);
+        else if (lhs->is(_float()))
+            gen<eq_f32>(r, lhs, rhs);
+        else if (lhs->is(_double()))
+            gen<eq_f64>(r, lhs, rhs);
+        else
+            throw exceptions::semantic_error("unsupported type", offset);
+    }
+
+    void function::not_equal(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+                             const std::shared_ptr<value>& rhs)
+    {
+        assert_same_type("compare", lhs, rhs, offset);
+        assert_type("assign", r, _bool(), offset);
+        if (lhs->is(_byte()))
+            gen<neq_i8>(r, lhs, rhs);
+        else if (lhs->is(_short()))
+            gen<neq_i16>(r, lhs, rhs);
+        else if (lhs->is(_int()))
+            gen<neq_i32>(r, lhs, rhs);
+        else if (lhs->is(_long()))
+            gen<neq_i64>(r, lhs, rhs);
+        else if (lhs->is(_float()))
+            gen<neq_f32>(r, lhs, rhs);
+        else if (lhs->is(_double()))
+            gen<neq_f64>(r, lhs, rhs);
+        else
+            throw exceptions::semantic_error("unsupported type", offset);
+    }
+
+    void function::lower(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+                         const std::shared_ptr<value>& rhs)
+    {
+        assert_same_type("compare", lhs, rhs, offset);
+        assert_type("assign", r, _bool(), offset);
+        if (lhs->is(_byte()))
+            gen<lt_i8>(r, lhs, rhs);
+        else if (lhs->is(_short()))
+            gen<lt_i16>(r, lhs, rhs);
+        else if (lhs->is(_int()))
+            gen<lt_i32>(r, lhs, rhs);
+        else if (lhs->is(_long()))
+            gen<lt_i64>(r, lhs, rhs);
+        else if (lhs->is(_float()))
+            gen<lt_f32>(r, lhs, rhs);
+        else if (lhs->is(_double()))
+            gen<lt_f64>(r, lhs, rhs);
+        else
+            throw exceptions::semantic_error("unsupported type", offset);
+    }
+
+    void function::lower_equal(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+                               const std::shared_ptr<value>& rhs)
+    {
+        assert_same_type("compare", lhs, rhs, offset);
+        assert_type("assign", r, _bool(), offset);
+        if (lhs->is(_byte()))
+            gen<lte_i8>(r, lhs, rhs);
+        else if (lhs->is(_short()))
+            gen<lte_i16>(r, lhs, rhs);
+        else if (lhs->is(_int()))
+            gen<lte_i32>(r, lhs, rhs);
+        else if (lhs->is(_long()))
+            gen<lte_i64>(r, lhs, rhs);
+        else if (lhs->is(_float()))
+            gen<lte_f32>(r, lhs, rhs);
+        else if (lhs->is(_double()))
+            gen<lte_f64>(r, lhs, rhs);
+        else
+            throw exceptions::semantic_error("unsupported type", offset);
+    }
+
+    void function::greater(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+                           const std::shared_ptr<value>& rhs)
+    {
+        assert_same_type("compare", lhs, rhs, offset);
+        assert_type("assign", r, _bool(), offset);
+        if (lhs->is(_byte()))
+            gen<gt_i8>(r, lhs, rhs);
+        else if (lhs->is(_short()))
+            gen<gt_i16>(r, lhs, rhs);
+        else if (lhs->is(_int()))
+            gen<gt_i32>(r, lhs, rhs);
+        else if (lhs->is(_long()))
+            gen<gt_i64>(r, lhs, rhs);
+        else if (lhs->is(_float()))
+            gen<gt_f32>(r, lhs, rhs);
+        else if (lhs->is(_double()))
+            gen<gt_f64>(r, lhs, rhs);
+        else
+            throw exceptions::semantic_error("unsupported type", offset);
+    }
+
+    void function::greater_equal(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+                                 const std::shared_ptr<value>& rhs)
+    {
+        assert_same_type("compare", lhs, rhs, offset);
+        assert_type("assign", r, _bool(), offset);
+        if (lhs->is(_byte()))
+            gen<gte_i8>(r, lhs, rhs);
+        else if (lhs->is(_short()))
+            gen<gte_i16>(r, lhs, rhs);
+        else if (lhs->is(_int()))
+            gen<gte_i32>(r, lhs, rhs);
+        else if (lhs->is(_long()))
+            gen<gte_i64>(r, lhs, rhs);
+        else if (lhs->is(_float()))
+            gen<gte_f32>(r, lhs, rhs);
+        else if (lhs->is(_double()))
+            gen<gte_f64>(r, lhs, rhs);
+        else
+            throw exceptions::semantic_error("unsupported type", offset);
+    }
+
+    void function::move(const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs)
+    {
+        assert_same_type("assign", lhs, rhs, offset);
+        if (lhs->is(_byte()))
+            gen<i8_to_i8>(lhs, rhs);
+        else if (lhs->is(_short()))
+            gen<i16_to_i16>(lhs, rhs);
+        else if (lhs->is(_int()))
+            gen<i32_to_i32>(lhs, rhs);
+        else if (lhs->is(_long()))
+            gen<i64_to_i64>(lhs, rhs);
+        else if (lhs->is(_float()))
+            gen<f32_to_f32>(lhs, rhs);
+        else if (lhs->is(_double()))
+            gen<f64_to_f64>(lhs, rhs);
+        else
+            throw exceptions::semantic_error("unsupported type", offset);
+    }
+
+    void function::return_value(const std::shared_ptr<value>& r)
+    {
+        std::shared_ptr<block> scp = get_scope();
+        if (scp->get_return_status() == block::concise_return)
+            throw exceptions::semantic_error("cannot return values more than once", offset);
+        if (scp->get_return_status() == block::branched_return and not scp->is(scope::in_else))
+            throw exceptions::semantic_error("conflicting returns", offset,
+                                             "both the 'if' block and the code after it return values\n\tuse 'else' to make return paths mutually exclusive");
+        if (scp->in_loop())
+        {
+            throw exceptions::semantic_error("cannot return inside loop", offset,
+                                             "return value will be overwritten on each iteration\n\trestructure to return after the loop completes");
+        }
+        scp->set_return_status(block::concise_return);
+        if (ret)
+        {
+            move(ret, r);
+        }
+        else
+            throw exceptions::semantic_error("cannot return without specifying return type first", offset);
+    }
+
+    void function::go(const std::shared_ptr<builder::label>& l)
+    {
+        gen<zen::go>(0, fmt::format("%{}", l->id));
+        l->use(code);
+    }
+
+    void function::go_if_not(const std::shared_ptr<value>& c, const std::shared_ptr<builder::label>& l)
+    {
+        gen<zen::go_if_not>(c, 0, fmt::format("%{}", l->id));
+        l->use(code);
+    }
+
+    void function::call(const std::shared_ptr<global_label>& l, const std::list<std::shared_ptr<value>>& args)
+    {
+        gen<zen::call>(0);
+        l->use(code);
+    }
+
+    std::shared_ptr<value> function::dereference(const std::shared_ptr<value>& r)
+    {
+        const auto dest = set_local(r->type, "dest");
+        const auto ptr = set_local(r->type, "ptr");
+        gen<zen::refer>(ptr, dest);
+        ptr->is_reference = true;
+        gen<zen::copy>(ptr, r, (i64)pool.get(r->type->get_size()).get());
+        get_scope()->use_stack(-ptr->type->get_size());
+        gen<most>(ptr->type->get_size());
+        return dest;
+    }
+
+    void function::branch(enum scope::type st,
+                          const std::shared_ptr<value>& c,
+                          const std::function<void(const std::shared_ptr<builder::function>&, const std::
+                                                   shared_ptr<builder::label>&,const std::shared_ptr<builder::label>&)>& callback,
+                          const std::shared_ptr<builder::label>& pel, const std::shared_ptr<builder::label>& pen)
+    {
+        std::shared_ptr<block> scp = get_scope();
+        switch (st)
+        {
+            case scope::in_if:
+                {
+                    if (pel or pen)
+                        throw std::logic_error("dont specify pel nor pen in if branches");
+                    const auto end_lab = label();
+                    const auto else_lab = label();
+                    if (not c)
+                        throw std::logic_error("a condition is needed for if branches");
+                    assert_type("assign", c, _bool(), offset);
+                    go_if_not(c, else_lab);
+
+                    scp->nested_scope = block::create(st);
+                    callback(shared_from_this(), else_lab, end_lab);
+                    if (not else_lab->bound())
+                    {
+                        pop();
+                        bind(else_lab);
+                    }
+                    bind(end_lab);
+                }
+            break;
+        case scope::in_else:
+            {
+                if (c)
+                    throw std::logic_error("dont specify c in else branches");
+                if (not(pen and pel))
+                    throw std::logic_error("specify pel and pen in else branches");
+                pop();
+                // if(get_scope()->type == scope::in_between)
+                //     peek();
+                go(pen);
+                bind(pel);
+                scope->__dncd__push(block::create(st));
+                callback(shared_from_this(), nullptr, pen);
+                pop();
+            }
+            break;
+        case scope::in_between:
+            {
+                if (c)
+                    throw std::logic_error("dont specify c in between branches");
+                pop();
+                // if(get_scope()->type == scope::in_between)
+                //     peek();
+                go(pen);
+                bind(pel);
+                const auto end_lab = label();
+                scope->__dncd__push(block::create(st));
+                callback(shared_from_this(), pel, end_lab);
+                bind(end_lab);
+                pop();
+                // go(pen);
+            }
+            break;
+        case scope::in_else_if:
+            {
+                if (not(pen and pel))
+                    throw std::logic_error("specify pel and pen for else if branches");
+                // go(pen);
+                // bind(pel);
+                const auto else_lab = label();
+                if (not c)
+                    throw std::logic_error("a condition is needed for else if branches");
+                assert_type("assign", c, _bool(), offset);
+                go_if_not(c, else_lab);
+                scope->__dncd__push(block::create(st));
+                callback(shared_from_this(), else_lab, pen);
+                if (not else_lab->bound())
+                {
+                    pop();
+                    bind(else_lab);
+                }
+            }
+            break;
+            default:
+            throw exceptions::semantic_error("unexpected scope type for branch", offset);
+        }
+    }
+
+    void function::peek()
+    {
+        std::shared_ptr<block> scp = scope;
+        if (scp)
+        {
+            for (const auto& local_set : scp->___dncd__deepest_locals())
+            {
+                for (const auto& local : local_set.second)
+                {
+                    if (local->type->kind == type::heap && !local->no_destructor)
+                    {
+                        try
+                        {
+                            // push(local);
+                            // call("[zenDestructor]", 1);
+                        }
+                        catch (const std::exception& e)
+                        {
+                            throw exceptions::semantic_error(
+                                fmt::format("missing destructor implementation for type {}", local->type->name),
+                                offset);
+                        }
+                    }
+                }
+            }
+            if (const i64 size = scp->__dncd__peek(scp->return_status); std::abs(size) > 0)
+            {
+                gen<most>(std::abs(size));
+            };
+        }
+    }
+
+    void function::build()
+    {
+        pop();
+        scope = nullptr;
+    }
+
+    void function::pop()
+    {
+        std::shared_ptr<block> scp = scope;
+        if (scp)
+        {
+            for (const auto& local_set : scp->___dncd__deepest_locals())
+            {
+                for (const auto& local : local_set.second)
+                {
+                    if (local->type->kind == type::heap && !local->no_destructor)
+                    {
+                        try
+                        {
+                            // push(local);
+                            // call("[zenDestructor]", 1);
+                        }
+                        catch (const std::exception& e)
+                        {
+                            throw exceptions::semantic_error(
+                                fmt::format("missing destructor implementation for type {}", local->type->name),
+                                offset);
+                        }
+                    }
+                }
+            }
+            if (const i64 size = scp->__dncd__pop(scp->return_status); std::abs(size) > 0)
+            {
+                gen<most>(std::abs(size));
+            }; // scope
+        }
     }
 }

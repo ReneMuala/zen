@@ -3,19 +3,23 @@
 //
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <vector>
 
 #include "block.hpp"
+#include "global_label.hpp"
+#include "label.hpp"
 #include "signature.hpp"
 #include "type.hpp"
 #include "value.hpp"
 #include "types/stack.hpp"
+#include "utils/utils.hpp"
 #include "vm/vm.hpp"
 
 namespace zen::builder
 {
-    struct function
+    struct function: std::enable_shared_from_this<function>
     {
         static std::shared_ptr<type> _bool();;
         static std::shared_ptr<type> _byte();
@@ -28,67 +32,46 @@ namespace zen::builder
 
         std::vector<types::stack::i64> code;
         std::shared_ptr<zen::builder::signature> signature;
+        bool logging = false;
+        std::shared_ptr<value> ret;
         std::shared_ptr<block> scope;
         types::stack::i64 offset;
-        bool logging = false;
-        // Factory methods
-        std::shared_ptr<block> get_scope();
-        static std::shared_ptr<function> create(const bool& logging = false);
+        utils::constant_pool & pool;
+
+        std::shared_ptr<block> get_scope() const;
+        static std::shared_ptr<function> create(utils::constant_pool & pool, const i64 & offset,const bool& logging = false);
         std::shared_ptr<value> set_parameter(const std::shared_ptr<zen::builder::type>& t, const std::string& name);
         std::shared_ptr<value> set_return(const std::shared_ptr<zen::builder::type>& t);
-        // Delete copy constructor and assignment
-        function(const function&) = delete;
-        function& operator=(const function&) = delete;
-        [[nodiscard]] std::shared_ptr<value> set_local(const std::shared_ptr<zen::builder::type>& t, const std::string& name, bool param = false);
-        std::string address_or_label(const std::shared_ptr<value>& _1, const std::shared_ptr<block> & scp) const
-        {
-            auto address = _1->address(scope->get_stack_usage());
-            return _1->label.empty() ?  fmt::format("{}", address) : fmt::format("{}:{}", _1->label, address);
-        }
+        [[nodiscard]] std::shared_ptr<value> set_local(const std::shared_ptr<zen::builder::type>& t,
+                                                       const std::string& name, bool param = false);
 
-        template<zen::instruction ins>
-        void gen(const std::shared_ptr<value>& _1, const std::shared_ptr<value>& _2, const std::shared_ptr<value>& _3)
-        {
-            const std::shared_ptr<block> & sc = get_scope();
-            code.push_back(ins);
-            code.push_back(_1->address(sc->get_stack_usage()));
-            code.push_back(_2->address(sc->get_stack_usage()));
-            code.push_back(_3->address(sc->get_stack_usage()));
-
-            if (logging)
-            {
-                fmt::println("<{}> {} {} {} {}", code.size() - 4, code.at(code.size() - 4),
-                    address_or_label(_1, sc),
-                    address_or_label(_2, sc),
-                    address_or_label(_3, sc)
-                    );
-            }
-        }
-        template<zen::instruction ins>
-        void gen(const std::shared_ptr<value>& _1)
-        {
-            const std::shared_ptr<block> & sc = get_scope();
-            code.push_back(ins);
-            code.push_back(_1->address(sc->get_stack_usage()));
-
-            if (logging)
-            {
-                fmt::println("<{}> {} {}", code.size() - 2, code.at(code.size() - 2), address_or_label(_1, sc));
-            }
-        }
-        template<zen::instruction ins>
-        void gen(const i64& _1)
-        {
-            const std::shared_ptr<block> & sc = get_scope();
-            code.push_back(ins);
-            code.push_back(_1);
-
-            if (logging)
-            {
-                fmt::println("<{}> {} {}", code.size() - 2, code.at(code.size() - 2), code.at(code.size() - 1));
-            }
-        }
         void add(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
+        void sub(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
+        void mul(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
+        void div(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
+        void mod(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
+        void equal(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+                   const std::shared_ptr<value>& rhs);
+        void not_equal(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+                       const std::shared_ptr<value>& rhs);
+        void lower(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+                   const std::shared_ptr<value>& rhs);
+        void lower_equal(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+                         const std::shared_ptr<value>& rhs);
+        void greater(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+                     const std::shared_ptr<value>& rhs);
+        void greater_equal(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+                           const std::shared_ptr<value>& rhs);
+        void move(const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
+        void return_value(const std::shared_ptr<value>& r);
+        void go(const  std::shared_ptr<label>& l);
+        void go_if_not(const std::shared_ptr<value>& c, const  std::shared_ptr<label>& l);
+        void call(const  std::shared_ptr<global_label>& l, const std::list<std::shared_ptr<value>>& args);
+        std::shared_ptr<value> dereference(const std::shared_ptr<value>& r);
+        void branch(enum builder::scope::type, const std::shared_ptr<value>& c, const std::function<void(const std::shared_ptr<builder::
+                            function>&, const std::shared_ptr<builder::label>&,
+                        const std::shared_ptr<builder::label>&)>&, const std::shared_ptr<builder::label>& pel = nullptr, const std::
+                    shared_ptr<builder::label>& pen = nullptr);
         /*
         // Integer register creation
         [[nodiscard]] std::shared_ptr<value> i8() const;
@@ -117,24 +100,6 @@ namespace zen::builder
         // Label operations
         [[nodiscard]]  std::shared_ptr<label> label() const;
         void bind(const std::shared_ptr<label>& label) const;
-
-        // Argument fetching
-        void fetch_argument(size_t index, const std::shared_ptr<value>& r) const;
-        void fetch_argument(size_t index, const asmjit::x86::Reg& r, bool f64 = false) const;
-
-        // Arithmetic operations
-        void add(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs) const;
-
-        void sub(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs) const;
-        void sub(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs) const;
-
-        void mul(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs) const;
-        void mul(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs) const;
-
-        void div(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs) const;
-        void div(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs) const;
-
-        void mod(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs) const;
 
         void increment(const std::shared_ptr<value>& r) const;
         void increment(const std::shared_ptr<value>& r);
@@ -183,6 +148,129 @@ namespace zen::builder
         template <typename FT>
         FT* build();
         */
-        function(){}
+        [[nodiscard]]  std::shared_ptr<builder::label> label()
+        {
+            return builder::label::create();
+        }
+        void bind(const std::shared_ptr<builder::label>& label)
+        {
+            label->bind(code);
+            fmt::println("\t<-1> %{} {}", label->id, label->bind_address.value_or(0));
+        }
+
+        [[nodiscard]] std::string address_or_label(const std::shared_ptr<value>& _1, const std::shared_ptr<block>& scp) const
+        {
+
+            auto address = _1->address(get_scope()->get_stack_usage());
+            return _1->label.empty() ? fmt::format("{}", address) : fmt::format("{}:{}", _1->label, address);
+        }
+
+        template <zen::instruction ins>
+        void gen(const std::shared_ptr<value>& _1, const std::shared_ptr<value>& _2, const std::shared_ptr<value>& _3)
+        {
+            const std::shared_ptr<block>& sc = get_scope();
+            code.push_back(ins);
+            code.push_back(_1->address(sc->get_stack_usage()));
+            code.push_back(_2->address(sc->get_stack_usage()));
+            code.push_back(_3->address(sc->get_stack_usage()));
+
+            if (logging)
+            {
+                fmt::println("<{}> {} {} {} {}", code.size() - 4, code.at(code.size() - 4),
+                             address_or_label(_1, sc),
+                             address_or_label(_2, sc),
+                             address_or_label(_3, sc)
+                );
+            }
+        }
+
+        template <zen::instruction ins>
+        void gen(const std::shared_ptr<value>& _1, const std::shared_ptr<value>& _2, const i64& _3)
+        {
+            const std::shared_ptr<block>& sc = get_scope();
+            code.push_back(ins);
+            code.push_back(_1->address(sc->get_stack_usage()));
+            code.push_back(_2->address(sc->get_stack_usage()));
+            code.push_back(_3);
+
+            if (logging)
+            {
+                fmt::println("<{}> {} {} {} {}", code.size() - 4, code.at(code.size() - 4),
+                             address_or_label(_1, sc),
+                             address_or_label(_2, sc),
+                             _3
+                );
+            }
+        }
+
+
+        template <zen::instruction ins>
+        void gen(const std::shared_ptr<value>& _1, const std::shared_ptr<value>& _2)
+        {
+            const std::shared_ptr<block>& sc = get_scope();
+            code.push_back(ins);
+            code.push_back(_1->address(sc->get_stack_usage()));
+            code.push_back(_2->address(sc->get_stack_usage()));
+
+            if (logging)
+            {
+                fmt::println("<{}> {} {} {}", code.size() - 3, code.at(code.size() - 3),
+                             address_or_label(_1, sc),
+                             address_or_label(_2, sc)
+                );
+            }
+        }
+
+        template <zen::instruction ins>
+        void gen(const std::shared_ptr<value>& _1, const i64& _2, const std::string _2prefix = "")
+        {
+            const std::shared_ptr<block>& sc = get_scope();
+            code.push_back(ins);
+            code.push_back(_1->address(sc->get_stack_usage()));
+            code.push_back(_2);
+
+            if (logging)
+            {
+                fmt::println("<{}> {} {} {}", code.size() - 3, code.at(code.size() - 3),
+                             address_or_label(_1, sc),
+                             _2prefix.empty() ? std::to_string(_2) : _2prefix
+                );
+            }
+        }
+
+        template <zen::instruction ins>
+        void gen(const std::shared_ptr<value>& _1)
+        {
+            const std::shared_ptr<block>& sc = get_scope();
+            code.push_back(ins);
+            code.push_back(_1->address(sc->get_stack_usage()));
+
+            if (logging)
+            {
+                fmt::println("<{}> {} {}", code.size() - 2, code.at(code.size() - 2), address_or_label(_1, sc));
+            }
+        }
+
+        template <zen::instruction ins>
+        void gen(const i64& _1, const std::string _1prefix = "")
+        {
+            const std::shared_ptr<block>& sc = get_scope();
+            code.push_back(ins);
+            code.push_back(_1);
+
+            if (logging)
+            {
+                fmt::println("<{}> {} {}", code.size() - 2, code.at(code.size() - 2), _1prefix.empty() ? std::to_string(_1) : _1prefix);
+            }
+        }
+        function(utils::constant_pool & pool, const i64 & offset): offset(offset), pool(pool)
+        {
+        }
+        function(const function&) = delete;
+        function& operator=(const function&) = delete;
+        void peek();
+        void build();
+    private:
+        void pop();
     };
 }

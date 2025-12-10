@@ -24,7 +24,7 @@ void EMSCRIPTEN_KEEPALIVE zen_sum(int a, int b)
 	fmt::print("{} + {} = {}\n", a, b, a + b);
 }
 
-inline void setup_parser(const std::shared_ptr<parser>& parser,const std::string& code)
+inline void setup_parser(const std::shared_ptr<parser>& parser, const std::string& code)
 {
 	tokens.clear();
 	std::stringstream stream(code);
@@ -90,7 +90,7 @@ void define_print_string(zen::composer::vm::composer* composer)
 	composer->end();\
 }
 
-	#define KAIZEN_DEFINE_PRINT_AS_STRING_FOR(T,NT)\
+#define KAIZEN_DEFINE_PRINT_AS_STRING_FOR(T,NT)\
 	void define_print_##T(zen::composer::vm::composer* composer)\
 {\
 	composer->begin("print");\
@@ -160,7 +160,7 @@ try
 	define_print_float(composer);
 	define_print_double(composer);
 	composer->link();
-	setup_parser(parser,std::string(code));
+	setup_parser(parser, std::string(code));
 	parser->parse();
 	composer->bake();
 	const std::list<zen::composer::vm::function> main_functions = composer->functions["main"];
@@ -202,6 +202,27 @@ void print_zen_string(void* str)
 		printf("%c", *(char*)((char*)str + sizeof(zen::i64) + i++));
 	}
 	// printf("(%d bytes)", len);
+}
+
+void if_test()
+{
+	zen::utils::constant_pool pool;
+	zen::i64 offset;
+	const auto fb = zen::builder::function::create(pool, offset, true);
+	const auto _b = fb->set_local(zen::builder::function::_bool(), "b");
+	fb->branch(zen::builder::scope::in_if, _b, [&](auto b, auto pel, auto pen)
+	{
+		auto _i = b->set_local(zen::builder::function::_int(), "i");
+		b->add(_i, _i, _i);
+		fb->branch(zen::builder::scope::in_else, {}, [&](auto b, auto pel, auto pen)
+		{
+			auto _i = b->set_local(zen::builder::function::_long(), "i");
+			b->add(_i, _i, _i);
+		}, pel, pen);
+	});
+	auto _a = fb->set_local(zen::builder::function::_int(), "a");
+	fb->add(_a, _a, _a);
+	fb->build();
 }
 
 int main(int argc, char** argv) try
@@ -256,17 +277,66 @@ class point {
  */
     )");
 #else
-
-	const auto fb = zen::builder::function::create(true);
-	auto _r = fb->set_return(zen::builder::function::_int());
-	auto _a = fb->set_parameter(zen::builder::function::_int(), "a");
-	auto _b = fb->set_parameter(zen::builder::function::_int(), "b");
-	fb->add(_r, _a, _b);
-	auto _x = fb->set_local(zen::builder::function::_short(),"x");
-	auto _y = fb->set_local(zen::builder::function::_short(),"y");
-	auto _z = fb->set_local(zen::builder::function::_short(),"z");
-	fb->add(_z, _x, _y);
-	#endif
+	// if_test();
+	// return 0;
+	zen::utils::constant_pool pool;
+	zen::i64 offset;
+	const auto fb = zen::builder::function::create(pool, offset, true);
+	const auto _b = fb->set_local(zen::builder::function::_bool(), "b");
+	fb->branch(zen::builder::scope::in_if, _b, [&](auto fb, auto pel, auto pen)
+	{
+		auto _i = fb->set_local(zen::builder::function::_int(), "i");
+		fb->add(_i, _i, _i);
+		fb->branch(zen::builder::scope::in_between, {}, [&](auto fb, auto pel, auto pen)
+		{
+			auto _b1 = fb->set_local(zen::builder::function::_bool(), "b1");
+			fb->branch(zen::builder::scope::in_else_if, _b1, [&](auto fb, auto pel, auto pen)
+			{
+				auto _i = fb->set_local(zen::builder::function::_int(), "i");
+				fb->add(_i, _i, _i);
+				fb->branch(zen::builder::scope::in_between, {}, [&](auto fb, auto pel, auto pen)
+				{
+					auto _b1 = fb->set_local(zen::builder::function::_bool(), "b1");
+					auto _i = fb->set_local(zen::builder::function::_int(), "i");
+					fb->branch(zen::builder::scope::in_else_if, _b1, [&](auto fb, auto pel, auto pen)
+					{
+						auto _i = fb->set_local(zen::builder::function::_int(), "i");
+						fb->add(_i, _i, _i);
+						fb->branch(zen::builder::scope::in_between, {}, [&](auto fb, auto pel, auto pen)
+						{
+							auto _b1 = fb->set_local(zen::builder::function::_bool(), "b1");
+							fb->branch(zen::builder::scope::in_else_if, _b1, [&](auto fb, auto pel, auto pen)
+							{
+								auto _i = fb->set_local(zen::builder::function::_int(), "i");
+								fb->add(_i, _i, _i);
+								fb->branch(zen::builder::scope::in_between, {}, [&](auto fb, auto pel, auto pen)
+								{
+									auto _b1 = fb->set_local(zen::builder::function::_bool(), "b1");
+									auto _i = fb->set_local(zen::builder::function::_int(), "i");
+									fb->branch(zen::builder::scope::in_else_if, _b1, [&](auto fb, auto pel, auto pen)
+									{
+										auto _i = fb->set_local(zen::builder::function::_int(), "i");
+										fb->add(_i, _i, _i);
+										fb->branch(zen::builder::scope::in_else, {}, [&](auto fb, auto pel, auto pen)
+										{
+											auto _i = fb->set_local(zen::builder::function::_long(), "i");
+											fb->add(_i, _i, _i);
+										}, pel, pen);
+									}, pel, pen);
+								}, pel, pen);
+							}, pel, pen);
+						}, pel, pen);
+					}, pel, pen);
+				}, pel, pen);
+			}, pel, pen);
+		}, pel, pen);
+	});
+	auto _a = fb->set_local(zen::builder::function::_int(), "a");
+	fb->add(_a, _a, _a);
+	fb->build();
+	// implement symbol manager
+	// implement deference wrappers
+#endif
 }
 catch (std::exception& e)
 {

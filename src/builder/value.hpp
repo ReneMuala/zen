@@ -23,14 +23,14 @@ namespace zen::builder
 
         kind kind;
         types::stack::i64 offset;
-        std::shared_ptr<struct type> type;
+        std::shared_ptr<builder::type> type;
         bool no_destructor = false;
         std::string label;
         bool is_reference = false;
         bool is_negated = false;
 
 
-        [[nodiscard]] bool is(const std::shared_ptr<struct type>& t) const
+        [[nodiscard]] bool is(const std::shared_ptr<builder::type>& t) const
         {
             return *type == *t;
         }

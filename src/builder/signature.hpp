@@ -5,13 +5,13 @@
 
 #include <memory>
 #include <vector>
-
+#include "type.hpp"
 namespace zen::builder
 {
     struct signature
     {
-        std::shared_ptr<struct type> type;
-        std::vector<std::shared_ptr<struct type>> parameters {};
+        std::shared_ptr<builder::type> type;
+        std::vector<std::shared_ptr<builder::type>> parameters {};
 
         bool operator==(const signature& other) const
         {

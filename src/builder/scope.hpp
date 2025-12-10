@@ -17,7 +17,7 @@ namespace zen::builder
             in_if = in_function | 1 << 3,
             in_else = in_if | 1 << 4,
             in_else_if = in_else | 1 << 5,
-            in_between_branches = in_else_if | 1 << 6,
+            in_between = in_else_if | 1 << 6,
             in_while_prologue = in_function | 1 << 7,
             in_while_body = in_function | 1 << 8,
             in_for = in_function | 1 << 9,

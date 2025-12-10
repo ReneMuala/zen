@@ -59,7 +59,7 @@ namespace zen::builder
         }
 
 
-        void add_field(const std::string & name, const std::shared_ptr<type> & type, const int offset)
+        void add_field(const std::string & name, const std::shared_ptr<type> & type, const types::stack::i64 offset)
         {
             if (type->has_relation(*this))
                 throw exceptions::semantic_error("infinite-sized type", offset, fmt::format("class '{}' contains itself as a field (directly or indirectly).\n\tuse a wrapper in the cycle to break infinite size", this->name));
