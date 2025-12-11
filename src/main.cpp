@@ -225,60 +225,8 @@ void if_test()
 	fb->build();
 }
 
-int main(int argc, char** argv) try
+void if_else_if_else_test()
 {
-#ifdef KAIZEN_WASM
-	zen_run(R"(
-        sum(x:int, y:int) = int(x+y)
-
-		rect(lines: int, cols: int) = {
-			for(l: int = 1, lines){
-				for(c: int = 1, cols){
-					print("*")
-				}
-				println()
-			}
-		}
-
-		divide(x: int, y: int) = int {
-			if(y != 0){
-				x/y
-			} else {
-				println("[detected division by 0]")
-				0
-			}
-		}
-
-		main2 = {
-			_ : unit
-			rows: int = 13
-			for(i: int = 1,rows,2){
-				for(j: int = (rows-i)/2, 1, -1){
-					print(" ")
-				}
-				for(k: int = 1, i){
-					print("*")
-				}
-				print("\n")
-			}
-		}
-class point {
-	x: double
-	y: double
-}
-
-        main = {
-		    print("Click 'Run' or hit CTR+R to execute your ZEN code. Output will appear here.")
-        }
-/*
-	- float format
-	- range clip
-	- duration format
- */
-    )");
-#else
-	// if_test();
-	// return 0;
 	zen::utils::constant_pool pool;
 	zen::i64 offset;
 	const auto fb = zen::builder::function::create(pool, offset, true);
@@ -331,8 +279,118 @@ class point {
 			}, pel, pen);
 		}, pel, pen);
 	});
-	auto _a = fb->set_local(zen::builder::function::_int(), "a");
-	fb->add(_a, _a, _a);
+}
+
+void if_else_if_test()
+{
+	zen::utils::constant_pool pool;
+	zen::i64 offset;
+	const auto fb = zen::builder::function::create(pool, offset, true);
+	const auto _b = fb->set_local(zen::builder::function::_bool(), "b");
+	fb->branch(zen::builder::scope::in_if, _b, [&](auto fb, auto pel, auto pen)
+	{
+		auto _i = fb->set_local(zen::builder::function::_int(), "i");
+		fb->add(_i, _i, _i);
+		fb->branch(zen::builder::scope::in_between, {}, [&](auto fb, auto pel, auto pen)
+		{
+			auto _b1 = fb->set_local(zen::builder::function::_bool(), "b1");
+			fb->branch(zen::builder::scope::in_else_if, _b1, [&](auto fb, auto pel, auto pen)
+			{
+				auto _i = fb->set_local(zen::builder::function::_int(), "i");
+				fb->add(_i, _i, _i);
+				fb->branch(zen::builder::scope::in_between, {}, [&](auto fb, auto pel, auto pen)
+				{
+					auto _b1 = fb->set_local(zen::builder::function::_bool(), "b1");
+					fb->branch(zen::builder::scope::in_else_if, _b1, [&](auto fb, auto pel, auto pen)
+					{
+						auto _i = fb->set_local(zen::builder::function::_int(), "i");
+						fb->add(_i, _i, _i);
+					}, pel, pen);
+				}, pel, pen);
+			}, pel, pen);
+		}, pel, pen);
+	});
+}
+
+int main(int argc, char** argv) try
+{
+#ifdef KAIZEN_WASM
+	zen_run(R"(
+        sum(x:int, y:int) = int(x+y)
+
+		rect(lines: int, cols: int) = {
+			for(l: int = 1, lines){
+				for(c: int = 1, cols){
+					print("*")
+				}
+				println()
+			}
+		}
+
+		divide(x: int, y: int) = int {
+			if(y != 0){
+				x/y
+			} else {
+				println("[detected division by 0]")
+				0
+			}
+		}
+
+		main2 = {
+			_ : unit
+			rows: int = 13
+			for(i: int = 1,rows,2){
+				for(j: int = (rows-i)/2, 1, -1){
+					print(" ")
+				}
+				for(k: int = 1, i){
+					print("*")
+				}
+				print("\n")
+			}
+		}
+class point {
+	x: double
+	y: double
+}
+
+        main = {
+		    print("Click 'Run' or hit CTR+R to execute your ZEN code. Output will appear here.")
+        }
+/*
+	- float format
+	- range clip
+	- duration format
+ */
+    )");
+#else
+	zen::utils::constant_pool pool;
+	zen::i64 offset;
+	const auto fb = zen::builder::function::create(pool, offset, true);
+	std::vector<std::shared_ptr<zen::builder::value>> params = {
+		fb->set_local(zen::builder::function::_int(), "it"),
+		fb->set_local(zen::builder::function::_int(), "beg"),
+		fb->set_local(zen::builder::function::_int(), "end")
+	};
+	fb->loop(zen::builder::scope::in_for, params,
+	         [&](auto fb)
+	         {
+				auto _sum = fb->set_local(zen::builder::function::_int(), "sum");
+		         fb->add(_sum, params.at(0), _sum);
+		         std::vector<std::shared_ptr<zen::builder::value>> sub_params = {
+			         fb->set_local(zen::builder::function::_int(), "sub_it"),
+			         fb->set_local(zen::builder::function::_int(), "sub_beg"),
+			         fb->set_local(zen::builder::function::_int(), "sub_end")
+		         };
+		         auto _sub_sum = fb->set_local(zen::builder::function::_int(), "sub_sum");
+		         fb->loop(zen::builder::scope::in_for, sub_params,
+		                  [&](auto fb)
+		                  {
+			                  fb->add(_sub_sum, sub_params.at(0), _sub_sum);
+		                  });
+	         });
+	// auto _a = fb->set_local(zen::builder::function::_int(), "a");
+	// fb->add(_a, _a, _a);
 	fb->build();
 	// implement symbol manager
 	// implement deference wrappers

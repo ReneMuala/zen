@@ -38,7 +38,7 @@ namespace zen::builder
         types::stack::i64 offset;
         utils::constant_pool & pool;
 
-        std::shared_ptr<block> get_scope() const;
+        std::shared_ptr<block> get_scope(const bool root  = false) const;
         static std::shared_ptr<function> create(utils::constant_pool & pool, const i64 & offset,const bool& logging = false);
         std::shared_ptr<value> set_parameter(const std::shared_ptr<zen::builder::type>& t, const std::string& name);
         std::shared_ptr<value> set_return(const std::shared_ptr<zen::builder::type>& t);
@@ -72,6 +72,8 @@ namespace zen::builder
                             function>&, const std::shared_ptr<builder::label>&,
                         const std::shared_ptr<builder::label>&)>&, const std::shared_ptr<builder::label>& pel = nullptr, const std::
                     shared_ptr<builder::label>& pen = nullptr);
+        void loop(enum scope::type st, const std::vector<std::shared_ptr<value>>& params, const std::function<void(const std::shared_ptr<
+                      builder::function>&)>& body);
         /*
         // Integer register creation
         [[nodiscard]] std::shared_ptr<value> i8() const;
@@ -158,17 +160,16 @@ namespace zen::builder
             fmt::println("\t<-1> %{} {}", label->id, label->bind_address.value_or(0));
         }
 
-        [[nodiscard]] std::string address_or_label(const std::shared_ptr<value>& _1, const std::shared_ptr<block>& scp) const
+        [[nodiscard]] static std::string get_address_or_label(const std::shared_ptr<value>& _1, const std::shared_ptr<block>& scp)
         {
-
-            auto address = _1->address(get_scope()->get_stack_usage());
+            auto address = _1->address(scp->get_stack_usage());
             return _1->label.empty() ? fmt::format("{}", address) : fmt::format("{}:{}", _1->label, address);
         }
 
         template <zen::instruction ins>
         void gen(const std::shared_ptr<value>& _1, const std::shared_ptr<value>& _2, const std::shared_ptr<value>& _3)
         {
-            const std::shared_ptr<block>& sc = get_scope();
+            const std::shared_ptr<block>& sc = get_scope(true);
             code.push_back(ins);
             code.push_back(_1->address(sc->get_stack_usage()));
             code.push_back(_2->address(sc->get_stack_usage()));
@@ -177,9 +178,9 @@ namespace zen::builder
             if (logging)
             {
                 fmt::println("<{}> {} {} {} {}", code.size() - 4, code.at(code.size() - 4),
-                             address_or_label(_1, sc),
-                             address_or_label(_2, sc),
-                             address_or_label(_3, sc)
+                             get_address_or_label(_1, sc),
+                             get_address_or_label(_2, sc),
+                             get_address_or_label(_3, sc)
                 );
             }
         }
@@ -187,7 +188,7 @@ namespace zen::builder
         template <zen::instruction ins>
         void gen(const std::shared_ptr<value>& _1, const std::shared_ptr<value>& _2, const i64& _3)
         {
-            const std::shared_ptr<block>& sc = get_scope();
+            const std::shared_ptr<block>& sc = get_scope(true);
             code.push_back(ins);
             code.push_back(_1->address(sc->get_stack_usage()));
             code.push_back(_2->address(sc->get_stack_usage()));
@@ -196,8 +197,8 @@ namespace zen::builder
             if (logging)
             {
                 fmt::println("<{}> {} {} {} {}", code.size() - 4, code.at(code.size() - 4),
-                             address_or_label(_1, sc),
-                             address_or_label(_2, sc),
+                             get_address_or_label(_1, sc),
+                             get_address_or_label(_2, sc),
                              _3
                 );
             }
@@ -207,7 +208,7 @@ namespace zen::builder
         template <zen::instruction ins>
         void gen(const std::shared_ptr<value>& _1, const std::shared_ptr<value>& _2)
         {
-            const std::shared_ptr<block>& sc = get_scope();
+            const std::shared_ptr<block>& sc = get_scope(true);
             code.push_back(ins);
             code.push_back(_1->address(sc->get_stack_usage()));
             code.push_back(_2->address(sc->get_stack_usage()));
@@ -215,8 +216,8 @@ namespace zen::builder
             if (logging)
             {
                 fmt::println("<{}> {} {} {}", code.size() - 3, code.at(code.size() - 3),
-                             address_or_label(_1, sc),
-                             address_or_label(_2, sc)
+                             get_address_or_label(_1, sc),
+                             get_address_or_label(_2, sc)
                 );
             }
         }
@@ -224,7 +225,7 @@ namespace zen::builder
         template <zen::instruction ins>
         void gen(const std::shared_ptr<value>& _1, const i64& _2, const std::string _2prefix = "")
         {
-            const std::shared_ptr<block>& sc = get_scope();
+            const std::shared_ptr<block>& sc = get_scope(true);
             code.push_back(ins);
             code.push_back(_1->address(sc->get_stack_usage()));
             code.push_back(_2);
@@ -232,7 +233,7 @@ namespace zen::builder
             if (logging)
             {
                 fmt::println("<{}> {} {} {}", code.size() - 3, code.at(code.size() - 3),
-                             address_or_label(_1, sc),
+                             get_address_or_label(_1, sc),
                              _2prefix.empty() ? std::to_string(_2) : _2prefix
                 );
             }
@@ -241,20 +242,20 @@ namespace zen::builder
         template <zen::instruction ins>
         void gen(const std::shared_ptr<value>& _1)
         {
-            const std::shared_ptr<block>& sc = get_scope();
+            const std::shared_ptr<block>& sc = get_scope(true);
             code.push_back(ins);
             code.push_back(_1->address(sc->get_stack_usage()));
 
             if (logging)
             {
-                fmt::println("<{}> {} {}", code.size() - 2, code.at(code.size() - 2), address_or_label(_1, sc));
+                fmt::println("<{}> {} {}", code.size() - 2, code.at(code.size() - 2), get_address_or_label(_1, sc));
             }
         }
 
         template <zen::instruction ins>
         void gen(const i64& _1, const std::string _1prefix = "")
         {
-            const std::shared_ptr<block>& sc = get_scope();
+            const std::shared_ptr<block>& sc = get_scope(true);
             code.push_back(ins);
             code.push_back(_1);
 

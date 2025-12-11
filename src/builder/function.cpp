@@ -53,18 +53,21 @@ namespace zen::builder
     std::shared_ptr<type> function::_string()
     {
         static auto t = type::create("string", 8);
-        t->add_field("[len]", _long(), /* offset */ 0 );
-        t->add_field("[data]", _long(), /* offset */ 0  );
+        t->kind = type::kind::heap;
+        t->add_field("[len]", _long(), /* offset */ 0);
+        t->add_field("[data]", _long(), /* offset */ 0);
         return t;
     }
 
-    std::shared_ptr<block> function::get_scope() const
+    std::shared_ptr<block> function::get_scope(const bool root) const
     {
         if (!scope)
         {
             throw exceptions::semantic_error("scope not found, function was already compiled", offset);
         }
         auto it = scope;
+        if (root)
+            return it;
         while (it->nested_scope)
         {
             it = it->nested_scope;
@@ -444,32 +447,33 @@ namespace zen::builder
     void function::branch(enum scope::type st,
                           const std::shared_ptr<value>& c,
                           const std::function<void(const std::shared_ptr<builder::function>&, const std::
-                                                   shared_ptr<builder::label>&,const std::shared_ptr<builder::label>&)>& callback,
+                                                   shared_ptr<builder::label>&,
+                                                   const std::shared_ptr<builder::label>&)>& callback,
                           const std::shared_ptr<builder::label>& pel, const std::shared_ptr<builder::label>& pen)
     {
         std::shared_ptr<block> scp = get_scope();
         switch (st)
         {
-            case scope::in_if:
-                {
-                    if (pel or pen)
-                        throw std::logic_error("dont specify pel nor pen in if branches");
-                    const auto end_lab = label();
-                    const auto else_lab = label();
-                    if (not c)
-                        throw std::logic_error("a condition is needed for if branches");
-                    assert_type("assign", c, _bool(), offset);
-                    go_if_not(c, else_lab);
+        case scope::in_if:
+            {
+                if (pel or pen)
+                    throw std::logic_error("dont specify pel nor pen in if branches");
+                const auto end_lab = label();
+                const auto else_lab = label();
+                if (not c)
+                    throw std::logic_error("a condition is needed for if branches");
+                assert_type("assign", c, _bool(), offset);
+                go_if_not(c, else_lab);
 
-                    scp->nested_scope = block::create(st);
-                    callback(shared_from_this(), else_lab, end_lab);
-                    if (not else_lab->bound())
-                    {
-                        pop();
-                        bind(else_lab);
-                    }
-                    bind(end_lab);
+                scp->nested_scope = block::create(st);
+                callback(shared_from_this(), else_lab, end_lab);
+                if (not else_lab->bound())
+                {
+                    pop();
+                    bind(else_lab);
                 }
+                bind(end_lab);
+            }
             break;
         case scope::in_else:
             {
@@ -524,8 +528,62 @@ namespace zen::builder
                 }
             }
             break;
-            default:
+        default:
             throw exceptions::semantic_error("unexpected scope type for branch", offset);
+        }
+    }
+
+    static std::shared_ptr<value> constant_of_type(const i64 val, const std::shared_ptr<type>& t)
+    {
+        return std::make_shared<value>(fmt::format("{}", val), t, 0);
+    }
+
+    void function::loop(const enum scope::type st, const std::vector<std::shared_ptr<value>>& params,
+                        const std::function<void(const std::shared_ptr<builder::function>&)>& body)
+    {
+        switch (st)
+        {
+        case scope::in_for:
+            {
+                if (params.size() == 3)
+                {
+                    std::vector<std::shared_ptr<value>> new_params = params;
+                    new_params.push_back(constant_of_type(1, params.at(0)->type));
+                    loop(st, new_params, body);
+                }
+                else if (params.size() == 4)
+                {
+                    const auto cond = set_local(_bool(), "cond");
+                    const std::shared_ptr<value> &iterator = params[0],
+                                                 &first = params[1],
+                                                 &last = params[2],
+                    &step = params[3];
+                    const std::shared_ptr<builder::label> begin = label(),
+                                                          end = label(),
+                                                          condition = label();
+                    move(iterator, first);
+                    go(condition); // skip increment for first iteration
+                    {
+                        bind(begin);
+                        add(iterator, iterator, step);
+                        bind(condition);
+                        lower_equal(cond, iterator, last);
+                        go_if_not(cond, end);
+                        {
+                            scope->__dncd__push(block::create(scope::in_for_body));
+                            body(shared_from_this());
+                            pop();
+                        }
+                        go(begin);
+                        bind(end);
+                    }
+                }
+                else
+                    throw exceptions::semantic_error("unsupported parameter count for for loop", offset);
+            }
+            break;
+        default:
+            throw exceptions::semantic_error("unexpected scope type for loop", offset);
         }
     }
 

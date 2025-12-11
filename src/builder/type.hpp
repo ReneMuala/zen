@@ -20,8 +20,8 @@ namespace zen::builder
         {
             stack,
             heap
-        } kind;
-        operator int() const
+        } kind = stack;
+        explicit operator unsigned long long() const
         {
             return id;
         }
