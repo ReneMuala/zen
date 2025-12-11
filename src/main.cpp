@@ -4,6 +4,7 @@
 #include <optional>
 #include "lexer/lexer.hpp"
 #include "parser/parser.hpp"
+#include "parser/builder_parser.hpp"
 #include "builder/function.hpp"
 #include <vm/vm.hpp>
 #include <sstream>
@@ -312,6 +313,37 @@ void if_else_if_test()
 	});
 }
 
+void for_test()
+{
+	zen::utils::constant_pool pool;
+	zen::i64 offset;
+	const auto fb = zen::builder::function::create(pool, offset, true);
+	std::vector params = {
+		fb->set_local(zen::builder::function::_int(), "it"),
+		fb->set_local(zen::builder::function::_int(), "beg"),
+		fb->set_local(zen::builder::function::_int(), "end")
+	};
+	fb->loop_for(params, [&](auto fb)
+	{
+		auto _sum = fb->set_local(zen::builder::function::_int(), "sum");
+		fb->add(_sum, params.at(0), _sum);
+		std::vector<std::shared_ptr<zen::builder::value>> sub_params = {
+			fb->set_local(zen::builder::function::_int(), "sub_it"),
+			fb->set_local(zen::builder::function::_int(), "sub_beg"),
+			fb->set_local(zen::builder::function::_int(), "sub_end")
+		};
+		auto _sub_sum = fb->set_local(zen::builder::function::_int(), "sub_sum");
+		fb->loop_for(sub_params,
+		             [&](auto fb)
+		             {
+			             fb->add(_sub_sum, sub_params.at(0), _sub_sum);
+		             });
+	});
+	// auto _a = fb->set_local(zen::builder::function::_int(), "a");
+	// fb->add(_a, _a, _a);
+	fb->build();
+}
+
 int main(int argc, char** argv) try
 {
 #ifdef KAIZEN_WASM
@@ -367,28 +399,20 @@ class point {
 	zen::utils::constant_pool pool;
 	zen::i64 offset;
 	const auto fb = zen::builder::function::create(pool, offset, true);
-	std::vector<std::shared_ptr<zen::builder::value>> params = {
-		fb->set_local(zen::builder::function::_int(), "it"),
-		fb->set_local(zen::builder::function::_int(), "beg"),
-		fb->set_local(zen::builder::function::_int(), "end")
-	};
-	fb->loop(zen::builder::scope::in_for, params,
-	         [&](auto fb)
-	         {
-				auto _sum = fb->set_local(zen::builder::function::_int(), "sum");
-		         fb->add(_sum, params.at(0), _sum);
-		         std::vector<std::shared_ptr<zen::builder::value>> sub_params = {
-			         fb->set_local(zen::builder::function::_int(), "sub_it"),
-			         fb->set_local(zen::builder::function::_int(), "sub_beg"),
-			         fb->set_local(zen::builder::function::_int(), "sub_end")
-		         };
-		         auto _sub_sum = fb->set_local(zen::builder::function::_int(), "sub_sum");
-		         fb->loop(zen::builder::scope::in_for, sub_params,
-		                  [&](auto fb)
-		                  {
-			                  fb->add(_sub_sum, sub_params.at(0), _sub_sum);
-		                  });
-	         });
+	std::vector<std::shared_ptr<zen::builder::value>> params;
+	auto _i = fb->set_local(zen::builder::function::_int(), "i");
+	auto _j = fb->set_local(zen::builder::function::_int(), "j");
+
+	fb->loop_while(params, [&](auto fb)
+	               {
+		               auto _c = fb->set_local(zen::builder::function::_bool(), "c");
+		               fb->lower_equal(_c, _i, _j);
+		               params.push_back(_c);
+	               }, [&](auto fb)
+	               {
+		               auto _sum = fb->set_local(zen::builder::function::_int(), "sum");
+		               fb->add(_sum, _i, _sum);
+	               });
 	// auto _a = fb->set_local(zen::builder::function::_int(), "a");
 	// fb->add(_a, _a, _a);
 	fb->build();

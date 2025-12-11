@@ -54,8 +54,8 @@ namespace zen::builder
     {
         static auto t = type::create("string", 8);
         t->kind = type::kind::heap;
-        t->add_field("[len]", _long(), /* offset */ 0);
-        t->add_field("[data]", _long(), /* offset */ 0);
+        t->add_field("string::len", _long(), /* offset */ 0);
+        t->add_field("string::data", _long(), /* offset */ 0);
         return t;
     }
 
@@ -97,13 +97,13 @@ namespace zen::builder
     std::shared_ptr<value> function::set_return(const std::shared_ptr<zen::builder::type>& t)
     {
         std::shared_ptr<block> scp = get_scope();
-        if (scp->get_stack_usage())
+        if (get_stack_usage())
         {
             throw exceptions::semantic_error("return type cannot be set after params", offset);
         }
         signature->type = t;
         ret = std::make_shared<value>(
-            t, scp->get_stack_usage() - /* jump callee IP */static_cast<types::stack::i64>(sizeof(
+            t, get_stack_usage() - /* jump callee IP */static_cast<types::stack::i64>(sizeof(
                 types::stack::i64)));
         ret->label = "@ret";
         scp->use_stack(t->get_size());
@@ -114,7 +114,7 @@ namespace zen::builder
                                                const bool param)
     {
         const auto& scp = get_scope();
-        const types::stack::i64 address = scp->get_stack_usage() - (param
+        const types::stack::i64 address = get_stack_usage() - (param
                                                                         ? /* jump callee IP */static_cast<
                                                                             types::stack::i64>(sizeof(
                                                                             types::stack::i64))
@@ -125,6 +125,12 @@ namespace zen::builder
         const auto sym = std::make_shared<value>(name, t, address);
         scp->locals[name].push_back(sym);
         return sym;
+    }
+
+    std::shared_ptr<value> function::get_local(const std::string& name) const
+    {
+        const auto scp = get_scope(true);
+        return scp->get_local(name);
     }
 
     inline void assert_same_type(const char* verb, const std::shared_ptr<value>& _1, const std::shared_ptr<value>& _2,
@@ -434,8 +440,8 @@ namespace zen::builder
 
     std::shared_ptr<value> function::dereference(const std::shared_ptr<value>& r)
     {
-        const auto dest = set_local(r->type, "dest");
-        const auto ptr = set_local(r->type, "ptr");
+        const auto dest = set_local(r->type, "deref::dest");
+        const auto ptr = set_local(r->type, "deref::ptr");
         gen<zen::refer>(ptr, dest);
         ptr->is_reference = true;
         gen<zen::copy>(ptr, r, (i64)pool.get(r->type->get_size()).get());
@@ -486,7 +492,7 @@ namespace zen::builder
                 //     peek();
                 go(pen);
                 bind(pel);
-                scope->__dncd__push(block::create(st));
+                get_scope(true)->__dncd__push(block::create(st));
                 callback(shared_from_this(), nullptr, pen);
                 pop();
             }
@@ -501,7 +507,7 @@ namespace zen::builder
                 go(pen);
                 bind(pel);
                 const auto end_lab = label();
-                scope->__dncd__push(block::create(st));
+                get_scope(true)->__dncd__push(block::create(st));
                 callback(shared_from_this(), pel, end_lab);
                 bind(end_lab);
                 pop();
@@ -519,7 +525,7 @@ namespace zen::builder
                     throw std::logic_error("a condition is needed for else if branches");
                 assert_type("assign", c, _bool(), offset);
                 go_if_not(c, else_lab);
-                scope->__dncd__push(block::create(st));
+                get_scope(true)->__dncd__push(block::create(st));
                 callback(shared_from_this(), else_lab, pen);
                 if (not else_lab->bound())
                 {
@@ -538,53 +544,72 @@ namespace zen::builder
         return std::make_shared<value>(fmt::format("{}", val), t, 0);
     }
 
-    void function::loop(const enum scope::type st, const std::vector<std::shared_ptr<value>>& params,
-                        const std::function<void(const std::shared_ptr<builder::function>&)>& body)
+    void function::loop_for(const std::vector<std::shared_ptr<value>>& params,
+                            const std::function<void(const std::shared_ptr<builder::function>&)>& body)
+
     {
-        switch (st)
+        if (params.size() == 3)
         {
-        case scope::in_for:
-            {
-                if (params.size() == 3)
-                {
-                    std::vector<std::shared_ptr<value>> new_params = params;
-                    new_params.push_back(constant_of_type(1, params.at(0)->type));
-                    loop(st, new_params, body);
-                }
-                else if (params.size() == 4)
-                {
-                    const auto cond = set_local(_bool(), "cond");
-                    const std::shared_ptr<value> &iterator = params[0],
-                                                 &first = params[1],
-                                                 &last = params[2],
-                    &step = params[3];
-                    const std::shared_ptr<builder::label> begin = label(),
-                                                          end = label(),
-                                                          condition = label();
-                    move(iterator, first);
-                    go(condition); // skip increment for first iteration
-                    {
-                        bind(begin);
-                        add(iterator, iterator, step);
-                        bind(condition);
-                        lower_equal(cond, iterator, last);
-                        go_if_not(cond, end);
-                        {
-                            scope->__dncd__push(block::create(scope::in_for_body));
-                            body(shared_from_this());
-                            pop();
-                        }
-                        go(begin);
-                        bind(end);
-                    }
-                }
-                else
-                    throw exceptions::semantic_error("unsupported parameter count for for loop", offset);
-            }
-            break;
-        default:
-            throw exceptions::semantic_error("unexpected scope type for loop", offset);
+            std::vector<std::shared_ptr<value>> new_params = params;
+            new_params.push_back(constant_of_type(1, params.at(0)->type));
+            loop_for(new_params, body);
         }
+        else if (params.size() == 4)
+        {
+            const auto cond = set_local(_bool(), "for::cond");
+            const std::shared_ptr<value> &iterator = params[0],
+                                         &first = params[1],
+                                         &last = params[2],
+                                         &step = params[3];
+            const std::shared_ptr<builder::label> begin = label(),
+                                                  end = label(),
+                                                  condition = label();
+            move(iterator, first);
+            go(condition); // skip increment for first iteration
+            {
+                bind(begin);
+                add(iterator, iterator, step);
+                bind(condition);
+                lower_equal(cond, iterator, last);
+                go_if_not(cond, end);
+                {
+                    get_scope(true)->__dncd__push(block::create(scope::in_for_body));
+                    body(shared_from_this());
+                    pop();
+                }
+                go(begin);
+                bind(end);
+            }
+        }
+        else
+            throw exceptions::semantic_error("unsupported parameter count for for loop", offset);
+    }
+
+    void function::loop_while(const std::vector<std::shared_ptr<value>>& params,
+                              const std::function<void(const std::shared_ptr<builder::function>&)>& prologue,
+                              const std::function<void(const std::shared_ptr<builder::function>&)>& body)
+    {
+        const auto scp = get_scope(true);
+        scp->__dncd__push(block::create(scope::in_while_prologue));
+        const std::shared_ptr<builder::label> begin = label(), end = label();
+        bind(begin);
+        prologue(shared_from_this());
+        if (params.size() == 1)
+        {
+            const auto cond = params[0];
+            go_if_not(cond, end);
+            {
+                scp->__dncd__push(block::create(scope::in_for_body));
+                body(shared_from_this());
+                pop();
+            }
+            peek();
+            go(begin);
+            bind(end);
+            pop();
+        }
+        else
+            throw exceptions::semantic_error("unsupported parameter count for while loop", offset);
     }
 
     void function::peek()
@@ -623,6 +648,11 @@ namespace zen::builder
     {
         pop();
         scope = nullptr;
+    }
+
+    i64 function::get_stack_usage() const
+    {
+        return get_scope(true)->get_stack_usage();
     }
 
     void function::pop()

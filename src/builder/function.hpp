@@ -38,13 +38,13 @@ namespace zen::builder
         types::stack::i64 offset;
         utils::constant_pool & pool;
 
-        std::shared_ptr<block> get_scope(const bool root  = false) const;
+        inline std::shared_ptr<block> get_scope(const bool root  = false) const;
         static std::shared_ptr<function> create(utils::constant_pool & pool, const i64 & offset,const bool& logging = false);
         std::shared_ptr<value> set_parameter(const std::shared_ptr<zen::builder::type>& t, const std::string& name);
         std::shared_ptr<value> set_return(const std::shared_ptr<zen::builder::type>& t);
         [[nodiscard]] std::shared_ptr<value> set_local(const std::shared_ptr<zen::builder::type>& t,
                                                        const std::string& name, bool param = false);
-
+        [[nodiscard]] std::shared_ptr<value> get_local(const std::string& name) const;
         void add(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
         void sub(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
         void mul(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
@@ -72,7 +72,10 @@ namespace zen::builder
                             function>&, const std::shared_ptr<builder::label>&,
                         const std::shared_ptr<builder::label>&)>&, const std::shared_ptr<builder::label>& pel = nullptr, const std::
                     shared_ptr<builder::label>& pen = nullptr);
-        void loop(enum scope::type st, const std::vector<std::shared_ptr<value>>& params, const std::function<void(const std::shared_ptr<
+        void loop_for(const std::vector<std::shared_ptr<value>>& params, const std::function<void(const std::shared_ptr<
+                          builder::function>&)>& body);
+        void loop_while(const std::vector<std::shared_ptr<value>>& params, const std::function<void(const std::shared_ptr<
+                      builder::function>&)>& prologue, const std::function<void(const std::shared_ptr<
                       builder::function>&)>& body);
         /*
         // Integer register creation
@@ -157,12 +160,15 @@ namespace zen::builder
         void bind(const std::shared_ptr<builder::label>& label)
         {
             label->bind(code);
-            fmt::println("\t<-1> %{} {}", label->id, label->bind_address.value_or(0));
+            if (logging)
+            {
+                fmt::println("%{}:", label->id);
+            }
         }
 
-        [[nodiscard]] static std::string get_address_or_label(const std::shared_ptr<value>& _1, const std::shared_ptr<block>& scp)
+        [[nodiscard]] std::string get_address_or_label(const std::shared_ptr<value>& _1) const
         {
-            auto address = _1->address(scp->get_stack_usage());
+            auto address = _1->address(get_stack_usage());
             return _1->label.empty() ? fmt::format("{}", address) : fmt::format("{}:{}", _1->label, address);
         }
 
@@ -171,16 +177,16 @@ namespace zen::builder
         {
             const std::shared_ptr<block>& sc = get_scope(true);
             code.push_back(ins);
-            code.push_back(_1->address(sc->get_stack_usage()));
-            code.push_back(_2->address(sc->get_stack_usage()));
-            code.push_back(_3->address(sc->get_stack_usage()));
+            code.push_back(_1->address(get_stack_usage()));
+            code.push_back(_2->address(get_stack_usage()));
+            code.push_back(_3->address(get_stack_usage()));
 
             if (logging)
             {
                 fmt::println("<{}> {} {} {} {}", code.size() - 4, code.at(code.size() - 4),
-                             get_address_or_label(_1, sc),
-                             get_address_or_label(_2, sc),
-                             get_address_or_label(_3, sc)
+                             get_address_or_label(_1),
+                             get_address_or_label(_2),
+                             get_address_or_label(_3)
                 );
             }
         }
@@ -190,15 +196,15 @@ namespace zen::builder
         {
             const std::shared_ptr<block>& sc = get_scope(true);
             code.push_back(ins);
-            code.push_back(_1->address(sc->get_stack_usage()));
-            code.push_back(_2->address(sc->get_stack_usage()));
+            code.push_back(_1->address(get_stack_usage()));
+            code.push_back(_2->address(get_stack_usage()));
             code.push_back(_3);
 
             if (logging)
             {
                 fmt::println("<{}> {} {} {} {}", code.size() - 4, code.at(code.size() - 4),
-                             get_address_or_label(_1, sc),
-                             get_address_or_label(_2, sc),
+                             get_address_or_label(_1),
+                             get_address_or_label(_2),
                              _3
                 );
             }
@@ -210,14 +216,14 @@ namespace zen::builder
         {
             const std::shared_ptr<block>& sc = get_scope(true);
             code.push_back(ins);
-            code.push_back(_1->address(sc->get_stack_usage()));
-            code.push_back(_2->address(sc->get_stack_usage()));
+            code.push_back(_1->address(get_stack_usage()));
+            code.push_back(_2->address(get_stack_usage()));
 
             if (logging)
             {
                 fmt::println("<{}> {} {} {}", code.size() - 3, code.at(code.size() - 3),
-                             get_address_or_label(_1, sc),
-                             get_address_or_label(_2, sc)
+                             get_address_or_label(_1),
+                             get_address_or_label(_2)
                 );
             }
         }
@@ -227,13 +233,13 @@ namespace zen::builder
         {
             const std::shared_ptr<block>& sc = get_scope(true);
             code.push_back(ins);
-            code.push_back(_1->address(sc->get_stack_usage()));
+            code.push_back(_1->address(get_stack_usage()));
             code.push_back(_2);
 
             if (logging)
             {
                 fmt::println("<{}> {} {} {}", code.size() - 3, code.at(code.size() - 3),
-                             get_address_or_label(_1, sc),
+                             get_address_or_label(_1),
                              _2prefix.empty() ? std::to_string(_2) : _2prefix
                 );
             }
@@ -244,11 +250,11 @@ namespace zen::builder
         {
             const std::shared_ptr<block>& sc = get_scope(true);
             code.push_back(ins);
-            code.push_back(_1->address(sc->get_stack_usage()));
+            code.push_back(_1->address(get_stack_usage()));
 
             if (logging)
             {
-                fmt::println("<{}> {} {}", code.size() - 2, code.at(code.size() - 2), get_address_or_label(_1, sc));
+                fmt::println("<{}> {} {}", code.size() - 2, code.at(code.size() - 2), get_address_or_label(_1));
             }
         }
 
@@ -272,6 +278,7 @@ namespace zen::builder
         void peek();
         void build();
     private:
+        inline i64 get_stack_usage() const;
         void pop();
     };
 }
