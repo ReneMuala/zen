@@ -25,6 +25,10 @@ namespace zen::builder
 
     void program::link(const std::shared_ptr<builder::function>& fn)
     {
+        if (fn->scope)
+        {
+            throw exceptions::link_error(fmt::format("cannot link function {} before building it", fn->get_canonical_name()));
+        }
         const auto hash = fn->hash();
         if (links.contains(hash)) return;
         links[hash] = code.size();

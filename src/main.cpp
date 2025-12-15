@@ -427,20 +427,18 @@ class point {
 	zen::utils::constant_pool pool;
 	zen::i64 offset;
 
-	const auto fb0 = zen::builder::function::create(pool, offset, true);
-	fb0->name = "test";
-	fb0->set_parameter(zen::builder::function::_int(), "i");
-	fb0->set_parameter(zen::builder::function::_float(), "i");
-	auto _ = fb0->set_local(zen::builder::function::_int(), "x");
-	fb0->build();
+	const auto test = zen::builder::function::create(pool, offset, true, "test");
+	test->set_parameter(zen::builder::function::_int(), "i");
+	test->set_parameter(zen::builder::function::_float(), "i");
+	auto _ = test->set_local(zen::builder::function::_int(), "x");
+	test->build();
 
-	const auto fb = zen::builder::function::create(pool, offset, true);
-	fb->name = "main";
-	const auto tbl = zen::builder::table::create(fb);
+	const auto entry = zen::builder::function::create(pool, offset, true, "entry");
+	const auto tbl = zen::builder::table::create(entry);
 	std::vector<std::shared_ptr<zen::builder::value>> params;
-	auto _i = fb->set_local(zen::builder::function::_int(), "i");
-	auto _j = fb->set_local(zen::builder::function::_int(), "j");
-	auto _str = fb->set_local(zen::builder::function::_string(), "s");
+	auto _i = entry->set_local(zen::builder::function::_int(), "i");
+	auto _j = entry->set_local(zen::builder::function::_int(), "j");
+	auto _str = entry->set_local(zen::builder::function::_string(), "s");
 	if (const auto result = tbl->get_value("s.string::data"))
 	{
 		std::shared_ptr<zen::builder::value> _ = result.value();
@@ -450,7 +448,7 @@ class point {
 		std::cout << result.error() << std::endl;
 	}
 
-	fb->loop_while(params, [&](auto fb)
+	entry->loop_while(params, [&](auto fb)
 	               {
 		               auto _c = fb->set_local(zen::builder::function::_bool(), "c");
 		               fb->lower_equal(_c, _i, _j);
@@ -462,25 +460,25 @@ class point {
 	               });
 	// auto _a = fb->set_local(zen::builder::function::_int(), "a");
 	// fb->add(_a, _a, _a);
-	auto r = fb->call(fb0, {
-		fb->set_local(zen::builder::function::_int(), "i"),
-		fb->set_local(zen::builder::function::_float(), "f"),
+	auto r = entry->call(test, {
+		entry->set_local(zen::builder::function::_int(), "i"),
+		entry->set_local(zen::builder::function::_float(), "f"),
 	});
 
 	if (not r.has_value())
 	{
-		throw zen::exceptions::semantic_error(r.error(), fb->offset);
+		throw zen::exceptions::semantic_error(r.error(), entry->offset);
 	}
-	fb->call(fb, {});
-	fb->build();
+	entry->call(entry, {});
+	entry->build();
 
 	const auto library = zen::builder::library::create("main");
-	library->add(fb0);
-	library->add(fb);
+	library->add(test);
+	library->add(entry);
 
 	const auto program = zen::builder::program::create();
 	program->add(library);
-	program->link(fb);
+	program->link(entry);
 
 	fmt::println("compiled with {} words", program->code.size());
 	// implement symbol manager
