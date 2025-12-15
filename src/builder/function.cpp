@@ -85,7 +85,6 @@ namespace zen::builder
         it->name = name;
         it->signature = std::make_shared<zen::builder::signature>();
         it->scope = builder::block::create(scope::in_function);
-        it->glabel = std::make_shared<zen::builder::global_label>();
         return it;
     }
 
@@ -589,13 +588,18 @@ namespace zen::builder
             call_cost+=arg->type->get_size();
         }
         gen<zen::call>(0, fmt::format("{}", fb_hash));
-        fb->glabel->use(shared_from_this());
+        // fb->glabel->use(shared_from_this());
+        if (not dependencies.contains(fb_hash))
+        {
+            dependencies[fb_hash] = global_label::create(fb->get_canonical_name());
+        }
+        dependencies[fb_hash]->use(code);
+
         if (call_cost)
         {
             gen<most>(call_cost);
         }
         scp->use_stack(-call_cost);
-        dependencies[fb->hash()] = fb->get_canonical_name();
         return return_value;
     }
 

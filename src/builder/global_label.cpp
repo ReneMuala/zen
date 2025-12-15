@@ -6,28 +6,25 @@
 
 namespace zen::builder
 {
-    void global_label::use(std::shared_ptr<builder::function> function)
+    std::shared_ptr<global_label> global_label::create(const std::string& name)
     {
-        auto& code = function->code;
-        if (code.empty())
-            throw std::invalid_argument("cannot bind label in empty code");
-        if (bind_address)
-        {
-            code[code.size() - 1] = bind_address.value();
-        }
-        const auto pair = std::pair<
-            std::shared_ptr<builder::function>, i64>{
-            function, code.size() - 1
-        };
-        indexes.emplace_back(pair);
+        static types::stack::i64 id = 0;
+        return std::make_shared<global_label>(name);
     }
 
-    void global_label::bind(const types::stack::i64 & ba)
+    void global_label::use(const std::vector<types::stack::i64>& code)
     {
-        for (const auto & [fst, snd] : indexes)
+        if (code.empty())
+            throw std::invalid_argument("cannot bind label in empty code");
+        indexes.emplace_back(code.size() - 1);
+    }
+
+    void global_label::bind(std::vector<types::stack::i64>& code, const types::stack::i64 offset,
+        const types::stack::i64 bind_address) const
+    {
+        for (const auto & index : indexes)
         {
-            fst->code[snd] = ba;
+            code[offset + index] = bind_address;
         }
-        this->bind_address = ba;
     }
 }

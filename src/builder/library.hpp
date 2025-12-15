@@ -2,8 +2,7 @@
 // Created by dte on 12/15/2025.
 //
 
-#ifndef ZEN_LIBRARY_HPP
-#define ZEN_LIBRARY_HPP
+#pragma once
 #include <memory>
 
 #include "function.hpp"
@@ -21,4 +20,3 @@ namespace zen::builder
     };
 }
 
-#endif //ZEN_LIBRARY_HPP

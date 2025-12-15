@@ -23,26 +23,29 @@ namespace zen::builder
         libraries.erase(lib->hash());
     }
 
-    void program::link(const std::shared_ptr<builder::function>& fn)
+    i64 program::link(const std::shared_ptr<builder::function>& fn)
     {
         if (fn->scope)
         {
             throw exceptions::link_error(fmt::format("cannot link function {} before building it", fn->get_canonical_name()));
         }
         const auto hash = fn->hash();
-        if (links.contains(hash)) return;
-        links[hash] = code.size();
+        if (links.contains(hash)) return links[hash];
+        const auto base = code.size();
+        links[hash] = base;
         code.insert(code.end(), fn->code.begin(), fn->code.end());
         for (const auto & [fst, snd] : fn -> dependencies)
         {
             if (const auto & dep_fb = get(fst))
             {
-                link(dep_fb);
+                const auto dep_base = link(dep_fb);
+                snd->bind(code, base, dep_base);
             } else
             {
-                throw exceptions::link_error(fmt::format("no such function {} needed by {}", snd, fn->get_canonical_name()));
+                throw exceptions::link_error(fmt::format("no such function {} needed by {}", snd->name, fn->get_canonical_name()));
             }
         }
+        return base;
     }
 
     void program::run()

@@ -39,9 +39,8 @@ namespace zen::builder
         types::stack::i64 offset;
         utils::constant_pool & pool;
         std::string name;
-        std::shared_ptr<global_label> glabel;
 
-        std::unordered_map<i32, std::string> dependencies;
+        std::unordered_map<i32, std::shared_ptr<global_label>> dependencies;
 
         inline std::shared_ptr<block> get_scope(const bool root  = false) const;
         static std::shared_ptr<function> create(utils::constant_pool & pool, const i64 & offset,const bool& logging = false, const std::string & name = "");
