@@ -78,14 +78,24 @@ namespace zen::builder
     }
 
     std::shared_ptr<zen::builder::function> function::create(utils::constant_pool& pool, const i64& offset,
-                                                             const bool& logging)
+                                                             const bool& logging,const std::string & name)
     {
         auto it = std::make_shared<function>(pool, offset);
         it->logging = logging;
+        it->name = name;
         it->signature = std::make_shared<zen::builder::signature>();
         it->scope = builder::block::create(scope::in_function);
         it->glabel = std::make_shared<zen::builder::global_label>();
         return it;
+    }
+
+    std::shared_ptr<function> function::create(const std::string& name, const std::vector<std::shared_ptr<builder::type>>& params, const std::shared_ptr<builder::type> &type)
+    {
+        auto func = create(pool, offset, false, name);
+        func->signature->parameters = params;
+        func->signature->type = type;
+        func->build();
+        return func;
     }
 
     std::shared_ptr<value> function::set_parameter(const std::shared_ptr<zen::builder::type>& t,
@@ -166,6 +176,16 @@ namespace zen::builder
             gen<add_f32>(r, lhs, rhs);
         else if (lhs->is(_double()))
             gen<add_f64>(r, lhs, rhs);
+        else if (lhs->type->kind == builder::type::heap)
+        {
+            if (const auto result = call(create("operator+", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            {
+                move(r, result.value());
+            } else
+            {
+                throw exceptions::semantic_error(result.error(), offset);
+            }
+        }
         else
             throw exceptions::semantic_error("unsupported type", offset);
     }
@@ -187,6 +207,16 @@ namespace zen::builder
             gen<sub_f32>(r, lhs, rhs);
         else if (lhs->is(_double()))
             gen<sub_f64>(r, lhs, rhs);
+        else if (lhs->type->kind == builder::type::heap)
+        {
+            if (const auto result = call(create("operator-", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            {
+                move(r, result.value());
+            } else
+            {
+                throw exceptions::semantic_error(result.error(), offset);
+            }
+        }
         else
             throw exceptions::semantic_error("unsupported type", offset);
     }
@@ -208,6 +238,16 @@ namespace zen::builder
             gen<mul_f32>(r, lhs, rhs);
         else if (lhs->is(_double()))
             gen<mul_f64>(r, lhs, rhs);
+        else if (lhs->type->kind == builder::type::heap)
+        {
+            if (const auto result = call(create("operator*", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            {
+                move(r, result.value());
+            } else
+            {
+                throw exceptions::semantic_error(result.error(), offset);
+            }
+        }
         else
             throw exceptions::semantic_error("unsupported type", offset);
     }
@@ -229,6 +269,16 @@ namespace zen::builder
             gen<div_f32>(r, lhs, rhs);
         else if (lhs->is(_double()))
             gen<div_f64>(r, lhs, rhs);
+        else if (lhs->type->kind == builder::type::heap)
+        {
+            if (const auto result = call(create("operator/", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            {
+                move(r, result.value());
+            } else
+            {
+                throw exceptions::semantic_error(result.error(), offset);
+            }
+        }
         else
             throw exceptions::semantic_error("unsupported type", offset);
     }
@@ -246,6 +296,16 @@ namespace zen::builder
             gen<mod_i32>(r, lhs, rhs);
         else if (lhs->is(_long()))
             gen<mod_i64>(r, lhs, rhs);
+        else if (lhs->type->kind == builder::type::heap)
+        {
+            if (const auto result = call(create("operator%", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            {
+                move(r, result.value());
+            } else
+            {
+                throw exceptions::semantic_error(result.error(), offset);
+            }
+        }
         else
             throw exceptions::semantic_error("unsupported type", offset);
     }
@@ -267,6 +327,16 @@ namespace zen::builder
             gen<eq_f32>(r, lhs, rhs);
         else if (lhs->is(_double()))
             gen<eq_f64>(r, lhs, rhs);
+        else if (lhs->type->kind == builder::type::heap)
+        {
+            if (const auto result = call(create("operator==", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            {
+                move(r, result.value());
+            } else
+            {
+                throw exceptions::semantic_error(result.error(), offset);
+            }
+        }
         else
             throw exceptions::semantic_error("unsupported type", offset);
     }
@@ -288,6 +358,16 @@ namespace zen::builder
             gen<neq_f32>(r, lhs, rhs);
         else if (lhs->is(_double()))
             gen<neq_f64>(r, lhs, rhs);
+        else if (lhs->type->kind == builder::type::heap)
+        {
+            if (const auto result = call(create("operator!=", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            {
+                move(r, result.value());
+            } else
+            {
+                throw exceptions::semantic_error(result.error(), offset);
+            }
+        }
         else
             throw exceptions::semantic_error("unsupported type", offset);
     }
@@ -309,6 +389,16 @@ namespace zen::builder
             gen<lt_f32>(r, lhs, rhs);
         else if (lhs->is(_double()))
             gen<lt_f64>(r, lhs, rhs);
+        else if (lhs->type->kind == builder::type::heap)
+        {
+            if (const auto result = call(create("operator<", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            {
+                move(r, result.value());
+            } else
+            {
+                throw exceptions::semantic_error(result.error(), offset);
+            }
+        }
         else
             throw exceptions::semantic_error("unsupported type", offset);
     }
@@ -330,6 +420,16 @@ namespace zen::builder
             gen<lte_f32>(r, lhs, rhs);
         else if (lhs->is(_double()))
             gen<lte_f64>(r, lhs, rhs);
+        else if (lhs->type->kind == builder::type::heap)
+        {
+            if (const auto result = call(create("operator<=", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            {
+                move(r, result.value());
+            } else
+            {
+                throw exceptions::semantic_error(result.error(), offset);
+            }
+        }
         else
             throw exceptions::semantic_error("unsupported type", offset);
     }
@@ -351,6 +451,16 @@ namespace zen::builder
             gen<gt_f32>(r, lhs, rhs);
         else if (lhs->is(_double()))
             gen<gt_f64>(r, lhs, rhs);
+        else if (lhs->type->kind == builder::type::heap)
+        {
+            if (const auto result = call(create("operator>", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            {
+                move(r, result.value());
+            } else
+            {
+                throw exceptions::semantic_error(result.error(), offset);
+            }
+        }
         else
             throw exceptions::semantic_error("unsupported type", offset);
     }
@@ -372,6 +482,16 @@ namespace zen::builder
             gen<gte_f32>(r, lhs, rhs);
         else if (lhs->is(_double()))
             gen<gte_f64>(r, lhs, rhs);
+        else if (lhs->type->kind == builder::type::heap)
+        {
+            if (const auto result = call(create("operator>=", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            {
+                move(r, result.value());
+            } else
+            {
+                throw exceptions::semantic_error(result.error(), offset);
+            }
+        }
         else
             throw exceptions::semantic_error("unsupported type", offset);
     }
@@ -391,6 +511,13 @@ namespace zen::builder
             gen<f32_to_f32>(lhs, rhs);
         else if (lhs->is(_double()))
             gen<f64_to_f64>(lhs, rhs);
+        else if (lhs->type->kind == builder::type::heap)
+        {
+            if (const auto result = call(create("operator=", {lhs->type,rhs->type}, nullptr), {lhs, rhs}); not result.has_value())
+            {
+                throw exceptions::semantic_error(result.error(), offset);
+            }
+        }
         else
             throw exceptions::semantic_error("unsupported type", offset);
     }

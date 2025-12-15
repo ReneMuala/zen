@@ -44,7 +44,8 @@ namespace zen::builder
         std::unordered_map<i32, std::string> dependencies;
 
         inline std::shared_ptr<block> get_scope(const bool root  = false) const;
-        static std::shared_ptr<function> create(utils::constant_pool & pool, const i64 & offset,const bool& logging = false);
+        static std::shared_ptr<function> create(utils::constant_pool & pool, const i64 & offset,const bool& logging = false, const std::string & name = "");
+        std::shared_ptr<function> create(const std::string & name, const std::vector<std::shared_ptr<builder::type>>& params, const std::shared_ptr<builder::type> &type);
         std::shared_ptr<value> set_parameter(const std::shared_ptr<zen::builder::type>& t, const std::string& name);
         std::shared_ptr<value> set_return(const std::shared_ptr<zen::builder::type>& t);
         [[nodiscard]] std::shared_ptr<value> set_local(const std::shared_ptr<zen::builder::type>& t,
