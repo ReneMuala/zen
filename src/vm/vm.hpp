@@ -4,14 +4,9 @@
 
 #pragma once
 #include <vector>
-#include <cstdint>
 // #include <ffi.h>
-#include <map>
-#include <memory>
-#include <optional>
 #include <stack>
 #include <string>
-#include <unordered_map>
 #include <fmt/base.h>
 #include "types/stack.hpp"
 #include "types/heap.hpp"
