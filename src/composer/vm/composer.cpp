@@ -656,7 +656,7 @@ if (scope and scope->is(scope::in_function)) throw std::logic_error(fmt::format(
                                          hint);
     }
 
-    std::vector<std::string> split_name(const std::string& name)
+    static std::vector<std::string> split_name(const std::string& name)
     {
         std::vector<std::string> result;
         std::istringstream iss(name);

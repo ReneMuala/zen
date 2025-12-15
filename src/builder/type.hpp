@@ -32,7 +32,6 @@ namespace zen::builder
         [[nodiscard]] std::optional<std::pair<types::stack::i64, std::shared_ptr<type>>> get_field(const std::string & name) const
         {
             types::stack::i64 offset = 0;
-            std::string hint;
             for (const auto & [fst, snd] : fields)
             {
                 if (fst == name) return {{offset, snd}};

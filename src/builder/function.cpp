@@ -4,6 +4,8 @@
 
 #include "function.hpp"
 
+#include <expected>
+
 #include "vm/vm.hpp"
 
 namespace zen::builder
@@ -82,6 +84,7 @@ namespace zen::builder
         it->logging = logging;
         it->signature = std::make_shared<zen::builder::signature>();
         it->scope = builder::block::create(scope::in_function);
+        it->glabel = std::make_shared<zen::builder::global_label>();
         return it;
     }
 
@@ -105,7 +108,7 @@ namespace zen::builder
         ret = std::make_shared<value>(
             t, get_stack_usage() - /* jump callee IP */static_cast<types::stack::i64>(sizeof(
                 types::stack::i64)));
-        ret->label = "@ret";
+        ret->name = "@ret";
         scp->use_stack(t->get_size());
         return ret;
     }
@@ -125,12 +128,6 @@ namespace zen::builder
         const auto sym = std::make_shared<value>(name, t, address);
         scp->locals[name].push_back(sym);
         return sym;
-    }
-
-    std::shared_ptr<value> function::get_local(const std::string& name) const
-    {
-        const auto scp = get_scope(true);
-        return scp->get_local(name);
     }
 
     inline void assert_same_type(const char* verb, const std::shared_ptr<value>& _1, const std::shared_ptr<value>& _2,
@@ -432,10 +429,58 @@ namespace zen::builder
         l->use(code);
     }
 
-    void function::call(const std::shared_ptr<global_label>& l, const std::list<std::shared_ptr<value>>& args)
+    std::expected<std::shared_ptr<value>, std::string> function::call(const std::shared_ptr<builder::function>& fb,
+                                                                      const std::vector<std::shared_ptr<value>>& args)
     {
-        gen<zen::call>(0);
-        l->use(code);
+        if (not fb->signature->check_args(args))
+            return std::unexpected(fmt::format("no matching args to call {}, expected {} got {}", fb->name, std::string(*fb->signature), builder::signature::describe_args(args)));
+        const auto fb_hash = fb->hash();
+        std::shared_ptr<value> return_value;
+        if (fb->signature->type)
+        {
+            return_value = set_local(fb->signature->type, fmt::format("{}/{}", fb_hash, offset));
+        }
+        i64 call_cost = 0;
+        const auto scp = get_scope();
+        for (auto & arg : args)
+        {
+            if (arg->is(_byte()))
+                gen<push_i8>(arg);
+            else if (arg->is(_short()))
+                gen<push_i16>(arg);
+            else if (arg->is(_int()))
+                gen<push_i32>(arg);
+            else if (arg->is(_long()))
+                gen<push_i64>(arg);
+            else if (arg->is(_float()))
+                gen<push_f32>(arg);
+            else if (arg->is(_double()))
+                gen<push_f64>(arg);
+            else
+                throw exceptions::semantic_error("unsupported type", offset);
+            scp->use_stack(arg->type->get_size());
+            call_cost+=arg->type->get_size();
+        }
+        gen<zen::call>(0, fmt::format("{}", fb_hash));
+        fb->glabel->use(shared_from_this());
+        if (call_cost)
+        {
+            gen<most>(call_cost);
+        }
+        scp->use_stack(-call_cost);
+        dependencies[fb->hash()] = fb->get_canonical_name();
+        return return_value;
+    }
+
+    int function::hash() const
+    {
+        static constexpr std::hash<std::string> hasher;
+        return hasher(get_canonical_name());
+    }
+
+    std::string function::get_canonical_name() const
+    {
+        return fmt::format("{}{}={}", name, std::string(*signature), signature->type ? signature->type->name : "unit");
     }
 
     std::shared_ptr<value> function::dereference(const std::shared_ptr<value>& r)

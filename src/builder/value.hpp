@@ -25,7 +25,7 @@ namespace zen::builder
         types::stack::i64 offset;
         std::shared_ptr<builder::type> type;
         bool no_destructor = false;
-        std::string label;
+        std::string name;
         bool is_reference = false;
         bool is_negated = false;
 
@@ -54,7 +54,7 @@ namespace zen::builder
         explicit value(const std::string& label, const std::shared_ptr<builder::type>& type,
                        const types::stack::i64& address) : value(type, address)
         {
-            this->label = label;
+            this->name = label;
         }
 
         types::stack::i64 _address;

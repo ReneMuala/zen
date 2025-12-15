@@ -8,6 +8,10 @@
 #include "builder/function.hpp"
 #include <vm/vm.hpp>
 #include <sstream>
+
+#include "builder/library.hpp"
+#include "builder/program.hpp"
+#include "builder/table.hpp"
 #include "utils/utils.hpp"
 
 #ifdef KAIZEN_WASM
@@ -344,6 +348,30 @@ void for_test()
 	fb->build();
 }
 
+void while_test()
+{
+	zen::utils::constant_pool pool;
+	zen::i64 offset;
+	const auto fb = zen::builder::function::create(pool, offset, true);
+	std::vector<std::shared_ptr<zen::builder::value>> params;
+	auto _i = fb->set_local(zen::builder::function::_int(), "i");
+	auto _j = fb->set_local(zen::builder::function::_int(), "j");
+
+	fb->loop_while(params, [&](auto fb)
+	               {
+		               auto _c = fb->set_local(zen::builder::function::_bool(), "c");
+		               fb->lower_equal(_c, _i, _j);
+		               params.push_back(_c);
+	               }, [&](auto fb)
+	               {
+		               auto _sum = fb->set_local(zen::builder::function::_int(), "sum");
+		               fb->add(_sum, _i, _sum);
+	               });
+	// auto _a = fb->set_local(zen::builder::function::_int(), "a");
+	// fb->add(_a, _a, _a);
+	fb->build();
+}
+
 int main(int argc, char** argv) try
 {
 #ifdef KAIZEN_WASM
@@ -398,10 +426,29 @@ class point {
 #else
 	zen::utils::constant_pool pool;
 	zen::i64 offset;
+
+	const auto fb0 = zen::builder::function::create(pool, offset, true);
+	fb0->name = "test";
+	fb0->set_parameter(zen::builder::function::_int(), "i");
+	fb0->set_parameter(zen::builder::function::_float(), "i");
+	auto _ = fb0->set_local(zen::builder::function::_int(), "x");
+	fb0->build();
+
 	const auto fb = zen::builder::function::create(pool, offset, true);
+	fb->name = "main";
+	const auto tbl = zen::builder::table::create(fb);
 	std::vector<std::shared_ptr<zen::builder::value>> params;
 	auto _i = fb->set_local(zen::builder::function::_int(), "i");
 	auto _j = fb->set_local(zen::builder::function::_int(), "j");
+	auto _str = fb->set_local(zen::builder::function::_string(), "s");
+	if (const auto result = tbl->get_value("s.string::data"))
+	{
+		std::shared_ptr<zen::builder::value> _ = result.value();
+	}
+	else
+	{
+		std::cout << result.error() << std::endl;
+	}
 
 	fb->loop_while(params, [&](auto fb)
 	               {
@@ -415,7 +462,27 @@ class point {
 	               });
 	// auto _a = fb->set_local(zen::builder::function::_int(), "a");
 	// fb->add(_a, _a, _a);
+	auto r = fb->call(fb0, {
+		fb->set_local(zen::builder::function::_int(), "i"),
+		fb->set_local(zen::builder::function::_float(), "f"),
+	});
+
+	if (not r.has_value())
+	{
+		throw zen::exceptions::semantic_error(r.error(), fb->offset);
+	}
+	fb->call(fb, {});
 	fb->build();
+
+	const auto library = zen::builder::library::create("main");
+	library->add(fb0);
+	library->add(fb);
+
+	const auto program = zen::builder::program::create();
+	program->add(library);
+	program->link(fb);
+
+	fmt::println("compiled with {} words", program->code.size());
 	// implement symbol manager
 	// implement deference wrappers
 #endif

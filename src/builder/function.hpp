@@ -3,6 +3,7 @@
 //
 #pragma once
 
+#include <expected>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -37,6 +38,10 @@ namespace zen::builder
         std::shared_ptr<block> scope;
         types::stack::i64 offset;
         utils::constant_pool & pool;
+        std::string name;
+        std::shared_ptr<global_label> glabel;
+
+        std::unordered_map<i32, std::string> dependencies;
 
         inline std::shared_ptr<block> get_scope(const bool root  = false) const;
         static std::shared_ptr<function> create(utils::constant_pool & pool, const i64 & offset,const bool& logging = false);
@@ -44,7 +49,6 @@ namespace zen::builder
         std::shared_ptr<value> set_return(const std::shared_ptr<zen::builder::type>& t);
         [[nodiscard]] std::shared_ptr<value> set_local(const std::shared_ptr<zen::builder::type>& t,
                                                        const std::string& name, bool param = false);
-        [[nodiscard]] std::shared_ptr<value> get_local(const std::string& name) const;
         void add(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
         void sub(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
         void mul(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
@@ -66,7 +70,10 @@ namespace zen::builder
         void return_value(const std::shared_ptr<value>& r);
         void go(const  std::shared_ptr<label>& l);
         void go_if_not(const std::shared_ptr<value>& c, const  std::shared_ptr<label>& l);
-        void call(const  std::shared_ptr<global_label>& l, const std::list<std::shared_ptr<value>>& args);
+        std::expected<std::shared_ptr<value>, std::string> call(const std::shared_ptr<builder::function>& fb,
+                                                                const std::vector<std::shared_ptr<value>>& args);
+        int hash() const;
+        std::string get_canonical_name() const;
         std::shared_ptr<value> dereference(const std::shared_ptr<value>& r);
         void branch(enum builder::scope::type, const std::shared_ptr<value>& c, const std::function<void(const std::shared_ptr<builder::
                             function>&, const std::shared_ptr<builder::label>&,
@@ -169,7 +176,7 @@ namespace zen::builder
         [[nodiscard]] std::string get_address_or_label(const std::shared_ptr<value>& _1) const
         {
             auto address = _1->address(get_stack_usage());
-            return _1->label.empty() ? fmt::format("{}", address) : fmt::format("{}:{}", _1->label, address);
+            return _1->name.empty() ? fmt::format("{}", address) : fmt::format("{}:{}", _1->name, address);
         }
 
         template <zen::instruction ins>
