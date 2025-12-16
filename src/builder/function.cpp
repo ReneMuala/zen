@@ -78,7 +78,7 @@ namespace zen::builder
     }
 
     std::shared_ptr<zen::builder::function> function::create(utils::constant_pool& pool, const i64& offset,
-                                                             const bool& logging,const std::string & name)
+                                                             const bool& logging, const std::string& name)
     {
         auto it = std::make_shared<function>(pool, offset);
         it->logging = logging;
@@ -88,7 +88,9 @@ namespace zen::builder
         return it;
     }
 
-    std::shared_ptr<function> function::create(const std::string& name, const std::vector<std::shared_ptr<builder::type>>& params, const std::shared_ptr<builder::type> &type)
+    std::shared_ptr<function> function::create(const std::string& name,
+                                               const std::vector<std::shared_ptr<builder::type>>& params,
+                                               const std::shared_ptr<builder::type>& type)
     {
         auto func = create(pool, offset, false, name);
         func->signature->parameters = params;
@@ -127,10 +129,10 @@ namespace zen::builder
     {
         const auto& scp = get_scope();
         const types::stack::i64 address = get_stack_usage() - (param
-                                                                        ? /* jump callee IP */static_cast<
-                                                                            types::stack::i64>(sizeof(
-                                                                            types::stack::i64))
-                                                                        : 0);
+                                                                   ? /* jump callee IP */static_cast<
+                                                                       types::stack::i64>(sizeof(
+                                                                       types::stack::i64))
+                                                                   : 0);
         scp->use_stack(t->get_size());
         if (not param)
             gen<most>(-t->get_size());
@@ -177,10 +179,12 @@ namespace zen::builder
             gen<add_f64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
-            if (const auto result = call(create("operator+", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            if (const auto result = call(create("operator+", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
+                has_value())
             {
                 move(r, result.value());
-            } else
+            }
+            else
             {
                 throw exceptions::semantic_error(result.error(), offset);
             }
@@ -208,10 +212,12 @@ namespace zen::builder
             gen<sub_f64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
-            if (const auto result = call(create("operator-", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            if (const auto result = call(create("operator-", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
+                has_value())
             {
                 move(r, result.value());
-            } else
+            }
+            else
             {
                 throw exceptions::semantic_error(result.error(), offset);
             }
@@ -239,10 +245,12 @@ namespace zen::builder
             gen<mul_f64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
-            if (const auto result = call(create("operator*", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            if (const auto result = call(create("operator*", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
+                has_value())
             {
                 move(r, result.value());
-            } else
+            }
+            else
             {
                 throw exceptions::semantic_error(result.error(), offset);
             }
@@ -270,10 +278,12 @@ namespace zen::builder
             gen<div_f64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
-            if (const auto result = call(create("operator/", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            if (const auto result = call(create("operator/", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
+                has_value())
             {
                 move(r, result.value());
-            } else
+            }
+            else
             {
                 throw exceptions::semantic_error(result.error(), offset);
             }
@@ -297,10 +307,12 @@ namespace zen::builder
             gen<mod_i64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
-            if (const auto result = call(create("operator%", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            if (const auto result = call(create("operator%", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
+                has_value())
             {
                 move(r, result.value());
-            } else
+            }
+            else
             {
                 throw exceptions::semantic_error(result.error(), offset);
             }
@@ -328,10 +340,12 @@ namespace zen::builder
             gen<eq_f64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
-            if (const auto result = call(create("operator==", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            if (const auto result = call(create("operator==", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
+                has_value())
             {
                 move(r, result.value());
-            } else
+            }
+            else
             {
                 throw exceptions::semantic_error(result.error(), offset);
             }
@@ -359,10 +373,12 @@ namespace zen::builder
             gen<neq_f64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
-            if (const auto result = call(create("operator!=", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            if (const auto result = call(create("operator!=", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
+                has_value())
             {
                 move(r, result.value());
-            } else
+            }
+            else
             {
                 throw exceptions::semantic_error(result.error(), offset);
             }
@@ -390,10 +406,12 @@ namespace zen::builder
             gen<lt_f64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
-            if (const auto result = call(create("operator<", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            if (const auto result = call(create("operator<", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
+                has_value())
             {
                 move(r, result.value());
-            } else
+            }
+            else
             {
                 throw exceptions::semantic_error(result.error(), offset);
             }
@@ -421,10 +439,12 @@ namespace zen::builder
             gen<lte_f64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
-            if (const auto result = call(create("operator<=", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            if (const auto result = call(create("operator<=", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
+                has_value())
             {
                 move(r, result.value());
-            } else
+            }
+            else
             {
                 throw exceptions::semantic_error(result.error(), offset);
             }
@@ -452,10 +472,12 @@ namespace zen::builder
             gen<gt_f64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
-            if (const auto result = call(create("operator>", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            if (const auto result = call(create("operator>", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
+                has_value())
             {
                 move(r, result.value());
-            } else
+            }
+            else
             {
                 throw exceptions::semantic_error(result.error(), offset);
             }
@@ -483,10 +505,12 @@ namespace zen::builder
             gen<gte_f64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
-            if (const auto result = call(create("operator>=", {lhs->type,rhs->type}, r->type), {lhs, rhs}); result.has_value())
+            if (const auto result = call(create("operator>=", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
+                has_value())
             {
                 move(r, result.value());
-            } else
+            }
+            else
             {
                 throw exceptions::semantic_error(result.error(), offset);
             }
@@ -512,7 +536,8 @@ namespace zen::builder
             gen<f64_to_f64>(lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
-            if (const auto result = call(create("operator=", {lhs->type,rhs->type}, nullptr), {lhs, rhs}); not result.has_value())
+            if (const auto result = call(create("operator=", {lhs->type, rhs->type}, nullptr), {lhs, rhs}); not result.
+                has_value())
             {
                 throw exceptions::semantic_error(result.error(), offset);
             }
@@ -559,16 +584,42 @@ namespace zen::builder
                                                                       const std::vector<std::shared_ptr<value>>& args)
     {
         if (not fb->signature->check_args(args))
-            return std::unexpected(fmt::format("no matching args to call {}, expected {} got {}", fb->name, std::string(*fb->signature), builder::signature::describe_args(args)));
+            return std::unexpected(fmt::format("no matching args to call {}, expected {} got {}", fb->name,
+                                               std::string(*fb->signature), builder::signature::describe_args(args)));
         const auto fb_hash = fb->hash();
         std::shared_ptr<value> return_value;
         if (fb->signature->type)
         {
             return_value = set_local(fb->signature->type, fmt::format("{}/{}", fb_hash, offset));
         }
-        i64 call_cost = 0;
         const auto scp = get_scope();
-        for (auto & arg : args)
+        std::vector<std::shared_ptr<value>> final_args;
+        for (auto& val : args)
+        {
+            std::shared_ptr<builder::value> arg = val;
+            if (arg->type->kind == type::kind::heap and arg->kind == value::kind::constant)
+            {
+                auto cha = set_local(arg->type, fmt::format("cha::{}", arg->name));
+                auto ptr = set_local(_long(), "cha::ptr");
+                gen<zen::refer>(ptr, arg);
+                ptr->type = arg->type;
+                ptr->is_reference = true;
+                if (const auto result = call(create("operator=", {cha->type, cha->type}, nullptr), {cha, ptr}); not
+                    result.has_value())
+                {
+                    throw exceptions::semantic_error(result.error(), offset);
+                }
+                arg = cha;
+            }
+            else if (arg->type->kind == type::kind::stack and arg->is_reference)
+            // deference fields only if they are stack allocated since nested objects are stored in a contiguous memory block
+            {
+                arg = dereference(arg);
+            }
+            final_args.push_back(arg);
+        }
+        i64 call_cost = 0;
+        for (auto& arg : final_args)
         {
             if (arg->is(_byte()))
                 gen<push_i8>(arg);
@@ -585,7 +636,7 @@ namespace zen::builder
             else
                 throw exceptions::semantic_error("unsupported type", offset);
             scp->use_stack(arg->type->get_size());
-            call_cost+=arg->type->get_size();
+            call_cost += arg->type->get_size();
         }
         gen<zen::call>(0, fmt::format("{}", fb_hash));
         // fb->glabel->use(shared_from_this());
