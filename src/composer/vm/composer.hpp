@@ -5,6 +5,7 @@
 #ifndef VM_COMPOSER_HPP
 #define VM_COMPOSER_HPP
 #include <list>
+#include <memory>
 
 #include "../composer.hpp"
 #include <vm/vm.hpp>
