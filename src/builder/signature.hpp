@@ -13,6 +13,7 @@ namespace zen::builder
     {
         std::shared_ptr<builder::type> type;
         std::vector<std::shared_ptr<builder::type>> parameters {};
+        bool is_allocator = false;
 
         [[nodiscard]] bool check_args(const std::vector<std::shared_ptr<builder::value>>& args) const
         {
