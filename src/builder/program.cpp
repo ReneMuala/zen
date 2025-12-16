@@ -13,7 +13,7 @@ namespace zen::builder
         return std::make_shared<builder::program>();
     }
 
-    void program::add(const std::shared_ptr<builder::library>& lib)
+    void program::add(std::shared_ptr<builder::library> lib)
     {
         libraries[lib->hash()] = lib;
     }
@@ -31,7 +31,7 @@ namespace zen::builder
         }
         const auto hash = fn->hash();
         if (links.contains(hash)) return links[hash];
-        const auto base = code.size();
+        const i64 base = code.size();
         links[hash] = base;
         code.insert(code.end(), fn->code.begin(), fn->code.end());
         for (const auto & [fst, snd] : fn -> dependencies)
@@ -52,7 +52,7 @@ namespace zen::builder
     {
     }
 
-    std::shared_ptr<builder::function> program::get(i32 id) const
+    std::shared_ptr<builder::function> program::get(i64 id) const
     {
         for (auto & lib : libraries)
         {

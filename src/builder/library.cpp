@@ -6,18 +6,19 @@
 
 namespace zen::builder
 {
-    int library::hash() const
+    i64 library::hash() const
     {
         static constexpr std::hash<std::string> hasher;
         return hasher(name);
     }
 
-    std::shared_ptr<builder::function> library::get(const i32 id)
+    std::shared_ptr<builder::function> library::get(const i64 id)
     {
-        return functions[id];
+        const auto target = functions.find(id);
+        return target != functions.end() ? target->second : nullptr;
     }
 
-    void library::add(const std::shared_ptr<builder::function>& fn)
+    void library::add(std::shared_ptr<builder::function> fn)
     {
         functions[fn->hash()] = fn;
     }
