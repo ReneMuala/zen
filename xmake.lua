@@ -22,6 +22,7 @@ if not is_plat("wasm") then
         "src/exceptions/*.cpp",
         "src/composer/vm/*.cpp",
         "src/builder/*.cpp",
+        "src/library/*.cpp",
         "test/*.cpp"
     )
 end
@@ -39,7 +40,8 @@ add_files(
     --"src/parser/*.cpp",
     "src/exceptions/*.cpp",
     "src/composer/vm/*.cpp",
-    "src/builder/*.cpp"
+    "src/builder/*.cpp",
+        "src/library/*.cpp"
 )
 --
 -- If you want to known more usage about xmake, please see https://xmake.io

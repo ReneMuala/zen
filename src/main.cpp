@@ -12,6 +12,7 @@
 #include "builder/library.hpp"
 #include "builder/program.hpp"
 #include "builder/table.hpp"
+#include "library/string.hpp"
 #include "utils/utils.hpp"
 
 #ifdef KAIZEN_WASM
@@ -478,7 +479,21 @@ class point {
 
 	const auto program = zen::builder::program::create();
 	program->add(library);
+	program->add(zen::library::string::create(pool));
 	program->link(entry);
+	fmt::println("string");
+
+	fmt::println("main");
+	for (auto & it : library->functions)
+	{
+		if (it.second)
+		{
+			fmt::println("{} valid", it.first);
+		} else
+		{
+			fmt::println("{} invalid", it.first);
+		}
+	}
 
 	fmt::println("compiled with {} words", program->code.size());
 	// implement symbol manager

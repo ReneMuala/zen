@@ -90,13 +90,12 @@ namespace zen::builder
 
     std::shared_ptr<function> function::create(const std::string& name,
                                                const std::vector<std::shared_ptr<builder::type>>& params,
-                                               const std::shared_ptr<builder::type>& type)
+                                               const std::shared_ptr<builder::type>& type) const
     {
-        auto func = create(pool, offset, false, name);
-        func->signature->parameters = params;
-        func->signature->type = type;
-        func->build();
-        return func;
+        auto fn = create(pool, offset, false, name);
+        fn->signature->parameters = params;
+        fn->signature->type = type;
+        return fn;
     }
 
     std::shared_ptr<value> function::set_parameter(const std::shared_ptr<zen::builder::type>& t,
@@ -134,10 +133,25 @@ namespace zen::builder
                                                                        types::stack::i64))
                                                                    : 0);
         scp->use_stack(t->get_size());
-        if (not param)
-            gen<most>(-t->get_size());
         const auto sym = std::make_shared<value>(name, t, address);
         scp->locals[name].push_back(sym);
+        if (not param)
+        {
+            gen<zen::most>(-t->get_size());
+            if (t->kind == type::kind::heap)
+            {
+                const auto allocator = create("zen::allocate", {}, t);
+                allocator->signature->is_allocator = true;
+                if (const auto result = call(allocator, {}); not result.
+                    has_value())
+                {
+                    throw exceptions::semantic_error(result.error(), offset);
+                }
+            }
+        } else
+        {
+            sym->no_destructor = true;
+        }
         return sym;
     }
 
@@ -166,17 +180,17 @@ namespace zen::builder
         assert_same_type("add", lhs, rhs, offset);
         assert_same_type("assign", lhs, r, offset);
         if (lhs->is(_byte()))
-            gen<add_i8>(r, lhs, rhs);
+            gen<zen::add_i8>(r, lhs, rhs);
         else if (lhs->is(_short()))
-            gen<add_i16>(r, lhs, rhs);
+            gen<zen::add_i16>(r, lhs, rhs);
         else if (lhs->is(_int()))
-            gen<add_i32>(r, lhs, rhs);
+            gen<zen::add_i32>(r, lhs, rhs);
         else if (lhs->is(_long()))
-            gen<add_i64>(r, lhs, rhs);
+            gen<zen::add_i64>(r, lhs, rhs);
         else if (lhs->is(_float()))
-            gen<add_f32>(r, lhs, rhs);
+            gen<zen::add_f32>(r, lhs, rhs);
         else if (lhs->is(_double()))
-            gen<add_f64>(r, lhs, rhs);
+            gen<zen::add_f64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator+", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -199,17 +213,17 @@ namespace zen::builder
         assert_same_type("subtract", lhs, rhs, offset);
         assert_same_type("assign", lhs, r, offset);
         if (lhs->is(_byte()))
-            gen<sub_i8>(r, lhs, rhs);
+            gen<zen::sub_i8>(r, lhs, rhs);
         else if (lhs->is(_short()))
-            gen<sub_i16>(r, lhs, rhs);
+            gen<zen::sub_i16>(r, lhs, rhs);
         else if (lhs->is(_int()))
-            gen<sub_i32>(r, lhs, rhs);
+            gen<zen::sub_i32>(r, lhs, rhs);
         else if (lhs->is(_long()))
-            gen<sub_i64>(r, lhs, rhs);
+            gen<zen::sub_i64>(r, lhs, rhs);
         else if (lhs->is(_float()))
-            gen<sub_f32>(r, lhs, rhs);
+            gen<zen::sub_f32>(r, lhs, rhs);
         else if (lhs->is(_double()))
-            gen<sub_f64>(r, lhs, rhs);
+            gen<zen::sub_f64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator-", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -232,17 +246,17 @@ namespace zen::builder
         assert_same_type("multiply", lhs, rhs, offset);
         assert_same_type("assign", lhs, r, offset);
         if (lhs->is(_byte()))
-            gen<mul_i8>(r, lhs, rhs);
+            gen<zen::mul_i8>(r, lhs, rhs);
         else if (lhs->is(_short()))
-            gen<mul_i16>(r, lhs, rhs);
+            gen<zen::mul_i16>(r, lhs, rhs);
         else if (lhs->is(_int()))
-            gen<mul_i32>(r, lhs, rhs);
+            gen<zen::mul_i32>(r, lhs, rhs);
         else if (lhs->is(_long()))
-            gen<mul_i64>(r, lhs, rhs);
+            gen<zen::mul_i64>(r, lhs, rhs);
         else if (lhs->is(_float()))
-            gen<mul_f32>(r, lhs, rhs);
+            gen<zen::mul_f32>(r, lhs, rhs);
         else if (lhs->is(_double()))
-            gen<mul_f64>(r, lhs, rhs);
+            gen<zen::mul_f64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator*", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -265,17 +279,17 @@ namespace zen::builder
         assert_same_type("divide", lhs, rhs, offset);
         assert_same_type("assign", lhs, r, offset);
         if (lhs->is(_byte()))
-            gen<div_i8>(r, lhs, rhs);
+            gen<zen::div_i8>(r, lhs, rhs);
         else if (lhs->is(_short()))
-            gen<div_i16>(r, lhs, rhs);
+            gen<zen::div_i16>(r, lhs, rhs);
         else if (lhs->is(_int()))
-            gen<div_i32>(r, lhs, rhs);
+            gen<zen::div_i32>(r, lhs, rhs);
         else if (lhs->is(_long()))
-            gen<div_i64>(r, lhs, rhs);
+            gen<zen::div_i64>(r, lhs, rhs);
         else if (lhs->is(_float()))
-            gen<div_f32>(r, lhs, rhs);
+            gen<zen::div_f32>(r, lhs, rhs);
         else if (lhs->is(_double()))
-            gen<div_f64>(r, lhs, rhs);
+            gen<zen::div_f64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator/", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -298,13 +312,13 @@ namespace zen::builder
         assert_same_type("mod", lhs, rhs, offset);
         assert_same_type("assign", lhs, r, offset);
         if (lhs->is(_byte()))
-            gen<mod_i8>(r, lhs, rhs);
+            gen<zen::mod_i8>(r, lhs, rhs);
         else if (lhs->is(_short()))
-            gen<mod_i16>(r, lhs, rhs);
+            gen<zen::mod_i16>(r, lhs, rhs);
         else if (lhs->is(_int()))
-            gen<mod_i32>(r, lhs, rhs);
+            gen<zen::mod_i32>(r, lhs, rhs);
         else if (lhs->is(_long()))
-            gen<mod_i64>(r, lhs, rhs);
+            gen<zen::mod_i64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator%", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -393,17 +407,17 @@ namespace zen::builder
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
         if (lhs->is(_byte()))
-            gen<lt_i8>(r, lhs, rhs);
+            gen<zen::lt_i8>(r, lhs, rhs);
         else if (lhs->is(_short()))
-            gen<lt_i16>(r, lhs, rhs);
+            gen<zen::lt_i16>(r, lhs, rhs);
         else if (lhs->is(_int()))
-            gen<lt_i32>(r, lhs, rhs);
+            gen<zen::lt_i32>(r, lhs, rhs);
         else if (lhs->is(_long()))
-            gen<lt_i64>(r, lhs, rhs);
+            gen<zen::lt_i64>(r, lhs, rhs);
         else if (lhs->is(_float()))
-            gen<lt_f32>(r, lhs, rhs);
+            gen<zen::lt_f32>(r, lhs, rhs);
         else if (lhs->is(_double()))
-            gen<lt_f64>(r, lhs, rhs);
+            gen<zen::lt_f64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator<", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -459,17 +473,17 @@ namespace zen::builder
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
         if (lhs->is(_byte()))
-            gen<gt_i8>(r, lhs, rhs);
+            gen<zen::gt_i8>(r, lhs, rhs);
         else if (lhs->is(_short()))
-            gen<gt_i16>(r, lhs, rhs);
+            gen<zen::gt_i16>(r, lhs, rhs);
         else if (lhs->is(_int()))
-            gen<gt_i32>(r, lhs, rhs);
+            gen<zen::gt_i32>(r, lhs, rhs);
         else if (lhs->is(_long()))
-            gen<gt_i64>(r, lhs, rhs);
+            gen<zen::gt_i64>(r, lhs, rhs);
         else if (lhs->is(_float()))
-            gen<gt_f32>(r, lhs, rhs);
+            gen<zen::gt_f32>(r, lhs, rhs);
         else if (lhs->is(_double()))
-            gen<gt_f64>(r, lhs, rhs);
+            gen<zen::gt_f64>(r, lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator>", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -523,17 +537,17 @@ namespace zen::builder
     {
         assert_same_type("assign", lhs, rhs, offset);
         if (lhs->is(_byte()))
-            gen<i8_to_i8>(lhs, rhs);
+            gen<zen::i8_to_i8>(lhs, rhs);
         else if (lhs->is(_short()))
-            gen<i16_to_i16>(lhs, rhs);
+            gen<zen::i16_to_i16>(lhs, rhs);
         else if (lhs->is(_int()))
-            gen<i32_to_i32>(lhs, rhs);
+            gen<zen::i32_to_i32>(lhs, rhs);
         else if (lhs->is(_long()))
-            gen<i64_to_i64>(lhs, rhs);
+            gen<zen::i64_to_i64>(lhs, rhs);
         else if (lhs->is(_float()))
-            gen<f32_to_f32>(lhs, rhs);
+            gen<zen::f32_to_f32>(lhs, rhs);
         else if (lhs->is(_double()))
-            gen<f64_to_f64>(lhs, rhs);
+            gen<zen::f64_to_f64>(lhs, rhs);
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator=", {lhs->type, rhs->type}, nullptr), {lhs, rhs}); not result.
@@ -568,6 +582,11 @@ namespace zen::builder
             throw exceptions::semantic_error("cannot return without specifying return type first", offset);
     }
 
+    void function::return_implicitly() const
+    {
+        get_scope(true)->set_return_status(block::concise_return);
+    }
+
     void function::go(const std::shared_ptr<builder::label>& l)
     {
         gen<zen::go>(0, fmt::format("%{}", l->id));
@@ -588,7 +607,7 @@ namespace zen::builder
                                                std::string(*fb->signature), builder::signature::describe_args(args)));
         const auto fb_hash = fb->hash();
         std::shared_ptr<value> return_value;
-        if (fb->signature->type)
+        if (fb->signature->type and not fb->signature->is_allocator)
         {
             return_value = set_local(fb->signature->type, fmt::format("{}/{}", fb_hash, offset));
         }
@@ -622,19 +641,19 @@ namespace zen::builder
         for (auto& arg : final_args)
         {
             if (arg->is(_byte()))
-                gen<push_i8>(arg);
+                gen<zen::push_i8>(arg);
             else if (arg->is(_short()))
-                gen<push_i16>(arg);
+                gen<zen::push_i16>(arg);
             else if (arg->is(_int()))
-                gen<push_i32>(arg);
+                gen<zen::push_i32>(arg);
             else if (arg->is(_long()))
-                gen<push_i64>(arg);
+                gen<zen::push_i64>(arg);
             else if (arg->is(_float()))
-                gen<push_f32>(arg);
+                gen<zen::push_f32>(arg);
             else if (arg->is(_double()))
-                gen<push_f64>(arg);
+                gen<zen::push_f64>(arg);
             else
-                throw exceptions::semantic_error("unsupported type", offset);
+                gen<zen::push_f64>(arg);
             scp->use_stack(arg->type->get_size());
             call_cost += arg->type->get_size();
         }
@@ -648,13 +667,13 @@ namespace zen::builder
 
         if (call_cost)
         {
-            gen<most>(call_cost);
+            gen<zen::most>(call_cost);
         }
         scp->use_stack(-call_cost);
         return return_value;
     }
 
-    int function::hash() const
+    i64 function::hash() const
     {
         static constexpr std::hash<std::string> hasher;
         return hasher(get_canonical_name());
@@ -673,7 +692,7 @@ namespace zen::builder
         ptr->is_reference = true;
         gen<zen::copy>(ptr, r, (i64)pool.get(r->type->get_size()).get());
         get_scope()->use_stack(-ptr->type->get_size());
-        gen<most>(ptr->type->get_size());
+        gen<zen::most>(ptr->type->get_size());
         return dest;
     }
 
@@ -778,7 +797,24 @@ namespace zen::builder
         if (params.size() == 3)
         {
             std::vector<std::shared_ptr<value>> new_params = params;
-            new_params.push_back(constant_of_type(1, params.at(0)->type));
+            auto it = params.at(0);
+            std::shared_ptr<value> step;
+
+            if (it->is(_byte()))
+                step = constant<i8>(1);
+            else if (it->is(_short()))
+                step = constant<i16>(1);
+            else if (it->is(_int()))
+                step = constant<i32>(1);
+            else if (it->is(_long()))
+                step = constant<i64>(1);
+            else if (it->is(_float()))
+                step = constant<f32>(1);
+            else if (it->is(_double()))
+                step = constant<f64>(1);
+            else
+                throw exceptions::semantic_error("unsupported type", offset);
+            new_params.push_back(step);
             loop_for(new_params, body);
         }
         else if (params.size() == 4)
@@ -850,30 +886,31 @@ namespace zen::builder
                 {
                     if (local->type->kind == type::heap && !local->no_destructor)
                     {
-                        try
+                        if (const auto result = call(create("zen::deallocate", {local->type}, nullptr), {local}); not
+                            result.
+                            has_value())
                         {
-                            // push(local);
-                            // call("[zenDestructor]", 1);
-                        }
-                        catch (const std::exception& e)
-                        {
-                            throw exceptions::semantic_error(
-                                fmt::format("missing destructor implementation for type {}", local->type->name),
-                                offset);
+                            throw exceptions::semantic_error(result.error(), offset);
                         }
                     }
                 }
             }
             if (const i64 size = scp->__dncd__peek(scp->return_status); std::abs(size) > 0)
             {
-                gen<most>(std::abs(size));
+                gen<zen::most>(std::abs(size));
             };
         }
     }
 
     void function::build()
     {
+        if (get_scope(true)->get_return_status() != block::concise_return and signature->type)
+            throw exceptions::semantic_error("missing return value", offset,
+                                             fmt::format(
+                                                 "ensure that all control paths of {} return a value of type {}",
+                                                 get_canonical_name(), signature->type->name));
         pop();
+        gen<zen::ret>();
         scope = nullptr;
     }
 
@@ -893,23 +930,18 @@ namespace zen::builder
                 {
                     if (local->type->kind == type::heap && !local->no_destructor)
                     {
-                        try
+                        if (const auto result = call(create("zen::deallocate", {local->type}, nullptr), {local}); not
+                            result.
+                            has_value())
                         {
-                            // push(local);
-                            // call("[zenDestructor]", 1);
-                        }
-                        catch (const std::exception& e)
-                        {
-                            throw exceptions::semantic_error(
-                                fmt::format("missing destructor implementation for type {}", local->type->name),
-                                offset);
+                            throw exceptions::semantic_error(result.error(), offset);
                         }
                     }
                 }
             }
             if (const i64 size = scp->__dncd__pop(scp->return_status); std::abs(size) > 0)
             {
-                gen<most>(std::abs(size));
+                gen<zen::most>(std::abs(size));
             }; // scope
         }
     }

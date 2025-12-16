@@ -40,11 +40,11 @@ namespace zen::builder
         utils::constant_pool & pool;
         std::string name;
 
-        std::unordered_map<i32, std::shared_ptr<global_label>> dependencies;
+        std::unordered_map<i64, std::shared_ptr<global_label>> dependencies;
 
         inline std::shared_ptr<block> get_scope(const bool root  = false) const;
         static std::shared_ptr<function> create(utils::constant_pool & pool, const i64 & offset,const bool& logging = false, const std::string & name = "");
-        std::shared_ptr<function> create(const std::string & name, const std::vector<std::shared_ptr<builder::type>>& params, const std::shared_ptr<builder::type> &type);
+        std::shared_ptr<function> create(const std::string & name, const std::vector<std::shared_ptr<builder::type>>& params, const std::shared_ptr<builder::type> &type) const;
         std::shared_ptr<value> set_parameter(const std::shared_ptr<zen::builder::type>& t, const std::string& name);
         std::shared_ptr<value> set_return(const std::shared_ptr<zen::builder::type>& t);
         [[nodiscard]] std::shared_ptr<value> set_local(const std::shared_ptr<zen::builder::type>& t,
@@ -68,11 +68,12 @@ namespace zen::builder
                            const std::shared_ptr<value>& rhs);
         void move(const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
         void return_value(const std::shared_ptr<value>& r);
+        void return_implicitly() const;
         void go(const  std::shared_ptr<label>& l);
         void go_if_not(const std::shared_ptr<value>& c, const  std::shared_ptr<label>& l);
         std::expected<std::shared_ptr<value>, std::string> call(const std::shared_ptr<builder::function>& fb,
                                                                 const std::vector<std::shared_ptr<value>>& args);
-        int hash() const;
+        i64 hash() const;
         std::string get_canonical_name() const;
         std::shared_ptr<value> dereference(const std::shared_ptr<value>& r);
         void branch(enum builder::scope::type, const std::shared_ptr<value>& c, const std::function<void(const std::shared_ptr<builder::
@@ -81,6 +82,40 @@ namespace zen::builder
                     shared_ptr<builder::label>& pen = nullptr);
         void loop_for(const std::vector<std::shared_ptr<value>>& params, const std::function<void(const std::shared_ptr<
                           builder::function>&)>& body);
+        template<typename T>
+        std::shared_ptr<value> constant(const T & value) const
+        {
+            if constexpr (std::is_same_v<T, bool>)
+            {
+                return std::make_shared<builder::value>(fmt::format("_{}", value), _bool(), (i64)pool.get<T>(value).get());
+            } else if constexpr  (std::is_same_v<T, i8>)
+            {
+                return std::make_shared<builder::value>(fmt::format("_{}", value), _byte(), (i64)pool.get<T>(value).get());
+            } else if constexpr (std::is_same_v<T, i16>)
+            {
+                return std::make_shared<builder::value>(fmt::format("_{}", value), _short(), (i64)pool.get<T>(value).get());
+            } else if constexpr (std::is_same_v<T, i32>)
+            {
+                return std::make_shared<builder::value>(fmt::format("_{}", value), _int(), (i64)pool.get<T>(value).get());
+            } else if constexpr (std::is_same_v<T, i64>)
+            {
+                return std::make_shared<builder::value>(fmt::format("_{}", value), _long(), (i64)pool.get<T>(value).get());
+            }  else if constexpr (std::is_same_v<T, f32>)
+            {
+                return std::make_shared<builder::value>(fmt::format("_{}", value), _float(), (i64)pool.get<T>(value).get());
+            } else if constexpr (std::is_same_v<T, f64>)
+            {
+                return std::make_shared<builder::value>(fmt::format("_{}", value), _double(), (i64)pool.get<T>(value).get());
+            } else if constexpr (std::is_same_v<T, std::string>)
+            {
+                auto s = std::make_shared<builder::value>(fmt::format("_{}", value), _double(), (i64)pool.get<T>(zen::types::heap::string::from_string(value)).get());
+                s->kind = value::kind::constant;
+                return s;
+            } else
+            {
+                throw std::runtime_error("unsupported type");
+            }
+        };
         void loop_while(const std::vector<std::shared_ptr<value>>& params, const std::function<void(const std::shared_ptr<
                       builder::function>&)>& prologue, const std::function<void(const std::shared_ptr<
                       builder::function>&)>& body);
@@ -275,6 +310,16 @@ namespace zen::builder
             if (logging)
             {
                 fmt::println("<{}> {} {}", code.size() - 2, code.at(code.size() - 2), _1prefix.empty() ? std::to_string(_1) : _1prefix);
+            }
+        }
+        template <zen::instruction ins>
+       void gen()
+        {
+            const std::shared_ptr<block>& sc = get_scope(true);
+            code.push_back(ins);
+            if (logging)
+            {
+                fmt::println("<{}> {}", code.size() - 1, code.at(code.size() - 1));
             }
         }
         function(utils::constant_pool & pool, const i64 & offset): offset(offset), pool(pool)
