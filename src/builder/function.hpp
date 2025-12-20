@@ -67,6 +67,9 @@ namespace zen::builder
         void greater_equal(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
                            const std::shared_ptr<value>& rhs);
         void move(const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
+        void not_(const std::shared_ptr<value>& r, const std::shared_ptr<value>& val);
+        void and_(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
+        void or_(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
         void return_value(const std::shared_ptr<value>& r);
         void return_implicitly() const;
         void go(const  std::shared_ptr<label>& l);
@@ -83,6 +86,25 @@ namespace zen::builder
         void loop_for(const std::vector<std::shared_ptr<value>>& params, const std::function<void(const std::shared_ptr<
                           builder::function>&)>& body);
         template<typename T>
+        std::shared_ptr<value> constant(const T & value, const std::shared_ptr<zen::builder::type> & t) const
+        {
+            if (*t == *_byte())
+                return constant<i8>(static_cast<i8>(value));
+            if (*t == *_short())
+                return constant<i16>(static_cast<i16>(value));
+            if (*t == *_int())
+                return constant<i32>(static_cast<i32>(value));
+            if (*t == *_long())
+                return constant<i64>(static_cast<i64>(value));
+            if (*t == *_float())
+                return constant<f32>(static_cast<f32>(value));
+            if (*t == *_double())
+                return constant<f64>(static_cast<f64>(value));
+            if (*t == *_bool())
+                return constant<boolean>(static_cast<boolean>(value));
+            throw exceptions::semantic_error("unsupported type", offset);
+        }
+        template<typename T>
         std::shared_ptr<value> constant(const T & value) const
         {
             if constexpr (std::is_same_v<T, bool>)
@@ -90,30 +112,42 @@ namespace zen::builder
                 return std::make_shared<builder::value>(fmt::format("_{}", value), _bool(), (i64)pool.get<T>(value).get());
             } else if constexpr  (std::is_same_v<T, i8>)
             {
-                return std::make_shared<builder::value>(fmt::format("_{}", value), _byte(), (i64)pool.get<T>(value).get());
+                const auto it = std::make_shared<builder::value>(fmt::format("_{}", value), _byte(), (i64)pool.get<T>(value).get());
+                it->is_negated = value < 0;
+                return it;
             } else if constexpr (std::is_same_v<T, i16>)
             {
-                return std::make_shared<builder::value>(fmt::format("_{}", value), _short(), (i64)pool.get<T>(value).get());
+                const auto it = std::make_shared<builder::value>(fmt::format("_{}", value), _short(), (i64)pool.get<T>(value).get());
+                it->is_negated = value < 0;
+                return it;
             } else if constexpr (std::is_same_v<T, i32>)
             {
-                return std::make_shared<builder::value>(fmt::format("_{}", value), _int(), (i64)pool.get<T>(value).get());
+                const auto it = std::make_shared<builder::value>(fmt::format("_{}", value), _int(), (i64)pool.get<T>(value).get());
+                it->is_negated = value < 0;
+                return it;
             } else if constexpr (std::is_same_v<T, i64>)
             {
-                return std::make_shared<builder::value>(fmt::format("_{}", value), _long(), (i64)pool.get<T>(value).get());
+                const auto it = std::make_shared<builder::value>(fmt::format("_{}", value), _long(), (i64)pool.get<T>(value).get());
+                it->is_negated = value < 0;
+                return it;
             }  else if constexpr (std::is_same_v<T, f32>)
             {
-                return std::make_shared<builder::value>(fmt::format("_{}", value), _float(), (i64)pool.get<T>(value).get());
+                const auto it = std::make_shared<builder::value>(fmt::format("_{}", value), _float(), (i64)pool.get<T>(value).get());
+                it->is_negated = value < 0;
+                return it;
             } else if constexpr (std::is_same_v<T, f64>)
             {
-                return std::make_shared<builder::value>(fmt::format("_{}", value), _double(), (i64)pool.get<T>(value).get());
+                const auto it = std::make_shared<builder::value>(fmt::format("_{}", value), _double(), (i64)pool.get<T>(value).get());
+                it->is_negated = value < 0;
+                return it;
             } else if constexpr (std::is_same_v<T, std::string>)
             {
-                auto s = std::make_shared<builder::value>(fmt::format("_{}", value), _double(), (i64)pool.get<T>(zen::types::heap::string::from_string(value)).get());
+                auto s = std::make_shared<builder::value>(fmt::format("_{}", value), _double(), (i64)pool.get<zen::types::heap::string*>(zen::types::heap::string::from_string(value)).get());
                 s->kind = value::kind::constant;
                 return s;
             } else
             {
-                throw std::runtime_error("unsupported type");
+                throw exceptions::semantic_error("unsupported type", offset);
             }
         };
         void loop_while(const std::vector<std::shared_ptr<value>>& params, const std::function<void(const std::shared_ptr<

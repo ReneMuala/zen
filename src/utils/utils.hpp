@@ -99,6 +99,10 @@ namespace zen::utils
                 {
                     data.emplace(key, std::move(raii<>(value)));
                 }
+            } else
+            {
+                if constexpr (std::is_same_v<type, zen::types::heap::string*>)
+                    delete value;
             }
             return data.find(key)->second;
         }

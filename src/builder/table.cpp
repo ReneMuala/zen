@@ -9,7 +9,7 @@
 
 namespace zen::builder
 {
-    static std::vector<std::string> split_name(const std::string& name)
+    std::vector<std::string> table::split_name(const std::string& name)
     {
         std::vector<std::string> result;
         std::istringstream iss(name);
@@ -71,6 +71,20 @@ namespace zen::builder
         {
             return this->function->set_local(zen::builder::function::_long(), "pointer::table");
         });
+    }
+
+    std::expected<std::shared_ptr<struct type>, std::string> table::get_type(const std::string& name)
+    {
+        if (name == "byte") return zen::builder::function::_byte();
+        if (name == "bool") return zen::builder::function::_bool();
+        if (name == "short") return zen::builder::function::_short();
+        if (name == "int") return zen::builder::function::_int();
+        if (name == "long") return zen::builder::function::_long();
+        if (name == "float") return zen::builder::function::_float();
+        if (name == "double") return zen::builder::function::_double();
+        if (name == "string") return zen::builder::function::_string();
+
+        return std::unexpected(fmt::format("no such type {}", name));
     }
 
     std::shared_ptr<table> table::create(const std::shared_ptr<builder::function>& function, std::shared_ptr<builder::type> type)

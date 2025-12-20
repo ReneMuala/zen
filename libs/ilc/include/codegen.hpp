@@ -18,7 +18,7 @@
    * value of an index after REQUIRE_X(...) always do chain[offset-1], because \
    * offset gets incremented after REQUIRE*/                                   \
   int offset{0}; \
-  static std::shared_ptr<NAME> make(){ return std::make_unique<NAME>();  }
+  static std::shared_ptr<NAME> make(){ return std::make_shared<NAME>();  }
 
 #if defined(BEGIN_ILC_CODEGEN)
 

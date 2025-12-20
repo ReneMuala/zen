@@ -110,13 +110,13 @@ namespace zen::builder
     std::shared_ptr<value> function::set_return(const std::shared_ptr<zen::builder::type>& t)
     {
         std::shared_ptr<block> scp = get_scope();
-        if (get_stack_usage())
-        {
-            throw exceptions::semantic_error("return type cannot be set after params", offset);
-        }
+        // if (get_stack_usage())
+        // {
+        //     throw exceptions::semantic_error("return type cannot be set after params", offset);
+        // }
         signature->type = t;
         ret = std::make_shared<value>(
-            t, get_stack_usage() - /* jump callee IP */static_cast<types::stack::i64>(sizeof(
+            t, 0 - /* jump callee IP */static_cast<types::stack::i64>(sizeof(
                 types::stack::i64)));
         ret->name = "@ret";
         scp->use_stack(t->get_size());
@@ -140,7 +140,7 @@ namespace zen::builder
             gen<zen::most>(-t->get_size());
             if (t->kind == type::kind::heap)
             {
-                const auto allocator = create("zen::allocate", {}, t);
+                const auto allocator = create(fmt::format("{}::allocate", t->name), {}, t);
                 allocator->signature->is_allocator = true;
                 if (const auto result = call(allocator, {}); not result.
                     has_value())
@@ -560,6 +560,24 @@ namespace zen::builder
             throw exceptions::semantic_error("unsupported type", offset);
     }
 
+    void function::not_(const std::shared_ptr<value>& r, const std::shared_ptr<value>& val)
+    {
+        gen<zen::boolean_not>(r, val);
+    }
+
+    void function::and_(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+        const std::shared_ptr<value>& rhs)
+    {
+        gen<zen::boolean_and>(r, lhs, rhs);
+    }
+
+
+    void function::or_(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
+        const std::shared_ptr<value>& rhs)
+    {
+        gen<zen::boolean_or>(r, lhs, rhs);
+    }
+
     void function::return_value(const std::shared_ptr<value>& r)
     {
         std::shared_ptr<block> scp = get_scope();
@@ -681,7 +699,9 @@ namespace zen::builder
 
     std::string function::get_canonical_name() const
     {
-        return fmt::format("{}{}={}", name, std::string(*signature), signature->type ? signature->type->name : "unit");
+        // because return type should not matter in most cases
+        // return fmt::format("{}{}={}", name, std::string(*signature), signature->type ? signature->type->name : "unit");
+        return fmt::format("{}{}", name, std::string(*signature));
     }
 
     std::shared_ptr<value> function::dereference(const std::shared_ptr<value>& r)
@@ -798,22 +818,8 @@ namespace zen::builder
         {
             std::vector<std::shared_ptr<value>> new_params = params;
             auto it = params.at(0);
-            std::shared_ptr<value> step;
+            std::shared_ptr<value> step = constant(1, it->type);
 
-            if (it->is(_byte()))
-                step = constant<i8>(1);
-            else if (it->is(_short()))
-                step = constant<i16>(1);
-            else if (it->is(_int()))
-                step = constant<i32>(1);
-            else if (it->is(_long()))
-                step = constant<i64>(1);
-            else if (it->is(_float()))
-                step = constant<f32>(1);
-            else if (it->is(_double()))
-                step = constant<f64>(1);
-            else
-                throw exceptions::semantic_error("unsupported type", offset);
             new_params.push_back(step);
             loop_for(new_params, body);
         }
@@ -886,7 +892,7 @@ namespace zen::builder
                 {
                     if (local->type->kind == type::heap && !local->no_destructor)
                     {
-                        if (const auto result = call(create("zen::deallocate", {local->type}, nullptr), {local}); not
+                        if (const auto result = call(create(fmt::format("{}::deallocate", local->type->name), {local->type}, nullptr), {local}); not
                             result.
                             has_value())
                         {
@@ -930,7 +936,7 @@ namespace zen::builder
                 {
                     if (local->type->kind == type::heap && !local->no_destructor)
                     {
-                        if (const auto result = call(create("zen::deallocate", {local->type}, nullptr), {local}); not
+                        if (const auto result = call(create(fmt::format("{}::deallocate", local->type->name), {local->type}, nullptr), {local}); not
                             result.
                             has_value())
                         {

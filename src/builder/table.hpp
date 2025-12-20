@@ -14,9 +14,11 @@ namespace zen::builder
     {
         const std::shared_ptr<builder::function> & function;
         std::shared_ptr<builder::type> type;
+        static std::vector<std::string> split_name(const std::string& name);
         static std::expected<std::shared_ptr<value>, std::string> get_field(std::shared_ptr<value>,const std::vector<std::string>& tokens, const std::function<std::shared_ptr<value>()>& pointer_creator);
         std::expected<std::shared_ptr<value>, std::string> get_value(const std::string& name, const std::function<std::shared_ptr<value>()>& pointer_creator);
         std::expected<std::shared_ptr<value>, std::string> get_value(const std::string& name);
+        std::expected<std::shared_ptr<struct type>, std::string> get_type(const std::string& name);
         static std::shared_ptr<table> create(const std::shared_ptr<builder::function>& function, std::shared_ptr<builder::type> type = nullptr);
     };
 }
