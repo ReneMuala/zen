@@ -178,7 +178,7 @@ namespace zen::builder
                        const std::shared_ptr<value>& rhs)
     {
         assert_same_type("add", lhs, rhs, offset);
-        assert_same_type("assign", lhs, r, offset);
+        assert_same_type("assign", r, lhs, offset);
         if (lhs->is(_byte()))
             gen<zen::add_i8>(r, lhs, rhs);
         else if (lhs->is(_short()))
@@ -211,7 +211,7 @@ namespace zen::builder
                        const std::shared_ptr<value>& rhs)
     {
         assert_same_type("subtract", lhs, rhs, offset);
-        assert_same_type("assign", lhs, r, offset);
+        assert_same_type("assign", r, lhs, offset);
         if (lhs->is(_byte()))
             gen<zen::sub_i8>(r, lhs, rhs);
         else if (lhs->is(_short()))
@@ -244,7 +244,7 @@ namespace zen::builder
                        const std::shared_ptr<value>& rhs)
     {
         assert_same_type("multiply", lhs, rhs, offset);
-        assert_same_type("assign", lhs, r, offset);
+        assert_same_type("assign", r, lhs, offset);
         if (lhs->is(_byte()))
             gen<zen::mul_i8>(r, lhs, rhs);
         else if (lhs->is(_short()))
@@ -277,7 +277,7 @@ namespace zen::builder
                        const std::shared_ptr<value>& rhs)
     {
         assert_same_type("divide", lhs, rhs, offset);
-        assert_same_type("assign", lhs, r, offset);
+        assert_same_type("assign", r, lhs, offset);
         if (lhs->is(_byte()))
             gen<zen::div_i8>(r, lhs, rhs);
         else if (lhs->is(_short()))
@@ -310,7 +310,7 @@ namespace zen::builder
                        const std::shared_ptr<value>& rhs)
     {
         assert_same_type("mod", lhs, rhs, offset);
-        assert_same_type("assign", lhs, r, offset);
+        assert_same_type("assign", r, lhs, offset);
         if (lhs->is(_byte()))
             gen<zen::mod_i8>(r, lhs, rhs);
         else if (lhs->is(_short()))
@@ -915,7 +915,7 @@ namespace zen::builder
                                              fmt::format(
                                                  "ensure that all control paths of {} return a value of type {}",
                                                  get_canonical_name(), signature->type->name));
-        pop();
+        pop(true);
         gen<zen::ret>();
         scope = nullptr;
     }
@@ -925,7 +925,7 @@ namespace zen::builder
         return get_scope(true)->get_stack_usage();
     }
 
-    void function::pop()
+    void function::pop(bool final)
     {
         std::shared_ptr<block> scp = scope;
         if (scp)
@@ -945,9 +945,18 @@ namespace zen::builder
                     }
                 }
             }
+            i64 callee_cost = 0;
+            if (final)
+            {
+                callee_cost = signature->type ? signature->type->get_size() : 0;
+                for (const auto & param : signature->parameters)
+                {
+                    callee_cost += param->get_size();
+                }
+            }
             if (const i64 size = scp->__dncd__pop(scp->return_status); std::abs(size) > 0)
             {
-                gen<zen::most>(std::abs(size));
+                gen<zen::most>(std::abs(size) - callee_cost);
             }; // scope
         }
     }

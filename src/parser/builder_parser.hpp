@@ -7,12 +7,9 @@
 
 #include "builder/library.hpp"
 #include "builder/table.hpp"
-#include "composer/composer.hpp"
-#include "composer/vm/composer.hpp"
 #include "exceptions/semantic_error.hpp"
 #include "exceptions/syntax_error.hpp"
 #include "types/stack.hpp"
-#include "types/heap.hpp"
 
 using namespace enums;
 extern std::vector<zen::token> tokens;
@@ -24,12 +21,13 @@ typedef enums::token_type SYMBOL;
 
 BEGIN_ILC_CODEGEN(builder_parser)
 #define EXPECTED(ITEM) [this]() { throw zen::exceptions::syntax_error(ITEM, offset); }
-    std::shared_ptr<zen::builder::library> lib;
+    std::shared_ptr<zen::builder::library> lib = zen::builder::library::create("main");
     std::shared_ptr<zen::builder::function> fun;
     std::shared_ptr<zen::builder::table> tab;
     zen::utils::constant_pool pool;
     std::stack<std::shared_ptr<zen::builder::value>> values;
-    const bool logging = false;
+    std::shared_ptr<zen::builder::label> temp_pel, temp_pen;
+    const bool logging = true;
     bool pragma_dangling_return_value = false;
 
     std::string id, type, value;
@@ -48,14 +46,15 @@ BEGIN_ILC_CODEGEN(builder_parser)
         {
             throw zen::exceptions::semantic_error("missing value", offset);
         }
-        return values.top();
+        auto top = values.top();
+        values.pop();
+        return top;
     }
 
-    void push(const std::shared_ptr<zen::builder::value>& value)
+    void push(const std::shared_ptr<zen::builder::value>& val)
     {
-        values.push(value);
+        values.push(val);
     }
-
 
     BEGIN_PRODUCTION(PRODUCTION_NUSING_STAT)
         REQUIRE_TERMINAL(TKEYWORD_USING)
@@ -99,8 +98,69 @@ BEGIN_ILC_CODEGEN(builder_parser)
         }
     END_PRODUCTION
 
-    BEGIN_PRODUCTION(PRODUCTION_NIF)
+    BEGIN_PRODUCTION(META_PRODUCTION_NELSE)
+        REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
+        REQUIRE_NON_TERMINAL(NFUNCTION_BODY)
+        REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
+    END_PRODUCTION
 
+    BEGIN_PRODUCTION(META_PRODUCTION_NIF)
+        REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
+        REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
+        REQUIRE_NON_TERMINAL(NFUNCTION_BODY)
+        REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
+        if (TRY_REQUIRE_TERMINAL(TKEYWORD_ELSE))
+        {
+            if (TRY_REQUIRE_TERMINAL(TKEYWORD_IF))
+            {
+                REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_OPEN, EXPECTED("("))
+                /* disable extract for now
+
+                first = true;
+                do
+                {
+                    REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
+                    if (chain[offset - 1] == TID and (chain[offset - 2] == TPARENTHESIS_OPEN or not
+                        first) and TRY_REQUIRE_TERMINAL(TCOLON))
+                    {
+                        first = false;
+                        REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
+                        REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
+                        REQUIRE_NON_TERMINAL_CALLBACK(NSINGLE_VAL, EXPECTED("VALUE"))
+                    }
+                }
+                while (TRY_REQUIRE_TERMINAL(TAND));
+                */
+                fun->branch(zen::builder::scope::in_between, nullptr,
+                            [&](auto& _, const std::shared_ptr<zen::builder::label>& pel,
+                                const std::shared_ptr<zen::builder::label>& pen)-> void
+                            {
+                                // REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
+                                if (!(HANDLE_NON_TERMINAL(NVAL)))
+                                {
+                                    [this]() { throw zen::exceptions::syntax_error("value", offset); }();
+                                }
+                                fun->branch(zen::builder::scope::in_else_if, pop(),
+                                            [&](auto& _0, const std::shared_ptr<zen::builder::label>& _pel,
+                                                const std::shared_ptr<zen::builder::label>& _pen)
+                                            {
+                                                temp_pel = _pel;
+                                                temp_pen = _pen;
+                                                META_PRODUCTION_NIF();
+                                            }, pel, pen);
+                            }, temp_pel, temp_pen);
+            }
+            else
+            {
+                fun->branch(zen::builder::scope::in_else, nullptr, [&](auto &_0, auto &_1, auto &_2)
+                {
+                    META_PRODUCTION_NELSE();
+                }, temp_pel, temp_pen);
+            }
+        }
+    END_PRODUCTION
+
+    BEGIN_PRODUCTION(PRODUCTION_NIF)
         REQUIRE_TERMINAL(TKEYWORD_IF)
         REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_OPEN, EXPECTED("("))
         // bool first = true;
@@ -124,51 +184,14 @@ BEGIN_ILC_CODEGEN(builder_parser)
         while (TRY_REQUIRE_TERMINAL(TAND));
         */
         REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
-        composer->begin_if_then();
-        REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
-        REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
-        REQUIRE_NON_TERMINAL(NFUNCTION_BODY)
-        REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
-        while (TRY_REQUIRE_TERMINAL(TKEYWORD_ELSE))
-        {
-            composer->close_branch();
-            if (TRY_REQUIRE_TERMINAL(TKEYWORD_IF))
-            {
-                REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_OPEN, EXPECTED("("))
-                /* disable extract for now
-
-                first = true;
-                do
-                {
-                    REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
-                    if (chain[offset - 1] == TID and (chain[offset - 2] == TPARENTHESIS_OPEN or not
-                        first) and TRY_REQUIRE_TERMINAL(TCOLON))
+        fun->branch(zen::builder::scope::in_if, pop(),
+                    [&](auto &_, const std::shared_ptr<zen::builder::label>& pel,
+                        const std::shared_ptr<zen::builder::label>& pen)
                     {
-                        first = false;
-                        REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
-                        REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
-                        REQUIRE_NON_TERMINAL_CALLBACK(NSINGLE_VAL, EXPECTED("VALUE"))
-                    }
-                }
-                while (TRY_REQUIRE_TERMINAL(TAND));
-                */
-                REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
-                composer->else_if_then();
-                REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
-                REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
-                REQUIRE_NON_TERMINAL(NFUNCTION_BODY)
-                REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
-            }
-            else
-            {
-                composer->else_then();
-                REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
-                REQUIRE_NON_TERMINAL(NFUNCTION_BODY)
-                REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
-                break;
-            }
-        }
-        composer->end_if();
+                        temp_pel = pel;
+                        temp_pen = pen;
+                        META_PRODUCTION_NIF();
+                    });
     END_PRODUCTION
 
     BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
@@ -278,6 +301,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
                                              class_
                                                  ? fmt::format("{}.{}", class_->name, function_name)
                                                  : function_name);
+        tab = zen::builder::table::create(fun, class_);
         if (class_)
             fun->set_parameter(class_, "this");
         if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
@@ -349,71 +373,87 @@ BEGIN_ILC_CODEGEN(builder_parser)
         fun->build();
     END_PRODUCTION
 
-    BEGIN_PRODUCTION(PRODUCTION_NFOR)
-        // fun->loop_for()
+    BEGIN_PRODUCTION(META_PRODUCTION_NFOR)
+        REQUIRE_TERMINAL_CALLBACK(TID, EXPECTED("ID"))
+        const std::string iterator = tokens[offset - 1].value;
+        type.clear();
+        /*if (TRY_REQUIRE_TERMINAL(TCOLON))
+        {
+            REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
+        }*/
+        REQUIRE_TERMINAL(TCOLON)
+        REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
         std::vector<std::shared_ptr<zen::builder::value>> for_params;
-        REQUIRE_TERMINAL(TKEYWORD_FOR)
-        REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_OPEN, EXPECTED("("))
-        auto parse_end = [&](auto fn)
+        if (auto result = tab->get_type(type); result.has_value())
+        {
+            for_params.push_back(fun->set_local(result.value(), iterator));
+        }
+        else
+        {
+            throw zen::exceptions::semantic_error(result.error(), offset);
+        }
+        REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
+        // composer->begin_block();
+        REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
+        for_params.push_back(pop());
+        REQUIRE_TERMINAL_CALLBACK(TCOMMA, EXPECTED(","))
+        REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
+        for_params.push_back(pop());
+        if (TRY_REQUIRE_TERMINAL(TCOMMA))
+        {
+            REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
+            for_params.push_back(pop());
+        }
+        if (TRY_REQUIRE_TERMINAL(TSEMICOLON))
+        {
+            fun->loop_for(for_params, [&](auto& _)
+            {
+                META_PRODUCTION_NFOR();
+            });
+        }
+        else
         {
             REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
             REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
-            REQUIRE_NON_TERMINAL(NFUNCTION_BODY)
+            fun->loop_for(for_params, [&](auto &_)
+            {
+                TRY_REQUIRE_NON_TERMINAL(NFUNCTION_BODY);
+            });
             REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
-        };
-        auto handle_iterator = [&](auto fn)
-        {
-            REQUIRE_TERMINAL_CALLBACK(TID, EXPECTED("ID"))
-            std::string iterator = tokens[offset - 1].value;
-            type.clear();
-            /*if (TRY_REQUIRE_TERMINAL(TCOLON))
-            {
-                REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
-            }*/
-            REQUIRE_TERMINAL(TCOLON)
-            REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
-            if (auto result = tab->get_type(type); result.has_value())
-            {
-                for_params.push_back(fun->set_local(result.value(), iterator));
-            }
-            else
-            {
-                throw zen::exceptions::semantic_error(result.error(), offset);
-            }
-            REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
-            // composer->begin_block();
-            REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
-            for_params.push_back(pop());
-            REQUIRE_TERMINAL_CALLBACK(TCOMMA, EXPECTED(","))
-            REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
-            for_params.push_back(pop());
-            if (TRY_REQUIRE_TERMINAL(TCOMMA))
-            {
-                REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
-                for_params.push_back(pop());
-                // composer->end_block();
-                // composer->set_for_begin_end_step();
-            }
         }
-        while (TRY_REQUIRE_TERMINAL(TSEMICOLON));
+    END_PRODUCTION
 
+    BEGIN_PRODUCTION(PRODUCTION_NFOR)
+        REQUIRE_TERMINAL(TKEYWORD_FOR)
+        REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_OPEN, EXPECTED("("))
+        META_PRODUCTION_NFOR();
     END_PRODUCTION
 
     BEGIN_PRODUCTION(PRODUCTION_NWHILE)
 
         REQUIRE_TERMINAL(TKEYWORD_WHILE)
         std::vector<std::shared_ptr<zen::builder::value>> params;
-        fun->loop_while(params, [&](auto _)
+        fun->loop_while(params, [&](auto &_)-> void
                         {
-                            REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_OPEN, EXPECTED("("))
-                            REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
-                            params.push_back(pop());
-                            REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
-                        }, [&](auto _)
+                            auto callback = [&]()-> bool
+                            {
+                                REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_OPEN, EXPECTED("("))
+                                REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
+                                params.push_back(pop());
+                                REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
+                                return true;
+                            };
+                            callback();
+                        }, [&](auto &_)-> void
                         {
-                            REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
-                            REQUIRE_NON_TERMINAL(NFUNCTION_BODY)
-                            REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
+                            auto callback = [&]()-> bool
+                            {
+                                REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
+                                REQUIRE_NON_TERMINAL(NFUNCTION_BODY)
+                                REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
+                                return true;
+                            };
+                            callback();
                         });
     END_PRODUCTION
 
@@ -427,7 +467,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
         REQUIRE_NON_TERMINAL_CALLBACK(NFIRST_PRIORITY_RHS_VAL, EXPECTED("value"))
         const auto rhs = pop();
         const auto lhs = pop();
-        const auto r = fun->set_local(zen::builder::function::_bool(), "temp::mod");
+        const auto r = fun->set_local(lhs->type, "temp::mod");
         fun->mod(r, lhs, rhs);
         push(r);
     END_PRODUCTION
@@ -438,7 +478,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
         REQUIRE_NON_TERMINAL_CALLBACK(NFIRST_PRIORITY_RHS_VAL, EXPECTED("value"))
         const auto rhs = pop();
         const auto lhs = pop();
-        const auto r = fun->set_local(zen::builder::function::_bool(), "temp::mul");
+        const auto r = fun->set_local(lhs->type, "temp::mul");
         fun->mul(r, lhs, rhs);
         push(r);
     END_PRODUCTION
@@ -449,18 +489,17 @@ BEGIN_ILC_CODEGEN(builder_parser)
         REQUIRE_NON_TERMINAL_CALLBACK(NFIRST_PRIORITY_RHS_VAL, EXPECTED("value"))
         const auto rhs = pop();
         const auto lhs = pop();
-        const auto r = fun->set_local(zen::builder::function::_bool(), "temp::div");
+        const auto r = fun->set_local(lhs->type, "temp::div");
         fun->div(r, lhs, rhs);
         push(r);
     END_PRODUCTION
 
     BEGIN_PRODUCTION(PRODUCTION_NVAL_PLUS_VAL)
-
         REQUIRE_TERMINAL(TPLUS)
         REQUIRE_NON_TERMINAL_CALLBACK(NSECOND_PRIORITY_RHS_VAL, EXPECTED("value"))
         const auto rhs = pop();
         const auto lhs = pop();
-        const auto r = fun->set_local(zen::builder::function::_bool(), "temp::add");
+        const auto r = fun->set_local(lhs->type, "temp::add");
         fun->add(r, lhs, rhs);
         push(r);
     END_PRODUCTION
@@ -471,7 +510,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
         REQUIRE_NON_TERMINAL_CALLBACK(NTHIRD_PRIORITY_RHS_VAL, EXPECTED("value"))
         const auto rhs = pop();
         const auto lhs = pop();
-        const auto r = fun->set_local(zen::builder::function::_bool(), "temp::sub");
+        const auto r = fun->set_local(lhs->type, "temp::sub");
         fun->sub(r, lhs, rhs);
         push(r);
     END_PRODUCTION
@@ -670,6 +709,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
         if (TRY_REQUIRE_TERMINAL(TEQU))
         {
             push(local);
+            offset--;
             REQUIRE_NON_TERMINAL_CALLBACK(NSUFFIX_ASGN, EXPECTED("ASSIGNMENT"))
         }
     END_PRODUCTION
@@ -754,6 +794,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
             {
                 throw zen::exceptions::semantic_error(result.error(), offset);
             }
+            offset--;
             REQUIRE_NON_TERMINAL(NSUFFIX_ASGN)
         }
         else
@@ -798,6 +839,9 @@ BEGIN_ILC_CODEGEN(builder_parser)
             const auto val = fun->set_local(it->type, "temp::post_dec");
             fun->sub(val, it, one);
             push(val);
+        } else
+        {
+            push(it);
         }
     END_PRODUCTION
 

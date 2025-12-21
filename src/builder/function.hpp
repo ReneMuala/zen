@@ -365,6 +365,6 @@ namespace zen::builder
         void build();
     private:
         inline i64 get_stack_usage() const;
-        void pop();
+        void pop(bool final = false);
     };
 }

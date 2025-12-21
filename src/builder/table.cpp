@@ -57,10 +57,14 @@ namespace zen::builder
         }
         std::vector<std::string> tokens = split_name(name);
         std::shared_ptr<value> target = function->get_scope(true)->get_local(tokens[0]);
-        if (target and tokens.size() > 1)
+        if (target)
         {
-            tokens.erase(tokens.begin());
-            return get_field(target, tokens, pointer_creator);
+            if (tokens.size() > 1)
+            {
+                tokens.erase(tokens.begin());
+                return get_field(target, tokens, pointer_creator);
+            }
+            return target;
         }
         return std::unexpected(fmt::format("no such symbol {}", tokens[0]));
     }
