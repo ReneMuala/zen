@@ -4,6 +4,10 @@ namespace enums
 {
   enum token_type
   {
+    /// @something
+    TDECORATOR,
+    /// @something(val,...)
+    NDECORATOR,
     /// // or /* */
     TCOMMENT,
     /// [
@@ -23,6 +27,8 @@ namespace enums
     /// statement
     NSTAT,
     NGLOBAL_STAT,
+    NGLOBAL_DISCOVERY_STAT,
+    META_NANY_BODY,
     /// ,
     TCOMMA,
     /// :
@@ -91,6 +97,8 @@ namespace enums
     NSUFFIX_FUNCTION_CALL,
     // (...) = TYPE? {...}
     NFUNCTION_DEFINITION,
+    // (...) = TYPE
+    NFUNCTION_DEFINITION_PREFIX,
     /// short number
     TBYTE_NUM,
     /// short number

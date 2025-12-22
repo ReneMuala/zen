@@ -14,6 +14,18 @@ zen::lexer::lexer(std::istream & stream): stream(stream)
     line = col = 1;
 }
 
+zen::token zen::lexer::next_decorator()
+{
+    std::string value;
+    const auto type = enums::TDECORATOR;
+    do
+    {
+        value+=it;
+        getchar();
+    } while (isalnum(it) or it == '_');
+    return token(type, std::move(value), line, col);
+}
+
 zen::token zen::lexer::next_number()
 {
     std::string value;
@@ -401,6 +413,8 @@ std::optional<zen::token> zen::lexer::next()
             return next_number();
         if (isalpha(it) or it == '_')
             return next_id_or_keyword();
+        if (it == '@')
+            return next_decorator();
         if (it == '{')
             return next_single(enums::TBRACES_OPEN);
         if (it == '}')

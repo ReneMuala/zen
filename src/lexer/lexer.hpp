@@ -19,6 +19,7 @@ namespace zen {
         public:
         explicit lexer(std::istream& stream);
 
+        token next_decorator();
         std::optional<token> next();
         inline token next_number();
         inline token next_string();
