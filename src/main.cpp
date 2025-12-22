@@ -47,6 +47,7 @@ try
 	}
 	auto parser = builder_parser::make();
 	setup_parser(parser, std::string(code));
+	parser->discover();
 	parser->parse();
 	return true;
 }
@@ -110,8 +111,19 @@ class point {
     )");
 #else
 	zen_run(R"(
+		//@debug() // you will be able to see the bytecode of this function
 		sum(x:int, y:int) = int(x+y)
-		)");
+		main = {
+			y: int = sum0(2,3)+sum0(3,4)
+			x: int = sum(1,2)
+		}
+		sum0(x:int, y:int) = int(x+y)
+		@debug
+		test = {
+			name: string = "R
+ene"
+		}
+	)");
 	// implement symbol manager
 	// implement deference wrappers
 #endif
