@@ -6,6 +6,7 @@
 #include <expected>
 #include <functional>
 #include <memory>
+#include <regex>
 #include <vector>
 
 #include "block.hpp"
@@ -29,6 +30,7 @@ namespace zen::builder
         static std::shared_ptr<type> _long();
         static std::shared_ptr<type> _float();
         static std::shared_ptr<type> _double();
+        static std::shared_ptr<type> _unit();
         static std::shared_ptr<type> _string();
 
         std::vector<types::stack::i64> code;
@@ -102,7 +104,7 @@ namespace zen::builder
                 return constant<f64>(static_cast<f64>(value));
             if (*t == *_bool())
                 return constant<boolean>(static_cast<boolean>(value));
-            throw exceptions::semantic_error("unsupported type", offset);
+            throw exceptions::semantic_error(fmt::format("cannot create a constant of type {}", t->name), offset);
         }
         template<typename T>
         std::shared_ptr<value> constant(const T & value) const
@@ -142,12 +144,14 @@ namespace zen::builder
                 return it;
             } else if constexpr (std::is_same_v<T, std::string>)
             {
-                auto s = std::make_shared<builder::value>(fmt::format("_{}", value), _double(), (i64)pool.get<zen::types::heap::string*>(zen::types::heap::string::from_string(value)).get());
+                static const std::regex replaceable("[^\\w\\d]");
+                std::string label = std::regex_replace(value.substr(0, 5), replaceable, "_");
+                auto s = std::make_shared<builder::value>(fmt::format("_{}", label), _string(), (i64)pool.get<zen::types::heap::string*>(zen::types::heap::string::from_string(value)).get());
                 s->kind = value::kind::constant;
                 return s;
             } else
             {
-                throw exceptions::semantic_error("unsupported type", offset);
+                throw exceptions::semantic_error("unsupported type for constant", offset);
             }
         };
         void loop_while(const std::vector<std::shared_ptr<value>>& params, const std::function<void(const std::shared_ptr<

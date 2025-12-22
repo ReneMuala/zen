@@ -52,6 +52,12 @@ namespace zen::builder
         return t;
     }
 
+    std::shared_ptr<type> function::_unit()
+    {
+        static auto t = type::create("unit", 0);
+        return t;
+    }
+
     std::shared_ptr<type> function::_string()
     {
         static auto t = type::create("string", 8);
@@ -84,6 +90,7 @@ namespace zen::builder
         it->logging = logging;
         it->name = name;
         it->signature = std::make_shared<zen::builder::signature>();
+        it->signature->type = _unit();
         it->scope = builder::block::create(scope::in_function);
         return it;
     }
@@ -94,7 +101,10 @@ namespace zen::builder
     {
         auto fn = create(pool, offset, false, name);
         fn->signature->parameters = params;
-        fn->signature->type = type;
+        if (type)
+        {
+            fn->signature->type = type;
+        }
         return fn;
     }
 
@@ -137,7 +147,7 @@ namespace zen::builder
         scp->locals[name].push_back(sym);
         if (not param)
         {
-            gen<zen::most>(-t->get_size());
+            gen<zen::most>(-t->get_size(), fmt::format("{}:{}", name, -t->get_size()));
             if (t->kind == type::kind::heap)
             {
                 const auto allocator = create(fmt::format("{}::allocate", t->name), {}, t);
@@ -168,7 +178,7 @@ namespace zen::builder
     inline void assert_type(const char* verb, const std::shared_ptr<value>& _1, const std::shared_ptr<type>& _t,
                             const i64& offset)
     {
-        if (*_1->type != *_t)
+        if (_1->type != _t)
         {
             throw exceptions::semantic_error(fmt::format("cannot {} {} to {}", verb, _t->name, _1->type->name), offset);
         }
@@ -204,7 +214,7 @@ namespace zen::builder
             }
         }
         else
-            throw exceptions::semantic_error("unsupported type", offset);
+            throw exceptions::semantic_error(fmt::format("cannot add type {}", lhs->type->name), offset);
     }
 
     void function::sub(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -237,7 +247,7 @@ namespace zen::builder
             }
         }
         else
-            throw exceptions::semantic_error("unsupported type", offset);
+            throw exceptions::semantic_error(fmt::format("cannot subtract type {}", lhs->type->name), offset);
     }
 
     void function::mul(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -270,7 +280,7 @@ namespace zen::builder
             }
         }
         else
-            throw exceptions::semantic_error("unsupported type", offset);
+            throw exceptions::semantic_error(fmt::format("cannot multiply type {}", lhs->type->name), offset);
     }
 
     void function::div(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -303,7 +313,7 @@ namespace zen::builder
             }
         }
         else
-            throw exceptions::semantic_error("unsupported type", offset);
+            throw exceptions::semantic_error(fmt::format("cannot divide type {}", lhs->type->name), offset);
     }
 
     void function::mod(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -332,7 +342,7 @@ namespace zen::builder
             }
         }
         else
-            throw exceptions::semantic_error("unsupported type", offset);
+            throw exceptions::semantic_error(fmt::format("cannot compute module for type {}", lhs->type->name), offset);
     }
 
     void function::equal(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -365,7 +375,7 @@ namespace zen::builder
             }
         }
         else
-            throw exceptions::semantic_error("unsupported type", offset);
+            throw exceptions::semantic_error(fmt::format("cannot compare type {}", lhs->type->name), offset);
     }
 
     void function::not_equal(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -398,7 +408,7 @@ namespace zen::builder
             }
         }
         else
-            throw exceptions::semantic_error("unsupported type", offset);
+            throw exceptions::semantic_error(fmt::format("cannot compare type {}", lhs->type->name), offset);
     }
 
     void function::lower(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -431,7 +441,7 @@ namespace zen::builder
             }
         }
         else
-            throw exceptions::semantic_error("unsupported type", offset);
+            throw exceptions::semantic_error(fmt::format("cannot compare type {}", lhs->type->name), offset);
     }
 
     void function::lower_equal(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -464,7 +474,7 @@ namespace zen::builder
             }
         }
         else
-            throw exceptions::semantic_error("unsupported type", offset);
+            throw exceptions::semantic_error(fmt::format("cannot compare type {}", lhs->type->name), offset);
     }
 
     void function::greater(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -497,7 +507,7 @@ namespace zen::builder
             }
         }
         else
-            throw exceptions::semantic_error("unsupported type", offset);
+            throw exceptions::semantic_error(fmt::format("cannot compare type {}", lhs->type->name), offset);
     }
 
     void function::greater_equal(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -530,7 +540,7 @@ namespace zen::builder
             }
         }
         else
-            throw exceptions::semantic_error("unsupported type", offset);
+            throw exceptions::semantic_error(fmt::format("cannot compare type {}", lhs->type->name), offset);
     }
 
     void function::move(const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs)
@@ -557,7 +567,7 @@ namespace zen::builder
             }
         }
         else
-            throw exceptions::semantic_error("unsupported type", offset);
+            throw exceptions::semantic_error(fmt::format("cannot copy type {}", lhs->type->name), offset);
     }
 
     void function::not_(const std::shared_ptr<value>& r, const std::shared_ptr<value>& val)
@@ -625,9 +635,9 @@ namespace zen::builder
                                                std::string(*fb->signature), builder::signature::describe_args(args)));
         const auto fb_hash = fb->hash();
         std::shared_ptr<value> return_value;
-        if (fb->signature->type and not fb->signature->is_allocator)
+        if (fb->signature->type != _unit() and not fb->signature->is_allocator)
         {
-            return_value = set_local(fb->signature->type, fmt::format("{}/{}", fb_hash, offset));
+            return_value = set_local(fb->signature->type, fmt::format("@ret::{}", fb->name, offset));
         }
         const auto scp = get_scope();
         std::vector<std::shared_ptr<value>> final_args;
@@ -641,6 +651,7 @@ namespace zen::builder
                 gen<zen::refer>(ptr, arg);
                 ptr->type = arg->type;
                 ptr->is_reference = true;
+                ptr->no_destructor = true;
                 if (const auto result = call(create("operator=", {cha->type, cha->type}, nullptr), {cha, ptr}); not
                     result.has_value())
                 {
@@ -675,7 +686,7 @@ namespace zen::builder
             scp->use_stack(arg->type->get_size());
             call_cost += arg->type->get_size();
         }
-        gen<zen::call>(0, fmt::format("{}", fb_hash));
+        gen<zen::call>(0, fmt::format("{}:{}", fb->name, fb_hash));
         // fb->glabel->use(shared_from_this());
         if (not dependencies.contains(fb_hash))
         {
@@ -685,7 +696,7 @@ namespace zen::builder
 
         if (call_cost)
         {
-            gen<zen::most>(call_cost);
+            gen<zen::most>(call_cost, fmt::format("@cc:{}", call_cost));
         }
         scp->use_stack(-call_cost);
         return return_value;
@@ -910,7 +921,7 @@ namespace zen::builder
 
     void function::build()
     {
-        if (get_scope(true)->get_return_status() != block::concise_return and signature->type)
+        if (get_scope(true)->get_return_status() != block::concise_return and signature->type != _unit())
             throw exceptions::semantic_error("missing return value", offset,
                                              fmt::format(
                                                  "ensure that all control paths of {} return a value of type {}",
