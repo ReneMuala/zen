@@ -546,7 +546,7 @@ namespace zen::builder
     void function::move(const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs)
     {
         assert_same_type("assign", lhs, rhs, offset);
-        if (lhs->is(_byte()))
+        if (lhs->is(_byte()) or lhs->is(_bool()))
             gen<zen::i8_to_i8>(lhs, rhs);
         else if (lhs->is(_short()))
             gen<zen::i16_to_i16>(lhs, rhs);
