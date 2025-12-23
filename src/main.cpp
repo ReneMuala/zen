@@ -45,7 +45,10 @@ try
 		fmt::println("[zen_compile] called with null argument.");
 		return false;
 	}
-	auto parser = builder_parser::make();
+	const auto program = zen::builder::program::create();
+	const auto parser = builder_parser::make();
+	parser->prog = program;
+	program->add(parser->lib);
 	setup_parser(parser, std::string(code));
 	parser->discover();
 	parser->parse();
@@ -118,15 +121,34 @@ class point {
 			x: int = sum(1,2)
 		}
 		sum0(x:int, y:int) = int(x+y)
-		@debug
-		test = {
-			a: int = 2
-			b: int = 1
-			if(a > b){
-				sum(a,b)
-			} else {
-				sum : int = a + b
+		class point {
+			x: double
+			y: double
+			//@debug
+			getX = double(x)
+			//@debug
+			getY = double(this.y)
+
+			//@debug
+			setX(x: double) = {
+				this.x = x
 			}
+
+			//@debug
+			setY(y: double) = {
+				this.y = y
+			}
+		}
+		greet(name: string) = string("Hello " + name)
+		test = {
+			name: bool = !((greet("Rene") + " Its a pleasure to meet you") == "Hello Rene Its a pleasure to meet you" || false && true || greet("Descartes") == "Hello Descartes")
+		}
+		@extern
+		@debug
+		print(x:double) = unit
+		@debug
+		test2 = {
+			pt: point
 		}
 	)");
 	// implement symbol manager

@@ -15,9 +15,15 @@ namespace zen::library::string
         fn->set_return(type);
         fn->gen<zen::allocate>(fn->ret, type->get_full_size(), fmt::format("{}::size:{}", type->name, type->get_full_size()));
 
-        auto pointer_creator = [&]()
+        auto pointer_creator = [&](std::shared_ptr<zen::builder::value> & ptr, const std::shared_ptr<zen::builder::value>& original)
         {
-            return fn->set_local(builder::function::_long(), "pointer::string");
+            if (not ptr)
+            {
+                ptr = fn->set_local(zen::builder::function::_long(), "temp::field");
+            } else
+            {
+                fn->gen<zen::add_i64>(ptr, original, ptr->offset, fmt::format("@offset:{}", ptr->offset));
+            }
         };
 
         if (auto r = builder::table::get_field(fn->ret, {"string::len"}, pointer_creator); r.has_value())
@@ -42,9 +48,15 @@ namespace zen::library::string
     inline std::shared_ptr<builder::function> create_deallocator(utils::constant_pool & pool)
     {
         const auto fn = zen::builder::function::create(pool, 0,false, "zen::deallocate");
-        auto pointer_creator = [&]()
+        auto pointer_creator = [&](std::shared_ptr<zen::builder::value> & ptr, const std::shared_ptr<zen::builder::value>& original)
         {
-            return fn->set_local(builder::function::_long(), "pointer::string");
+            if (not ptr)
+            {
+                ptr = fn->set_local(zen::builder::function::_long(), "temp::field");
+            } else
+            {
+                fn->gen<zen::add_i64>(ptr, original, ptr->offset, fmt::format("@offset:{}", ptr->offset));
+            }
         };
         const auto type = builder::function::_string();
         const auto it = fn->set_parameter(type,"it");

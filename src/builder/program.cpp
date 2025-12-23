@@ -56,7 +56,7 @@ namespace zen::builder
     {
         for (auto & lib : libraries)
         {
-            if (auto func = lib.second->get(id))
+            if (auto func = lib.second->get_function(id); func and not func->is_extern)
             {
                 return func;
             }
