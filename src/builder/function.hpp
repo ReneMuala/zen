@@ -43,7 +43,7 @@ namespace zen::builder
         std::string name;
 
         std::unordered_map<i64, std::shared_ptr<global_label>> dependencies;
-
+        bool is_extern = false;
         inline std::shared_ptr<block> get_scope(const bool root  = false) const;
         static std::shared_ptr<function> create(utils::constant_pool & pool, const i64 & offset,const bool& logging = false, const std::string & name = "");
         std::shared_ptr<function> create(const std::string & name, const std::vector<std::shared_ptr<builder::type>>& params, const std::shared_ptr<builder::type> &type) const;
@@ -280,7 +280,7 @@ namespace zen::builder
         }
 
         template <zen::instruction ins>
-        void gen(const std::shared_ptr<value>& _1, const std::shared_ptr<value>& _2, const i64& _3)
+        void gen(const std::shared_ptr<value>& _1, const std::shared_ptr<value>& _2, const i64& _3, const std::string _3prefix = "")
         {
             const std::shared_ptr<block>& sc = get_scope(true);
             code.push_back(ins);
@@ -293,7 +293,7 @@ namespace zen::builder
                 fmt::println("<{}> {} {} {} {}", code.size() - 4, code.at(code.size() - 4),
                              get_address_or_label(_1),
                              get_address_or_label(_2),
-                             _3
+                             _3prefix.empty() ? std::to_string(_3) : _3prefix
                 );
             }
         }

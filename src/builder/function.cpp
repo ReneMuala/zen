@@ -170,7 +170,7 @@ namespace zen::builder
     {
         if (not _1->has_same_type_as(*_2))
         {
-            throw exceptions::semantic_error(fmt::format("cannot {} {} to {}", verb, _2->type->name, _1->type->name),
+            throw exceptions::semantic_error(fmt::format("cannot {} {}[{}] to {}[{}]", verb, _2->type->name, _2->type->get_full_size(), _1->type->name, _1->type->get_full_size()),
                                              offset);
         }
     }
@@ -546,28 +546,55 @@ namespace zen::builder
     void function::move(const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs)
     {
         assert_same_type("assign", lhs, rhs, offset);
-        if (lhs->is(_byte()) or lhs->is(_bool()))
-            gen<zen::i8_to_i8>(lhs, rhs);
-        else if (lhs->is(_short()))
-            gen<zen::i16_to_i16>(lhs, rhs);
-        else if (lhs->is(_int()))
-            gen<zen::i32_to_i32>(lhs, rhs);
-        else if (lhs->is(_long()))
-            gen<zen::i64_to_i64>(lhs, rhs);
-        else if (lhs->is(_float()))
-            gen<zen::f32_to_f32>(lhs, rhs);
-        else if (lhs->is(_double()))
-            gen<zen::f64_to_f64>(lhs, rhs);
-        else if (lhs->type->kind == builder::type::heap)
+        if (lhs->type->kind == builder::type::stack)
         {
+            if (not(lhs->is_reference or rhs->is_reference))
+            {
+                if (lhs->is(_byte()) or lhs->is(_bool()))
+                    gen<zen::i8_to_i8>(lhs, rhs);
+                else if (lhs->is(_short()))
+                    gen<zen::i16_to_i16>(lhs, rhs);
+                else if (lhs->is(_int()))
+                    gen<zen::i32_to_i32>(lhs, rhs);
+                else if (lhs->is(_long()))
+                    gen<zen::i64_to_i64>(lhs, rhs);
+                else if (lhs->is(_float()))
+                    gen<zen::f32_to_f32>(lhs, rhs);
+                else if (lhs->is(_double()))
+                    gen<zen::f64_to_f64>(lhs, rhs);
+                else
+                    throw exceptions::semantic_error(fmt::format("cannot copy type {}", lhs->type->name), offset);
+            }
+            else if (lhs->is_reference and not rhs->is_reference)
+            {
+                const auto ref = set_local(_long(),"temp::rhs_ref");
+                gen<zen::refer>(ref, rhs);
+                ref->type = rhs->type;
+                ref->is_reference = true;
+                ref->no_destructor = true;
+                move(lhs, ref);
+            }
+            else if (not lhs->is_reference and rhs->is_reference)
+            {
+                const auto ref = set_local(_long(),"temp::lhs_ref");
+                gen<zen::refer>(ref, lhs);
+                ref->type = lhs->type;
+                ref->is_reference = true;
+                ref->no_destructor = true;
+                move(ref, rhs);
+            }
+            else
+            {
+                gen<zen::copy>(lhs, rhs, lhs->type->get_full_size(), fmt::format("@size:{}", lhs->type->get_full_size()));
+            }
+        }
+        else {
             if (const auto result = call(create("operator=", {lhs->type, rhs->type}, nullptr), {lhs, rhs}); not result.
                 has_value())
             {
                 throw exceptions::semantic_error(result.error(), offset);
             }
         }
-        else
-            throw exceptions::semantic_error(fmt::format("cannot copy type {}", lhs->type->name), offset);
     }
 
     void function::not_(const std::shared_ptr<value>& r, const std::shared_ptr<value>& val)
