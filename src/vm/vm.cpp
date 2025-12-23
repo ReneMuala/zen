@@ -173,7 +173,11 @@ bool zen::vm::stack::operator-=(const i64& size)
 {
     negative_stack_size -= size;
     if (negative_stack_size <= 0)
-        return (data = realloc(data, std::abs(negative_stack_size)));
+    {
+        data = realloc(data, std::abs(negative_stack_size));
+        // memset((void*)((i64)data+(std::abs(negative_stack_size)-size)), 0, std::abs(size));
+        return data;
+    }
     throw std::runtime_error(fmt::format("zen::vm::stack invalid resize: {}", size));
     negative_stack_size -= std::abs(size);
     return false;
