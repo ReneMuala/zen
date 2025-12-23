@@ -662,9 +662,9 @@ BEGIN_ILC_CODEGEN(builder_parser)
     BEGIN_PRODUCTION(PRODUCTION_NVAL_NOT_VAL)
         REQUIRE_TERMINAL(TNOT)
         REQUIRE_NON_TERMINAL_CALLBACK(NSINGLE_VAL, EXPECTED("single value"))
-        const auto it = fun->set_local(zen::builder::function::_bool(), "temp::not");
-        fun->not_(it, pop());
-        push(it);
+        const auto r = fun->set_local(zen::builder::function::_bool(), "temp::not");
+        fun->not_(r, pop());
+        push(r);
     END_PRODUCTION
 
     BEGIN_PRODUCTION(PRODUCTION_NVAL_NEGATE_VAL)
@@ -772,35 +772,40 @@ BEGIN_ILC_CODEGEN(builder_parser)
         }
     END_PRODUCTION
 
-BEGIN_PRODUCTION(META_PRODUCTION_NANY_BODY)
-    zen::i64 parentheses = 0;
-    zen::i64 braces = 0;
-    if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
-    {
-        parentheses++;
-    } else if (TRY_REQUIRE_TERMINAL(TBRACES_OPEN))
-    {
-        braces++;
-    }
-    while (parentheses >0 or braces >0)
-    {
+    BEGIN_PRODUCTION(META_PRODUCTION_NANY_BODY)
+        zen::i64 parentheses = 0;
+        zen::i64 braces = 0;
         if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
         {
             parentheses++;
-        } else if (TRY_REQUIRE_TERMINAL(TBRACES_OPEN))
+        }
+        else if (TRY_REQUIRE_TERMINAL(TBRACES_OPEN))
         {
             braces++;
-        } else if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_CLOSE))
-        {
-            parentheses--;
-        } else if (TRY_REQUIRE_TERMINAL(TBRACES_CLOSE))
-        {
-            braces--;
-        } else if (offset < chain_size)
-        {
-            offset++; // ignore anything else
         }
-    }
+        while (parentheses > 0 or braces > 0)
+        {
+            if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
+            {
+                parentheses++;
+            }
+            else if (TRY_REQUIRE_TERMINAL(TBRACES_OPEN))
+            {
+                braces++;
+            }
+            else if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_CLOSE))
+            {
+                parentheses--;
+            }
+            else if (TRY_REQUIRE_TERMINAL(TBRACES_CLOSE))
+            {
+                braces--;
+            }
+            else if (offset < chain_size)
+            {
+                offset++; // ignore anything else
+            }
+        }
     END_PRODUCTION
 
     BEGIN_PRODUCTION(META_PRODUCTION_GLOBAL_DISCOVERY)
@@ -810,7 +815,8 @@ BEGIN_PRODUCTION(META_PRODUCTION_NANY_BODY)
             if (TRY_REQUIRE_NON_TERMINAL(NFUNCTION_DEFINITION_PREFIX))
             {
                 REQUIRE_NON_TERMINAL(META_NANY_BODY)
-            } else if (TRY_REQUIRE_TERMINAL(TKEYWORD_CLASS))
+            }
+            else if (TRY_REQUIRE_TERMINAL(TKEYWORD_CLASS))
             {
                 REQUIRE_TERMINAL(TID)
                 class_ = zen::builder::type::create(id, 0);
@@ -819,9 +825,10 @@ BEGIN_PRODUCTION(META_PRODUCTION_NANY_BODY)
                 }
                 REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
                 while (TRY_REQUIRE_NON_TERMINAL(NCLASS_FIELD) or TRY_REQUIRE_NON_TERMINAL(NGLOBAL_DISCOVERY_STAT))
-                REQUIRE_NON_TERMINAL(META_NANY_BODY)
+                    REQUIRE_NON_TERMINAL(META_NANY_BODY)
                 REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
-            } else if (not TRY_REQUIRE_NON_TERMINAL(NDECORATOR))
+            }
+            else if (not TRY_REQUIRE_NON_TERMINAL(NDECORATOR))
             {
                 fmt::println("broke at {}", offset < chain_size ? tokens[offset].get_location_string() : "undefined");
                 break;
@@ -874,7 +881,14 @@ BEGIN_PRODUCTION(META_PRODUCTION_NANY_BODY)
         } // improve return handler
         if (dangling_value)
         {
-            fun->return_value(pop());
+            if (fun->signature->type != zen::builder::function::_unit())
+            {
+                fun->return_value(pop());
+            }
+            else
+            {
+                pop();
+            }
         }
     END_PRODUCTION
 
@@ -926,14 +940,16 @@ BEGIN_PRODUCTION(META_PRODUCTION_NANY_BODY)
         }
         else if (post_increment)
         {
-            const auto val = fun->set_local(it->type, "temp::post_inc");
-            fun->add(val, it, one);
+            const auto val = fun->set_local(it->type, "temp::befo_inc");
+            fun->move(val, it);
+            fun->add(it, it, one);
             push(val);
         }
         else if (post_decrement)
         {
-            const auto val = fun->set_local(it->type, "temp::post_dec");
-            fun->sub(val, it, one);
+            const auto val = fun->set_local(it->type, "temp::befo_dec");
+            fun->move(val, it);
+            fun->sub(it, it, one);
             push(val);
         }
         else
@@ -1043,7 +1059,7 @@ END_SYMBOL_BINDING
         PRODUCTION_NDECORATOR()
     END_SYMBOL_BINDING
 
-BEGIN_SYMBOL_BINDING(NGLOBAL_DISCOVERY_STAT)
+    BEGIN_SYMBOL_BINDING(NGLOBAL_DISCOVERY_STAT)
     META_PRODUCTION_GLOBAL_DISCOVERY()
 END_SYMBOL_BINDING
 

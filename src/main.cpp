@@ -120,8 +120,13 @@ class point {
 		sum0(x:int, y:int) = int(x+y)
 		@debug
 		test = {
-			name: string = "R
-ene"
+			a: int = 2
+			b: int = 1
+			if(a > b){
+				sum(a,b)
+			} else {
+				sum : int = a + b
+			}
 		}
 	)");
 	// implement symbol manager
