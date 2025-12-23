@@ -21,14 +21,13 @@ namespace zen::builder
             variable
         };
 
-        kind kind;
+        enum kind kind;
         types::stack::i64 offset;
         std::shared_ptr<builder::type> type;
         bool no_destructor = false;
         std::string name;
         bool is_reference = false;
         bool is_negated = false;
-
 
         [[nodiscard]] bool is(const std::shared_ptr<builder::type>& t) const
         {

@@ -111,44 +111,52 @@ namespace zen::builder
         {
             if constexpr (std::is_same_v<T, bool>)
             {
-                return std::make_shared<builder::value>(fmt::format("_{}", value), _bool(), (i64)pool.get<T>(value).get());
+                auto it = std::make_shared<builder::value>(fmt::format("_{}", value), _bool(), (i64)pool.get<T>(value).get());
+                it->kind = value::kind::constant;
+                return it;
             } else if constexpr  (std::is_same_v<T, i8>)
             {
                 const auto it = std::make_shared<builder::value>(fmt::format("_{}", value), _byte(), (i64)pool.get<T>(value).get());
                 it->is_negated = value < 0;
+                it->kind = value::kind::constant;
                 return it;
             } else if constexpr (std::is_same_v<T, i16>)
             {
                 const auto it = std::make_shared<builder::value>(fmt::format("_{}", value), _short(), (i64)pool.get<T>(value).get());
                 it->is_negated = value < 0;
+                it->kind = value::kind::constant;
                 return it;
             } else if constexpr (std::is_same_v<T, i32>)
             {
                 const auto it = std::make_shared<builder::value>(fmt::format("_{}", value), _int(), (i64)pool.get<T>(value).get());
                 it->is_negated = value < 0;
+                it->kind = value::kind::constant;
                 return it;
             } else if constexpr (std::is_same_v<T, i64>)
             {
                 const auto it = std::make_shared<builder::value>(fmt::format("_{}", value), _long(), (i64)pool.get<T>(value).get());
                 it->is_negated = value < 0;
+                it->kind = value::kind::constant;
                 return it;
             }  else if constexpr (std::is_same_v<T, f32>)
             {
                 const auto it = std::make_shared<builder::value>(fmt::format("_{}", value), _float(), (i64)pool.get<T>(value).get());
                 it->is_negated = value < 0;
+                it->kind = value::kind::constant;
                 return it;
             } else if constexpr (std::is_same_v<T, f64>)
             {
                 const auto it = std::make_shared<builder::value>(fmt::format("_{}", value), _double(), (i64)pool.get<T>(value).get());
                 it->is_negated = value < 0;
+                it->kind = value::kind::constant;
                 return it;
             } else if constexpr (std::is_same_v<T, std::string>)
             {
                 static const std::regex replaceable("[^\\w\\d]");
                 std::string label = std::regex_replace(value.substr(0, 5), replaceable, "_");
-                auto s = std::make_shared<builder::value>(fmt::format("_{}", label), _string(), (i64)pool.get<zen::types::heap::string*>(zen::types::heap::string::from_string(value)).get());
-                s->kind = value::kind::constant;
-                return s;
+                auto it = std::make_shared<builder::value>(fmt::format("_{}", label), _string(), (i64)pool.get<zen::types::heap::string*>(zen::types::heap::string::from_string(value)).get());
+                it->kind = value::kind::constant;
+                return it;
             } else
             {
                 throw exceptions::semantic_error("unsupported type for constant", offset);
