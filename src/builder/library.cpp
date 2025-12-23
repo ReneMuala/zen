@@ -12,15 +12,26 @@ namespace zen::builder
         return hasher(name);
     }
 
-    std::shared_ptr<builder::function> library::get(const i64 id)
+    std::shared_ptr<function> library::get_function(i64 id)
     {
         const auto target = functions.find(id);
         return target != functions.end() ? target->second : nullptr;
     }
 
+    std::shared_ptr<type> library::get_type(i64 id)
+    {
+        const auto target = types.find(id);
+        return target != types.end() ? target->second : nullptr;
+    }
+
     void library::add(std::shared_ptr<builder::function> fn)
     {
         functions[fn->hash()] = fn;
+    }
+
+    void library::add(std::shared_ptr<builder::type> ty)
+    {
+        types[ty->hash()] = ty;
     }
 
     std::shared_ptr<library> library::create(const std::string& name)
