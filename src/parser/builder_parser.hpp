@@ -91,7 +91,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
         {
             throw zen::exceptions::semantic_error("cannot create class field outside of class", offset);
         }
-        if (auto result = tab->get_type(type); result.has_value())
+        if (auto result = zen::builder::table::get_type(type, prog); result.has_value())
         {
             class_->add_field(field_name, result.value(), offset);
         }
@@ -227,28 +227,34 @@ BEGIN_ILC_CODEGEN(builder_parser)
         }
         else
         {
-            if (const auto result = fun->call(callee.value(), args); not result.
+            const auto target = callee.value();
+            if (target.first)
+            {
+                args.insert(args.begin(), target.first);
+            }
+
+            if (const auto result = fun->call(target.second, args); not result.
                 has_value())
             {
                 throw zen::exceptions::semantic_error(result.error(), offset);
             }
-            else
+            else if (result.value())
             {
                 push(result.value());
             }
-            pragma_dangling_return_value = callee.value()->signature->type != nullptr;
+            pragma_dangling_return_value = callee.value().second->signature->type != zen::builder::function::_unit();
         }
     END_PRODUCTION
 
     BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_METHOD_CALL)
-        const std::string name = id;
+        std::string name = id;
         if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
         {
             type.clear();
         }
         id = name;
         REQUIRE_TERMINAL(TPARENTHESIS_OPEN)
-        std::vector<std::shared_ptr<zen::builder::value>> args;
+        std::vector<std::shared_ptr<zen::builder::value>> args = {};
         while (TRY_REQUIRE_NON_TERMINAL(NVAL))
         {
             args.push_back(pop());
@@ -258,18 +264,35 @@ BEGIN_ILC_CODEGEN(builder_parser)
             }
         }
         REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
-        std::vector<std::shared_ptr<zen::builder::type>> params = {class_};
+        std::vector<std::shared_ptr<zen::builder::type>> params = {};
         for (const auto& arg : args)
         {
             params.push_back(arg->type);
         }
-        const auto callee = fun->create(name, params, nullptr);
-        if (const auto result = fun->call(callee, args); not result.
-            has_value())
-        {
-            throw zen::exceptions::semantic_error(result.error(), offset);
-        }
-        pragma_dangling_return_value = true;
+
+if (auto callee = tab->get_function(pop(),name, params); not callee.has_value())
+{
+    throw zen::exceptions::semantic_error(callee.error(), offset);
+}
+else
+{
+    const auto target = callee.value();
+    if (target.first)
+    {
+        args.insert(args.begin(), target.first);
+    }
+
+    if (const auto result = fun->call(target.second, args); not result.
+        has_value())
+    {
+        throw zen::exceptions::semantic_error(result.error(), offset);
+    }
+    else if (result.value())
+    {
+        push(result.value());
+    }
+    pragma_dangling_return_value = callee.value().second->signature->type != zen::builder::function::_unit();
+}
     END_PRODUCTION
 
     BEGIN_PRODUCTION(PRODUCTION_NDECORATOR)
@@ -309,7 +332,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
 
         if (at_logging and at_extern)
         {
-            throw zen::exceptions::semantic_error("cannot mix @debug with @extern", offset, "expression is pointless");
+            throw zen::exceptions::semantic_error("cannot mix @debug with @extern", offset);
         }
     END_PRODUCTION
 
@@ -351,17 +374,36 @@ BEGIN_ILC_CODEGEN(builder_parser)
             else if (TRY_REQUIRE_TERMINAL(TOR))
                 function_name += "||";
         }
-        fun = zen::builder::function::create(pool, offset, at_logging,
-                                             class_
-                                                 ? fmt::format("{}.{}", class_->name, function_name)
-                                                 : function_name);
+        bool is_constructor = false;
+
+    if (class_)
+    {
+        if (function_name == "new")
+        {
+            is_constructor = true;
+            function_name = class_->name;
+        } else
+        {
+            function_name = fmt::format("{}.{}", class_->name, function_name);
+        }
+    }
+        fun = zen::builder::function::create(pool, offset, at_logging,function_name);
         tab = zen::builder::table::create(fun, class_, prog);
         if (at_logging)
         {
             fmt::println("{}", fun->name);
         }
         if (class_)
-            fun->set_parameter(class_, "this");
+        {
+            if (is_constructor)
+            {
+                fun->set_alias(fun->set_return(class_),  "this");
+                fun->return_implicitly();
+            } else
+            {
+                fun->set_parameter(class_, "this");
+            }
+        }
         if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
         {
             type.clear();
@@ -398,7 +440,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
 
         REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
         type.clear();
-        if (TRY_REQUIRE_NON_TERMINAL(NTYPE))
+        if (not is_constructor and TRY_REQUIRE_NON_TERMINAL(NTYPE))
         {
             if (auto result = tab->get_type(type); result.has_value())
             {
@@ -421,6 +463,10 @@ BEGIN_ILC_CODEGEN(builder_parser)
             if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
             {
                 REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
+                if (*fun->signature->type != *zen::builder::function::_unit())
+                {
+                    fun->return_value(pop());
+                }
                 REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
             }
             else
@@ -428,11 +474,6 @@ BEGIN_ILC_CODEGEN(builder_parser)
                 REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
                 REQUIRE_NON_TERMINAL(NFUNCTION_BODY)
                 REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
-            }
-
-            if (*fun->signature->type != *zen::builder::function::_unit())
-            {
-                fun->return_value(pop());
             }
             fun->build();
         }
@@ -693,6 +734,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
         const auto it = pop();
         fun->mul(it, it, fun->constant(-1, it->type));
         it->is_negated = true;
+        push(it);
     END_PRODUCTION
 
     BEGIN_PRODUCTION(PRODUCTION_NVAL_WITH_PARENTHESIS)
@@ -980,41 +1022,44 @@ BEGIN_ILC_CODEGEN(builder_parser)
 
     BEGIN_PRODUCTION(PRODUCTION_NMEMBER_ACCESS)
         REQUIRE_TERMINAL(TDOT);
-        id.clear();
         do
         {
-            REQUIRE_TERMINAL_CALLBACK(TID, EXPECTED("identifier"))
-            id += "." + tokens[offset - 1].value;
-        }
-        while (TRY_REQUIRE_TERMINAL(TDOT));
-        if (not TRY_REQUIRE_NON_TERMINAL(NSUFFIX_METHOD_CALL))
-        {
-            auto result = zen::builder::table::get_field(pop(), zen::builder::table::split_name(id.substr(1)),
-                                                         [&](std::shared_ptr<zen::builder::value>& ptr,
-                                                             const std::shared_ptr<zen::builder::value>& original)
-                                                         {
-                                                             if (not ptr)
+            id.clear();
+            do
+            {
+                REQUIRE_TERMINAL_CALLBACK(TID, EXPECTED("identifier"))
+                id += "." + tokens[offset - 1].value;
+            }
+            while (TRY_REQUIRE_TERMINAL(TDOT));
+            if (not TRY_REQUIRE_NON_TERMINAL(NSUFFIX_METHOD_CALL))
+            {
+                auto result = zen::builder::table::get_field(pop(), zen::builder::table::split_name(id.substr(1)),
+                                                             [&](std::shared_ptr<zen::builder::value>& ptr,
+                                                                 const std::shared_ptr<zen::builder::value>& original)
                                                              {
-                                                                 ptr = fun->set_local(
-                                                                     zen::builder::function::_long(), "temp::field");
-                                                             }
-                                                             else
-                                                             {
-                                                                 fun->gen<zen::add_i64>(
-                                                                     ptr, original, ptr->offset,
-                                                                     fmt::format("@offset:{}", ptr->offset));
-                                                             }
-                                                         });
+                                                                 if (not ptr)
+                                                                 {
+                                                                     ptr = fun->set_local(
+                                                                         zen::builder::function::_long(), "temp::field");
+                                                                 }
+                                                                 else
+                                                                 {
+                                                                     fun->gen<zen::add_i64>(
+                                                                         ptr, original, ptr->offset,
+                                                                         fmt::format("@offset:{}", ptr->offset));
+                                                                 }
+                                                             });
 
-            if (result.has_value())
-            {
-                push(result.value());
+                if (result.has_value())
+                {
+                    push(result.value());
+                }
+                else
+                {
+                    throw zen::exceptions::semantic_error(result.error(), offset);
+                }
             }
-            else
-            {
-                throw zen::exceptions::semantic_error(result.error(), offset);
-            }
-        }
+        } while (TRY_REQUIRE_TERMINAL(TDOT));
     END_PRODUCTION
 
     BEGIN_PRODUCTION(PRODUCTION_NID)
@@ -1135,14 +1180,13 @@ END_SYMBOL_BINDING
         END_SYMBOL_BINDING
 
     BEGIN_SYMBOL_BINDING(NSINGLE_VAL_PREDICATE)
-            PRODUCTION_NVAL_NOT_VAL() or
+            (PRODUCTION_NVAL_NOT_VAL() or
             PRODUCTION_NVAL_NEGATE_VAL() or
             PRODUCTION_NVAL_AS_NUM() or
             PRODUCTION_NVAL_AS_CHAR_ARRAY() or
             (PRODUCTION_NID() and (PRODUCTION_NSUFFIX_FUNCTION_CALL() or push_parser_id())) or
             PRODUCTION_NVAL_BOOLEAN() or
-            PRODUCTION_NVAL_WITH_PARENTHESIS() or
-            PRODUCTION_NVAL_AS_LIST()
+            PRODUCTION_NVAL_WITH_PARENTHESIS() or PRODUCTION_NVAL_AS_LIST()) and (PRODUCTION_NMEMBER_ACCESS() or true)
         END_SYMBOL_BINDING
 
     BEGIN_SYMBOL_BINDING(NSINGLE_VAL)
@@ -1258,8 +1302,7 @@ END_SYMBOL_BINDING
           PRODUCTION_NVAL_EQUAL_VALUE() or
           PRODUCTION_NVAL_NOT_EQUAL_VALUE() or
           PRODUCTION_NVAL_AND_VALUE() or
-          PRODUCTION_NVAL_OR_VALUE() or
-        PRODUCTION_NMEMBER_ACCESS()
+          PRODUCTION_NVAL_OR_VALUE() or PRODUCTION_NMEMBER_ACCESS()
           // PRODUCTION_NSUFFIX_FUNCTION_CALL()
         END_SYMBOL_BINDING
     BEGIN_SYMBOL_BINDING(NSUFFIX_METHOD_CALL)

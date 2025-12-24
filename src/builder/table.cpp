@@ -23,7 +23,9 @@ namespace zen::builder
     }
 
     std::expected<std::shared_ptr<value>, std::string> table::get_field(std::shared_ptr<value> target,
-                                                                        const std::vector<std::string>& tokens, const std::function<void(std::shared_ptr<value>&, const std
+                                                                        const std::vector<std::string>& tokens,
+                                                                        const std::function<void(
+                                                                            std::shared_ptr<value>&, const std
                                                                             ::shared_ptr<value>&)>& pointer_handler)
     {
         if (target)
@@ -33,8 +35,9 @@ namespace zen::builder
             pointer_handler(new_target, original);
             new_target->type = target->type;
             new_target->is_reference = true;
+            new_target->no_destructor = true;
             target = new_target;
-            for (const auto & token : tokens)
+            for (const auto& token : tokens)
             {
                 std::optional<std::pair<types::stack::i64, std::shared_ptr<builder::type>>> result = target->type->
                     get_field(token);
@@ -42,7 +45,8 @@ namespace zen::builder
                 {
                     target->type = result->second;
                     target->offset += result->first;
-                } else
+                }
+                else
                 {
                     return std::unexpected(fmt::format("no such field {} in {}", token, target->type->name));
                 }
@@ -53,8 +57,9 @@ namespace zen::builder
         return std::unexpected(fmt::format("no such field {} in unit", tokens[0]));
     }
 
-    std::expected<std::shared_ptr<value>, std::string> table::get_value(const std::string& name, const std::function<void(std::shared_ptr<value>&, const std
-                                                                            ::shared_ptr<value>&)>& pointer_handler)
+    std::expected<std::shared_ptr<value>, std::string> table::get_value(
+        const std::string& name, const std::function<void(std::shared_ptr<value>&, const std
+                                                          ::shared_ptr<value>&)>& pointer_handler)
     {
         if (name.empty())
         {
@@ -76,47 +81,95 @@ namespace zen::builder
 
     std::expected<std::shared_ptr<value>, std::string> table::get_value(const std::string& name)
     {
-        auto result = get_value(name, [&](std::shared_ptr<value> & ptr, const std::shared_ptr<value>& original)
+        auto result = get_value(name, [&](std::shared_ptr<value>& ptr, const std::shared_ptr<value>& original)
         {
             if (not ptr)
             {
                 ptr = this->function->set_local(zen::builder::function::_long(), "temp::field");
-            } else
+            }
+            else
             {
                 this->function->gen<zen::add_i64>(ptr, original, ptr->offset, fmt::format("@offset:{}", ptr->offset));
             }
         });
         if (not result.has_value() and type and not name.starts_with("this."))
         {
-            return get_value("this."+name);
+            return get_value("this." + name);
         }
         return result;
     }
 
-    std::expected<std::shared_ptr<builder::function>, std::string> table::get_function(const std::string& name,
-        const std::vector<std::shared_ptr<zen::builder::type>>& params)
+    std::expected<std::pair<std::shared_ptr<builder::value>,std::shared_ptr<builder::function>>, std::string> table::get_function(const std::string& name,
+         std::vector<std::shared_ptr<zen::builder::type>>& params)
     {
-        auto target = function->create(name, params, nullptr);
-        for (const auto & lib : program->libraries)
+        std::shared_ptr<builder::function> target;
+        std::shared_ptr<builder::value> object;
+        if (name.contains('.'))
         {
-            if (const auto & r = lib.second->get_function(target->hash()))
+            const auto final = name.find_last_of('.');
+            if (auto result = get_value(name.substr(0, final)); result.has_value())
+            {
+                params.insert(params.begin(), result.value()->type);
+                target = function->create(result.value()->type->name + name.substr(final), params, nullptr);
+                object = result.value();
+            } else
+            {
+                return std::unexpected(result.error());
+            }
+        }
+        else
+        {
+            target = function->create(name, params, nullptr);
+        }
+        for (const auto& lib : program->libraries)
+        {
+            if (const auto& r = lib.second->get_function(target->hash()))
             {
                 target = r;
-                return target;
+                return std::pair{object, target};
             }
         }
         if (type and not name.starts_with("this."))
         {
-            return get_function("this."+name, params);
+            return get_function("this." + name, params);
         }
-        return std::unexpected(fmt::format("no such function {} found at compilation phase", target->get_canonical_name()));
+        return std::unexpected(fmt::format("no such function {}",
+                                           target->get_canonical_name()));
+    }
+
+    std::expected<std::pair<std::shared_ptr<builder::value>, std::shared_ptr<builder::function>>, std::string> table::
+    get_function(const std::shared_ptr<zen::builder::value>& object, const std::string& name,
+        std::vector<std::shared_ptr<zen::builder::type>>& params)
+    {
+        params.insert(params.begin(), object->type);
+        auto target = function->create(object->type->name + name, params, nullptr);
+        for (const auto& lib : program->libraries)
+        {
+            if (const auto& r = lib.second->get_function(target->hash()))
+            {
+                target = r;
+                return std::pair{object, target};
+            }
+        }
+        if (type and not name.starts_with("this."))
+        {
+            return get_function("this." + name, params);
+        }
+        return std::unexpected(fmt::format("no such function {}",
+                                           target->get_canonical_name()));
     }
 
     std::expected<std::shared_ptr<struct type>, std::string> table::get_type(const std::string& name)
     {
-        for (const auto & lib : program->libraries)
+        return get_type(name, program);
+    }
+
+    std::expected<std::shared_ptr<builder::type>, std::string> table::get_type(const std::string& name,
+        const std::shared_ptr<builder::program>& program)
+    {
+        for (const auto& lib : program->libraries)
         {
-            for (const auto & type : lib.second->types)
+            for (const auto& type : lib.second->types)
             {
                 if (type.second->name == name)
                 {
@@ -136,7 +189,9 @@ namespace zen::builder
         return std::unexpected(fmt::format("no such type {}", name));
     }
 
-    std::shared_ptr<table> table::create(const std::shared_ptr<builder::function>& function, const std::shared_ptr<builder::type>& type, const std::shared_ptr<builder::program>& program)
+    std::shared_ptr<table> table::create(const std::shared_ptr<builder::function>& function,
+                                         const std::shared_ptr<builder::type>& type,
+                                         const std::shared_ptr<builder::program>& program)
     {
         return std::make_shared<table>(function, type, program);
     }

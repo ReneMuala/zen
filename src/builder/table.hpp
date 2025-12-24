@@ -24,8 +24,10 @@ namespace zen::builder
         std::expected<std::shared_ptr<value>, std::string> get_value(const std::string& name, const std::function<void(std::shared_ptr<value>&, const std
                                                                          ::shared_ptr<value>&)>& pointer_handler);
         std::expected<std::shared_ptr<value>, std::string> get_value(const std::string& name);
-        std::expected<std::shared_ptr<builder::function>, std::string> get_function(const std::string& name, const std::vector<std::shared_ptr<zen::builder::type>> & params);
+        std::expected<std::pair<std::shared_ptr<builder::value>,std::shared_ptr<builder::function>>, std::string> get_function(const std::string& name, std::vector<std::shared_ptr<zen::builder::type>> & params);
+        std::expected<std::pair<std::shared_ptr<builder::value>,std::shared_ptr<builder::function>>, std::string> get_function(const std::shared_ptr<zen::builder::value>& object,const std::string& name, std::vector<std::shared_ptr<zen::builder::type>> & params);
         std::expected<std::shared_ptr<builder::type>, std::string> get_type(const std::string& name);
+        static std::expected<std::shared_ptr<builder::type>, std::string> get_type(const std::string& name, const std::shared_ptr<builder::program>& program);
         static std::shared_ptr<table> create(const std::shared_ptr<builder::function>& function, const std::shared_ptr<builder::type>& type = nullptr, const std::shared_ptr<builder::program>& program = nullptr);
     };
 }
