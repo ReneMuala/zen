@@ -61,9 +61,14 @@ namespace zen::builder
     std::shared_ptr<type> function::_string()
     {
         static auto t = type::create("string", 8);
-        t->kind = type::kind::heap;
-        t->add_field("string::len", _long(), /* offset */ 0);
-        t->add_field("string::data", _long(), /* offset */ 0);
+        static bool did_init = false;
+        if (!did_init)
+        {
+            t->kind = type::kind::heap;
+            t->add_field("string::len", _long(), /* offset */ 0);
+            t->add_field("string::data", _long(), /* offset */ 0);
+            did_init = true;
+        }
         return t;
     }
 
@@ -129,6 +134,7 @@ namespace zen::builder
             t, 0 - /* jump callee IP */static_cast<types::stack::i64>(sizeof(
                 types::stack::i64)));
         ret->name = "@ret";
+        ret->no_destructor = true;
         scp->use_stack(t->get_size());
         return ret;
     }
@@ -165,6 +171,13 @@ namespace zen::builder
         return sym;
     }
 
+    std::shared_ptr<value> function::set_alias(const std::shared_ptr<zen::builder::value>& val, const std::string& name) const
+    {
+        const auto& scp = get_scope();
+        scp->locals[name].push_back(val);
+        return val;
+    }
+
     inline void assert_same_type(const char* verb, const std::shared_ptr<value>& _1, const std::shared_ptr<value>& _2,
                                  const i64& offset)
     {
@@ -190,17 +203,17 @@ namespace zen::builder
         assert_same_type("add", lhs, rhs, offset);
         assert_same_type("assign", r, lhs, offset);
         if (lhs->is(_byte()))
-            gen<zen::add_i8>(r, lhs, rhs);
+            gen<zen::add_i8>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<zen::add_i16>(r, lhs, rhs);
+            gen<zen::add_i16>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<zen::add_i32>(r, lhs, rhs);
+            gen<zen::add_i32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<zen::add_i64>(r, lhs, rhs);
+            gen<zen::add_i64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<zen::add_f32>(r, lhs, rhs);
+            gen<zen::add_f32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<zen::add_f64>(r, lhs, rhs);
+            gen<zen::add_f64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator+", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -223,17 +236,17 @@ namespace zen::builder
         assert_same_type("subtract", lhs, rhs, offset);
         assert_same_type("assign", r, lhs, offset);
         if (lhs->is(_byte()))
-            gen<zen::sub_i8>(r, lhs, rhs);
+            gen<zen::sub_i8>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<zen::sub_i16>(r, lhs, rhs);
+            gen<zen::sub_i16>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<zen::sub_i32>(r, lhs, rhs);
+            gen<zen::sub_i32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<zen::sub_i64>(r, lhs, rhs);
+            gen<zen::sub_i64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<zen::sub_f32>(r, lhs, rhs);
+            gen<zen::sub_f32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<zen::sub_f64>(r, lhs, rhs);
+            gen<zen::sub_f64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator-", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -256,17 +269,17 @@ namespace zen::builder
         assert_same_type("multiply", lhs, rhs, offset);
         assert_same_type("assign", r, lhs, offset);
         if (lhs->is(_byte()))
-            gen<zen::mul_i8>(r, lhs, rhs);
+            gen<zen::mul_i8>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<zen::mul_i16>(r, lhs, rhs);
+            gen<zen::mul_i16>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<zen::mul_i32>(r, lhs, rhs);
+            gen<zen::mul_i32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<zen::mul_i64>(r, lhs, rhs);
+            gen<zen::mul_i64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<zen::mul_f32>(r, lhs, rhs);
+            gen<zen::mul_f32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<zen::mul_f64>(r, lhs, rhs);
+            gen<zen::mul_f64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator*", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -289,17 +302,17 @@ namespace zen::builder
         assert_same_type("divide", lhs, rhs, offset);
         assert_same_type("assign", r, lhs, offset);
         if (lhs->is(_byte()))
-            gen<zen::div_i8>(r, lhs, rhs);
+            gen<zen::div_i8>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<zen::div_i16>(r, lhs, rhs);
+            gen<zen::div_i16>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<zen::div_i32>(r, lhs, rhs);
+            gen<zen::div_i32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<zen::div_i64>(r, lhs, rhs);
+            gen<zen::div_i64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<zen::div_f32>(r, lhs, rhs);
+            gen<zen::div_f32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<zen::div_f64>(r, lhs, rhs);
+            gen<zen::div_f64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator/", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -322,13 +335,13 @@ namespace zen::builder
         assert_same_type("mod", lhs, rhs, offset);
         assert_same_type("assign", r, lhs, offset);
         if (lhs->is(_byte()))
-            gen<zen::mod_i8>(r, lhs, rhs);
+            gen<zen::mod_i8>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<zen::mod_i16>(r, lhs, rhs);
+            gen<zen::mod_i16>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<zen::mod_i32>(r, lhs, rhs);
+            gen<zen::mod_i32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<zen::mod_i64>(r, lhs, rhs);
+            gen<zen::mod_i64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator%", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -350,18 +363,18 @@ namespace zen::builder
     {
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
-        if (lhs->is(_byte()))
-            gen<eq_i8>(r, lhs, rhs);
+        if (lhs->is(_byte()) or lhs->is(_bool()))
+            gen<eq_i8>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<eq_i16>(r, lhs, rhs);
+            gen<eq_i16>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<eq_i32>(r, lhs, rhs);
+            gen<eq_i32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<eq_i64>(r, lhs, rhs);
+            gen<eq_i64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<eq_f32>(r, lhs, rhs);
+            gen<eq_f32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<eq_f64>(r, lhs, rhs);
+            gen<eq_f64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator==", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -383,18 +396,18 @@ namespace zen::builder
     {
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
-        if (lhs->is(_byte()))
-            gen<neq_i8>(r, lhs, rhs);
+        if (lhs->is(_byte()) or lhs->is(_bool()))
+            gen<neq_i8>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<neq_i16>(r, lhs, rhs);
+            gen<neq_i16>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<neq_i32>(r, lhs, rhs);
+            gen<neq_i32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<neq_i64>(r, lhs, rhs);
+            gen<neq_i64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<neq_f32>(r, lhs, rhs);
+            gen<neq_f32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<neq_f64>(r, lhs, rhs);
+            gen<neq_f64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator!=", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -417,17 +430,17 @@ namespace zen::builder
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
         if (lhs->is(_byte()))
-            gen<zen::lt_i8>(r, lhs, rhs);
+            gen<zen::lt_i8>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<zen::lt_i16>(r, lhs, rhs);
+            gen<zen::lt_i16>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<zen::lt_i32>(r, lhs, rhs);
+            gen<zen::lt_i32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<zen::lt_i64>(r, lhs, rhs);
+            gen<zen::lt_i64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<zen::lt_f32>(r, lhs, rhs);
+            gen<zen::lt_f32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<zen::lt_f64>(r, lhs, rhs);
+            gen<zen::lt_f64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator<", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -450,17 +463,17 @@ namespace zen::builder
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
         if (lhs->is(_byte()))
-            gen<lte_i8>(r, lhs, rhs);
+            gen<lte_i8>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<lte_i16>(r, lhs, rhs);
+            gen<lte_i16>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<lte_i32>(r, lhs, rhs);
+            gen<lte_i32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<lte_i64>(r, lhs, rhs);
+            gen<lte_i64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<lte_f32>(r, lhs, rhs);
+            gen<lte_f32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<lte_f64>(r, lhs, rhs);
+            gen<lte_f64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator<=", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -483,17 +496,17 @@ namespace zen::builder
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
         if (lhs->is(_byte()))
-            gen<zen::gt_i8>(r, lhs, rhs);
+            gen<zen::gt_i8>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<zen::gt_i16>(r, lhs, rhs);
+            gen<zen::gt_i16>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<zen::gt_i32>(r, lhs, rhs);
+            gen<zen::gt_i32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<zen::gt_i64>(r, lhs, rhs);
+            gen<zen::gt_i64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<zen::gt_f32>(r, lhs, rhs);
+            gen<zen::gt_f32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<zen::gt_f64>(r, lhs, rhs);
+            gen<zen::gt_f64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator>", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -516,17 +529,17 @@ namespace zen::builder
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
         if (lhs->is(_byte()))
-            gen<gte_i8>(r, lhs, rhs);
+            gen<gte_i8>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<gte_i16>(r, lhs, rhs);
+            gen<gte_i16>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<gte_i32>(r, lhs, rhs);
+            gen<gte_i32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<gte_i64>(r, lhs, rhs);
+            gen<gte_i64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<gte_f32>(r, lhs, rhs);
+            gen<gte_f32>(r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<gte_f64>(r, lhs, rhs);
+            gen<gte_f64>(r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator>=", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -599,20 +612,20 @@ namespace zen::builder
 
     void function::not_(const std::shared_ptr<value>& r, const std::shared_ptr<value>& val)
     {
-        gen<zen::boolean_not>(r, val);
+        gen<zen::boolean_not>(r, resolve(val));
     }
 
     void function::and_(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
         const std::shared_ptr<value>& rhs)
     {
-        gen<zen::boolean_and>(r, lhs, rhs);
+        gen<zen::boolean_and>(r, resolve(lhs), resolve(rhs));
     }
 
 
     void function::or_(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
         const std::shared_ptr<value>& rhs)
     {
-        gen<zen::boolean_or>(r, lhs, rhs);
+        gen<zen::boolean_or>(r, resolve(lhs), resolve(rhs));
     }
 
     void function::return_value(const std::shared_ptr<value>& r)
@@ -650,7 +663,7 @@ namespace zen::builder
 
     void function::go_if_not(const std::shared_ptr<value>& c, const std::shared_ptr<builder::label>& l)
     {
-        gen<zen::go_if_not>(c, 0, fmt::format("%{}", l->id));
+        gen<zen::go_if_not>(resolve(c), 0, fmt::format("%{}", l->id));
         l->use(code);
     }
 
@@ -748,9 +761,11 @@ namespace zen::builder
         const auto ptr = set_local(r->type, "deref::ptr");
         gen<zen::refer>(ptr, dest);
         ptr->is_reference = true;
-        gen<zen::copy>(ptr, r, (i64)pool.get(r->type->get_size()).get());
+        const auto size = (i64)pool.get(r->type->get_size()).get();
+        gen<zen::copy>(ptr, r, size, fmt::format("@size:{}", size));
         get_scope()->use_stack(-ptr->type->get_size());
-        gen<zen::most>(ptr->type->get_size());
+        const auto dereference_cost = ptr->type->get_size();
+        gen<zen::most>(dereference_cost, fmt::format("@dc:{}", dereference_cost));
         return dest;
     }
 

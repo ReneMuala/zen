@@ -51,6 +51,8 @@ namespace zen::builder
         std::shared_ptr<value> set_return(const std::shared_ptr<zen::builder::type>& t);
         [[nodiscard]] std::shared_ptr<value> set_local(const std::shared_ptr<zen::builder::type>& t,
                                                        const std::string& name, bool param = false);
+        std::shared_ptr<value> set_alias(const std::shared_ptr<zen::builder::value>& val,
+                                                       const std::string& name) const;
         void add(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
         void sub(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
         void mul(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs);
@@ -378,5 +380,9 @@ namespace zen::builder
     private:
         inline i64 get_stack_usage() const;
         void pop(bool final = false);
+        std::shared_ptr<value> resolve(const std::shared_ptr<value> & variable_or_ref)
+        {
+            return variable_or_ref->is_reference ? dereference(variable_or_ref) : variable_or_ref;
+        }
     };
 }
