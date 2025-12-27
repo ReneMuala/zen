@@ -38,7 +38,7 @@ namespace zen::builder
             for (const auto& [fst, snd] : fields)
             {
                 if (fst == name) return {{offset, snd}};
-                offset += snd->_size;
+                offset += snd->get_full_size();
             }
             return {};
         }
