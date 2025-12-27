@@ -9,6 +9,11 @@
 #include <sstream>
 
 #include "builder/table.hpp"
+#include "exceptions/link_error.hpp"
+#include "library/casting.hpp"
+#include "library/io.hpp"
+#include "library/string.hpp"
+#include "library/zen.hpp"
 
 #ifdef KAIZEN_WASM
 #include <emscripten.h>
@@ -47,11 +52,44 @@ try
 	}
 	const auto program = zen::builder::program::create();
 	const auto parser = builder_parser::make();
+	program->add(zen::library::zen::create(parser->pool));
+	program->add(zen::library::casting::create(parser->pool));
+	program->add(zen::library::string::create(parser->pool));
+	program->add(zen::library::io::create(parser->pool));
 	parser->prog = program;
 	program->add(parser->lib);
 	setup_parser(parser, std::string(code));
 	parser->discover();
 	parser->parse();
+	auto params = std::vector<std::shared_ptr<zen::builder::type>>{};
+	std::string hint;
+	if (const auto result = parser->tab->get_function("main",params, hint); result.has_value())
+	{
+		const auto main = result.value().second;
+		const auto entry_point = program->link(main);
+		fmt::println("compiled with {} word(s)", program->code.size());
+		if constexpr (false)
+		{
+			for (auto link : program->links)
+			{
+				for (auto lib : program->libraries)
+				{
+					if (auto fn = lib.second->get_function(link.first))
+					{
+						fmt::println("{} -> {}", link.second, fn->get_canonical_name());
+						break;
+					}
+				}
+			}
+		}
+		zen::vm vm;
+		vm.load(program->code);
+		vm.run(entry_point);
+		fmt::println("");
+	} else
+	{
+		throw zen::exceptions::link_error("failed to find main function");
+	}
 	return true;
 }
 catch (std::exception& e)
@@ -114,140 +152,33 @@ class point {
     )");
 #else
 	zen_run(R"(
-class point {
-    x: double
-    y: double
-	@debug
-    new(x: double, y: double) = {
-        this.x = x
-        this.y = y
-    }
-}
-class CC {
-	val: int
-	mul(x: int, y: int) = int(x*y)
-}
+	class person {
+		name: string
+		age: int
 
-class BB {
-	val: int
-	c: CC
-	sub(x: int, y: int) = int(x-y)
-	getC = CC(c)
-}
-class AA {
-	val: int
-	b: BB
-	sum(x: int, y: int) = int(x+y)
-	getB = BB(b)
-}
-@debug
-main3 = {
-	pt : point = point(2.0,3.0)
-	a: AA
-	x: int = a.getB().getC().mul(3,2)
-	y: bool = a.getB().getC().mul(3,2) > a.getB().getC().mul(2,4) == a.getB().getC().mul(3,2) < a.getB().getC().mul(2,4)
-	y: bool = a.getB().getC().mul(3,2) > a.getB().getC().mul(2,4) == a.getB().getC().mul(3,2) < a.getB().getC().mul(2,4)
-}
-class person {
-	name: string
-	surname: string
-	age: int
-	registered: bool
-}
-
-test = {
-	x: bool = person("Zendaya", 20).name == person("Zendaya", 20).name
-}
-
-sum(x: int, y: int) = int {
-	x + y
-}
-
-person(name: string, age: int) = person {
-	p: person
-	p.name = name
-	p.age = age
-	p
-}
-
-test_value_equality = bool {
-	1b == 1b &&
-	1s == 1s &&
-	1i == 1i &&
-	1 == 1 &&
-	1l == 1l &&
-	1.5f == 1.5f &&
-	1.5d == 1.5d &&
-	"1" == "1" &&
-	person("Zendaya", 20) == person("Zendaya", 20) &&
-	person("Zendaya", 20).name == person("Zendaya", 20).name &&
-	person("Zendaya", 20).age == person("Zendaya", 20).age &&
-	1 != 2 &&
-	1s != 2s &&
-	1i != 2i &&
-	1 != 2 &&
-	1l != 2l &&
-	1.5f != 2.5f &&
-	1.5d != 2.5d &&
-	"1" != "2" &&
-	person("Zendaya", 20) != person("Zenia", 20)
-}
-
-class Point {
-	x: double
-	y: double
-}
-
-operator >(a: Point, b: Point) = bool {
-	a.x > b.x && a.y > b.y
-}
-
-string(pt: Point) = string("")
-
-main = {
-	s: string
-	s = "Hello World!"
-	println(s)
-	if(test_value_equality()){
-		println("[test_value_equality: PASSED]")
-	} else {
-		println("[test_value_equality: FAILED]")
+		new(name: string,age: int) = {
+			this.name = name
+			this.age = age
+		}
 	}
-}
-		main2 = {
-			rows: int = 13
-			for(i: int = 1,rows,2){
-				for(j: int = (rows-i)/2, 1, -1){
-					print(" ")
-				}
-				for(k: int = 1, i){
-					print("*")
-				}
-				print("\n")
-			}
+
+	bool(p: person) = {}
+
+	example(x: int) = string("hello")
+
+	main = {
+		println(getZenVersion())
+		println("begin")
+		for(i: int = 1, 2){
+			p1: person = person("Rene",20)
+			println(p1.name)
+			println(string(p1.age))
 		}
-divide(x: int, y: int) = int {
-			if(y != 0){
-				x/y
-			} else {
-				println("[detected division by 0]")
-				0
-			}
-		}
-rect(lines: int, cols: int) = {
-			for(l: int = 1, lines){
-				for(c: int = 1, cols){
-					print("*")
-				}
-				println()
-			}
-		}
-	@extern
-	print(_:string) = unit
-	@extern
-	println(_:string) = unit
-	@extern
-	println() = unit
+		println("end")
+	}
+	by2(x: int) = int(x*2)
+	sum(x: int, y: int) = int(x+y)
+	sub(x: int, y: int) = int(x-y)
 	)");
 	// implement symbol manager
 	// implement deference wrappers
