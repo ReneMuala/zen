@@ -125,10 +125,10 @@ namespace zen::builder
     std::shared_ptr<value> function::set_return(const std::shared_ptr<zen::builder::type>& t)
     {
         std::shared_ptr<block> scp = get_scope();
-        // if (get_stack_usage())
-        // {
-        //     throw exceptions::semantic_error("return type cannot be set after params", offset);
-        // }
+        if (get_stack_usage())
+        {
+            throw exceptions::semantic_error("return type cannot be set after params", offset);
+        }
         signature->type = t;
         ret = std::make_shared<value>(
             t, 0 - /* jump callee IP */static_cast<types::stack::i64>(sizeof(
@@ -674,12 +674,6 @@ namespace zen::builder
             return std::unexpected(fmt::format("no matching args to call {}, expected {} got {}", fb->name,
                                                std::string(*fb->signature), builder::signature::describe_args(args)));
         const auto fb_hash = fb->hash();
-        std::shared_ptr<value> return_value;
-        if (fb->signature->type != _unit() and not fb->signature->is_allocator)
-        {
-            return_value = set_local(fb->signature->type, fmt::format("@ret::{}", fb->name, offset));
-        }
-        const auto scp = get_scope();
         std::vector<std::shared_ptr<value>> final_args;
         for (auto& val : args)
         {
@@ -699,13 +693,25 @@ namespace zen::builder
                 }
                 arg = cha;
             }
-            else if (arg->type->kind == type::kind::stack and arg->is_reference)
-            // deference fields only if they are stack allocated since nested objects are stored in a contiguous memory block
+            else if (arg->is_reference)
+                // deference fields only if they are stack allocated since nested objects are stored in a contiguous memory block
             {
-                arg = dereference(arg);
+                if (arg->type->kind == type::kind::stack)
+                {
+                    arg = dereference(arg);
+                } else
+                {
+                    arg = advance(arg);
+                }
             }
             final_args.push_back(arg);
         }
+        std::shared_ptr<value> return_value;
+        if (fb->signature->type != _unit() and not fb->signature->is_allocator)
+        {
+            return_value = set_local(fb->signature->type, fmt::format("@ret::{}", fb->name, offset));
+        }
+        const auto scp = get_scope();
         i64 call_cost = 0;
         for (auto& arg : final_args)
         {
@@ -758,15 +764,24 @@ namespace zen::builder
     std::shared_ptr<value> function::dereference(const std::shared_ptr<value>& r)
     {
         const auto dest = set_local(r->type, "deref::dest");
-        const auto ptr = set_local(r->type, "deref::ptr");
+        const auto ptr = set_local(zen::builder::function::_long(), "deref::ptr");
         gen<zen::refer>(ptr, dest);
         ptr->is_reference = true;
-        const auto size = (i64)pool.get(r->type->get_size()).get();
+        const auto size = r->type->get_size();
         gen<zen::copy>(ptr, r, size, fmt::format("@size:{}", size));
         get_scope()->use_stack(-ptr->type->get_size());
         const auto dereference_cost = ptr->type->get_size();
         gen<zen::most>(dereference_cost, fmt::format("@dc:{}", dereference_cost));
         return dest;
+    }
+
+    std::shared_ptr<value> function::advance(const std::shared_ptr<value>& r)
+    {
+        const auto adv = set_local(zen::builder::function::_long(), "adv::ptr");
+        adv->type = adv->type;
+        adv->no_destructor = true;
+        gen<zen::add_i64>(adv, r, constant<i64>(adv->offset));
+        return adv;
     }
 
     void function::branch(enum scope::type st,

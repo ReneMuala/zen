@@ -83,6 +83,7 @@ namespace zen::builder
         i64 hash() const;
         std::string get_canonical_name() const;
         std::shared_ptr<value> dereference(const std::shared_ptr<value>& r);
+        std::shared_ptr<value> advance(const std::shared_ptr<value>& r);
         void branch(enum builder::scope::type, const std::shared_ptr<value>& c, const std::function<void(const std::shared_ptr<builder::
                             function>&, const std::shared_ptr<builder::label>&,
                         const std::shared_ptr<builder::label>&)>&, const std::shared_ptr<builder::label>& pel = nullptr, const std::
@@ -288,7 +289,7 @@ namespace zen::builder
             code.push_back(ins);
             code.push_back(_1->address(get_stack_usage()));
             code.push_back(_2->address(get_stack_usage()));
-            code.push_back(_3);
+            code.push_back((i64)pool.get(_3).get());
 
             if (logging)
             {
@@ -324,7 +325,7 @@ namespace zen::builder
             const std::shared_ptr<block>& sc = get_scope(true);
             code.push_back(ins);
             code.push_back(_1->address(get_stack_usage()));
-            code.push_back(_2);
+            code.push_back(constant<i64>(_2)->address(get_stack_usage()));
 
             if (logging)
             {
