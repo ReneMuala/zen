@@ -57,6 +57,23 @@ namespace zen::builder
         return std::unexpected(fmt::format("no such field {} in unit", tokens[0]));
     }
 
+    std::shared_ptr<builder::value> table::get_field_or_throw(const std::shared_ptr<builder::value> &object, const std::string & field) const
+    {
+        auto pointer_handler = [&](std::shared_ptr<zen::builder::value> & ptr, const std::shared_ptr<zen::builder::value>& original) -> void
+        {
+            if (not ptr)
+                ptr = function->set_local(zen::builder::function::_long(), "temp::field");
+            else
+                function->gen<zen::add_i64>(ptr, original, ptr->offset, fmt::format("@offset:{}", ptr->offset));
+        };
+        std::shared_ptr<zen::builder::value> result_field;
+        if (auto result = builder::table::get_field(object, {field}, pointer_handler); not result.has_value())
+            throw exceptions::semantic_error(result.error(),0);
+        else
+            result_field = result.value();
+        return result_field;
+    }
+
     std::expected<std::shared_ptr<value>, std::string> table::get_value(
         const std::string& name, const std::function<void(std::shared_ptr<value>&, const std
                                                           ::shared_ptr<value>&)>& pointer_handler)
@@ -100,7 +117,7 @@ namespace zen::builder
     }
 
     std::expected<std::pair<std::shared_ptr<builder::value>,std::shared_ptr<builder::function>>, std::string> table::get_function(const std::string& name,
-         std::vector<std::shared_ptr<zen::builder::type>>& params)
+         std::vector<std::shared_ptr<zen::builder::type>>& params, std::string & hint)
     {
         std::shared_ptr<builder::function> target;
         std::shared_ptr<builder::value> object;
@@ -128,10 +145,31 @@ namespace zen::builder
                 target = r;
                 return std::pair{object, target};
             }
+            bool found = false;
+            for (const auto & fn : lib.second->functions)
+            {
+                if (target->name == fn.second->name)
+                {
+                    if (not found)
+                        hint += "\n\t- ";
+                    found = true;
+                    hint += fmt::format("{}, ", fn.second->get_canonical_name());
+                }
+            }
+            if (found and hint.size() > 2)
+            {
+                hint = fmt::format("{} [library: {}]", hint.substr(0, hint.size()-2), lib.second->name);
+            }
         }
         if (type and not name.starts_with("this."))
         {
-            return get_function("this." + name, params);
+            return get_function("this." + name, params, hint);
+        }
+        if (not hint.empty())
+        {
+            hint = fmt::format("available overloads: {}", hint);
+            return std::unexpected(fmt::format("no such overload {}",
+                                           target->get_canonical_name()));
         }
         return std::unexpected(fmt::format("no such function {}",
                                            target->get_canonical_name()));
@@ -139,7 +177,7 @@ namespace zen::builder
 
     std::expected<std::pair<std::shared_ptr<builder::value>, std::shared_ptr<builder::function>>, std::string> table::
     get_function(const std::shared_ptr<zen::builder::value>& object, const std::string& name,
-        std::vector<std::shared_ptr<zen::builder::type>>& params)
+        std::vector<std::shared_ptr<zen::builder::type>>& params, std::string & hint)
     {
         params.insert(params.begin(), object->type);
         auto target = function->create(object->type->name + name, params, nullptr);
@@ -153,9 +191,9 @@ namespace zen::builder
         }
         if (type and not name.starts_with("this."))
         {
-            return get_function("this." + name, params);
+            return get_function("this." + name, params, hint);
         }
-        return std::unexpected(fmt::format("no such function {}",
+        return std::unexpected(fmt::format("no such method {}",
                                            target->get_canonical_name()));
     }
 
