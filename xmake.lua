@@ -2,6 +2,10 @@ add_rules("mode.debug", "mode.release", "plugin.compile_commands.autoupdate")
 --add_requires("fmt", "asmjit", "libffi")
 add_requires("fmt", "gtest")
 
+version = "0.4.0"
+
+add_cxflags([[-DKAIZEN_VERSION=]] .. "\"" .. version .. "\"")
+
 if is_plat("wasm") then
     add_cxflags([[-DKAIZEN_WASM]])
     add_cxflags("-fexceptions")
