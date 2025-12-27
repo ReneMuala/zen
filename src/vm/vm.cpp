@@ -461,6 +461,7 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 i = this->code[i + 1] - 1;
                 break;
             case ret:
+                if (stack.empty()) return; // called from main
                 i = *static_cast<i64*>(stack - sizeof(i64)) - 1;
                 stack += sizeof(i64); // NOLINT
                 break;
@@ -490,7 +491,7 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 break;
             case copy:
                 // fmt::println("*({}){} = {}", *address<i64>(this->code[i + 3], stack), *address<i64>(this->code[i + 1], stack), *address<i64>(this->code[i + 2], stack));
-                // fmt::print("copy({},{},{}) ", *address<i64>(this->code[i + 1], stack), *address<i64>(this->code[i + 2], stack),*address<i64>(this->code[i + 3], stack));
+                // fmt::println("copy({},{},{}) ", *address<i64>(this->code[i + 1], stack), *address<i64>(this->code[i + 2], stack),*address<i64>(this->code[i + 3], stack));
                 // fmt::println("[i]: {}", i);
                 memcpy(reinterpret_cast<void*>(*address<i64>(this->code[i + 1], stack)),
                        reinterpret_cast<void*>(*address<i64>(this->code[i + 2], stack)),
