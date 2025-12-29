@@ -14,6 +14,7 @@
 #include "library/io.hpp"
 #include "library/string.hpp"
 #include "library/zen.hpp"
+#include "fmt/core.h"
 
 #ifdef KAIZEN_WASM
 #include <emscripten.h>
@@ -163,10 +164,21 @@ class point {
 	}
 
 	bool(p: person) = {}
-
+	@debug
+	main = {
+		println(string("hello".len()))
+		println(string("".empty()))
+		println(string("abc".at(1l)))
+		println("abc".slice(1l,11l))
+		println("[sub]")
+		println("abc".sub(1l,2l))
+		println("abc".sub(1l,1l))
+		println("abc".sub(0l,0l))
+	}
 	example(x: int) = string("hello")
 
-	main = {
+	test = {
+		println(getZenArt())
 		println(getZenVersion())
 		println("begin")
 		for(i: int = 1, 2){

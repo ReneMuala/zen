@@ -468,7 +468,14 @@ namespace zen::library::casting
     {
         const auto fn = zen::builder::function::create(pool, 0, false, "string");
         fn->set_return(zen::builder::function::_string());
-        fn->gen<zen::i8_to_str>(fn->ret, fn->set_parameter(zen::builder::function::_bool(), "it"));
+        fn->branch(zen::builder::scope::in_if, fn->set_parameter(zen::builder::function::_bool(), "it"), [&](auto &, auto & pel,auto& pen)
+        {
+            fn->return_value(fn->constant<std::string>("true"));
+            fn->branch(zen::builder::scope::in_else, nullptr, [&](auto &, auto &, auto&)
+            {
+                fn->return_value(fn->constant<std::string>("false"));
+            }, pel,pen);
+        });
         fn->return_implicitly();
         fn->build();
         return fn;
