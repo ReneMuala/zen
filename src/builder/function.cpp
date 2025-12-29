@@ -202,18 +202,19 @@ namespace zen::builder
     {
         assert_same_type("add", lhs, rhs, offset);
         assert_same_type("assign", r, lhs, offset);
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
         if (lhs->is(_byte()))
-            gen<zen::add_i8>(r, resolve(lhs), resolve(rhs));
+            gen<zen::add_i8>(temp_srh ? temp_srh : temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<zen::add_i16>(r, resolve(lhs), resolve(rhs));
+            gen<zen::add_i16>(temp_srh ? temp_srh : temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<zen::add_i32>(r, resolve(lhs), resolve(rhs));
+            gen<zen::add_i32>(temp_srh ? temp_srh : temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<zen::add_i64>(r, resolve(lhs), resolve(rhs));
+            gen<zen::add_i64>(temp_srh ? temp_srh : temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<zen::add_f32>(r, resolve(lhs), resolve(rhs));
+            gen<zen::add_f32>(temp_srh ? temp_srh : temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<zen::add_f64>(r, resolve(lhs), resolve(rhs));
+            gen<zen::add_f64>(temp_srh ? temp_srh : temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator+", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -228,6 +229,10 @@ namespace zen::builder
         }
         else
             throw exceptions::semantic_error(fmt::format("cannot add type {}", lhs->type->name), offset);
+        if (temp_srh)
+        {
+            move(r, temp_srh);
+        }
     }
 
     void function::sub(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -235,18 +240,19 @@ namespace zen::builder
     {
         assert_same_type("subtract", lhs, rhs, offset);
         assert_same_type("assign", r, lhs, offset);
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
         if (lhs->is(_byte()))
-            gen<zen::sub_i8>(r, resolve(lhs), resolve(rhs));
+            gen<zen::sub_i8>(temp_srh ? temp_srh : temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<zen::sub_i16>(r, resolve(lhs), resolve(rhs));
+            gen<zen::sub_i16>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<zen::sub_i32>(r, resolve(lhs), resolve(rhs));
+            gen<zen::sub_i32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<zen::sub_i64>(r, resolve(lhs), resolve(rhs));
+            gen<zen::sub_i64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<zen::sub_f32>(r, resolve(lhs), resolve(rhs));
+            gen<zen::sub_f32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<zen::sub_f64>(r, resolve(lhs), resolve(rhs));
+            gen<zen::sub_f64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator-", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -261,6 +267,10 @@ namespace zen::builder
         }
         else
             throw exceptions::semantic_error(fmt::format("cannot subtract type {}", lhs->type->name), offset);
+        if (temp_srh)
+        {
+            move(r, temp_srh);
+        }
     }
 
     void function::mul(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -268,18 +278,19 @@ namespace zen::builder
     {
         assert_same_type("multiply", lhs, rhs, offset);
         assert_same_type("assign", r, lhs, offset);
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
         if (lhs->is(_byte()))
-            gen<zen::mul_i8>(r, resolve(lhs), resolve(rhs));
+            gen<zen::mul_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<zen::mul_i16>(r, resolve(lhs), resolve(rhs));
+            gen<zen::mul_i16>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<zen::mul_i32>(r, resolve(lhs), resolve(rhs));
+            gen<zen::mul_i32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<zen::mul_i64>(r, resolve(lhs), resolve(rhs));
+            gen<zen::mul_i64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<zen::mul_f32>(r, resolve(lhs), resolve(rhs));
+            gen<zen::mul_f32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<zen::mul_f64>(r, resolve(lhs), resolve(rhs));
+            gen<zen::mul_f64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator*", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -294,6 +305,10 @@ namespace zen::builder
         }
         else
             throw exceptions::semantic_error(fmt::format("cannot multiply type {}", lhs->type->name), offset);
+        if (temp_srh)
+        {
+            move(r, temp_srh);
+        }
     }
 
     void function::div(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -301,18 +316,19 @@ namespace zen::builder
     {
         assert_same_type("divide", lhs, rhs, offset);
         assert_same_type("assign", r, lhs, offset);
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
         if (lhs->is(_byte()))
-            gen<zen::div_i8>(r, resolve(lhs), resolve(rhs));
+            gen<zen::div_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<zen::div_i16>(r, resolve(lhs), resolve(rhs));
+            gen<zen::div_i16>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<zen::div_i32>(r, resolve(lhs), resolve(rhs));
+            gen<zen::div_i32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<zen::div_i64>(r, resolve(lhs), resolve(rhs));
+            gen<zen::div_i64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<zen::div_f32>(r, resolve(lhs), resolve(rhs));
+            gen<zen::div_f32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<zen::div_f64>(r, resolve(lhs), resolve(rhs));
+            gen<zen::div_f64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator/", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -327,6 +343,10 @@ namespace zen::builder
         }
         else
             throw exceptions::semantic_error(fmt::format("cannot divide type {}", lhs->type->name), offset);
+        if (temp_srh)
+        {
+            move(r, temp_srh);
+        }
     }
 
     void function::mod(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -334,14 +354,15 @@ namespace zen::builder
     {
         assert_same_type("mod", lhs, rhs, offset);
         assert_same_type("assign", r, lhs, offset);
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
         if (lhs->is(_byte()))
-            gen<zen::mod_i8>(r, resolve(lhs), resolve(rhs));
+            gen<zen::mod_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<zen::mod_i16>(r, resolve(lhs), resolve(rhs));
+            gen<zen::mod_i16>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<zen::mod_i32>(r, resolve(lhs), resolve(rhs));
+            gen<zen::mod_i32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<zen::mod_i64>(r, resolve(lhs), resolve(rhs));
+            gen<zen::mod_i64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator%", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -356,6 +377,10 @@ namespace zen::builder
         }
         else
             throw exceptions::semantic_error(fmt::format("cannot compute module for type {}", lhs->type->name), offset);
+        if (temp_srh)
+        {
+            move(r, temp_srh);
+        }
     }
 
     void function::equal(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -363,18 +388,19 @@ namespace zen::builder
     {
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
         if (lhs->is(_byte()) or lhs->is(_bool()))
-            gen<eq_i8>(r, resolve(lhs), resolve(rhs));
+            gen<eq_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<eq_i16>(r, resolve(lhs), resolve(rhs));
+            gen<eq_i16>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<eq_i32>(r, resolve(lhs), resolve(rhs));
+            gen<eq_i32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<eq_i64>(r, resolve(lhs), resolve(rhs));
+            gen<eq_i64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<eq_f32>(r, resolve(lhs), resolve(rhs));
+            gen<eq_f32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<eq_f64>(r, resolve(lhs), resolve(rhs));
+            gen<eq_f64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator==", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -389,6 +415,10 @@ namespace zen::builder
         }
         else
             throw exceptions::semantic_error(fmt::format("cannot compare type {}", lhs->type->name), offset);
+        if (temp_srh)
+        {
+            move(r, temp_srh);
+        }
     }
 
     void function::not_equal(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -396,18 +426,19 @@ namespace zen::builder
     {
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
         if (lhs->is(_byte()) or lhs->is(_bool()))
-            gen<neq_i8>(r, resolve(lhs), resolve(rhs));
+            gen<neq_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<neq_i16>(r, resolve(lhs), resolve(rhs));
+            gen<neq_i16>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<neq_i32>(r, resolve(lhs), resolve(rhs));
+            gen<neq_i32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<neq_i64>(r, resolve(lhs), resolve(rhs));
+            gen<neq_i64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<neq_f32>(r, resolve(lhs), resolve(rhs));
+            gen<neq_f32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<neq_f64>(r, resolve(lhs), resolve(rhs));
+            gen<neq_f64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator!=", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -422,6 +453,10 @@ namespace zen::builder
         }
         else
             throw exceptions::semantic_error(fmt::format("cannot compare type {}", lhs->type->name), offset);
+        if (temp_srh)
+        {
+            move(r, temp_srh);
+        }
     }
 
     void function::lower(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -429,18 +464,19 @@ namespace zen::builder
     {
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
         if (lhs->is(_byte()))
-            gen<zen::lt_i8>(r, resolve(lhs), resolve(rhs));
+            gen<zen::lt_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<zen::lt_i16>(r, resolve(lhs), resolve(rhs));
+            gen<zen::lt_i16>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<zen::lt_i32>(r, resolve(lhs), resolve(rhs));
+            gen<zen::lt_i32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<zen::lt_i64>(r, resolve(lhs), resolve(rhs));
+            gen<zen::lt_i64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<zen::lt_f32>(r, resolve(lhs), resolve(rhs));
+            gen<zen::lt_f32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<zen::lt_f64>(r, resolve(lhs), resolve(rhs));
+            gen<zen::lt_f64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator<", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -455,6 +491,10 @@ namespace zen::builder
         }
         else
             throw exceptions::semantic_error(fmt::format("cannot compare type {}", lhs->type->name), offset);
+        if (temp_srh)
+        {
+            move(r, temp_srh);
+        }
     }
 
     void function::lower_equal(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -462,18 +502,19 @@ namespace zen::builder
     {
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
         if (lhs->is(_byte()))
-            gen<lte_i8>(r, resolve(lhs), resolve(rhs));
+            gen<lte_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<lte_i16>(r, resolve(lhs), resolve(rhs));
+            gen<lte_i16>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<lte_i32>(r, resolve(lhs), resolve(rhs));
+            gen<lte_i32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<lte_i64>(r, resolve(lhs), resolve(rhs));
+            gen<lte_i64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<lte_f32>(r, resolve(lhs), resolve(rhs));
+            gen<lte_f32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<lte_f64>(r, resolve(lhs), resolve(rhs));
+            gen<lte_f64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator<=", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -488,6 +529,10 @@ namespace zen::builder
         }
         else
             throw exceptions::semantic_error(fmt::format("cannot compare type {}", lhs->type->name), offset);
+        if (temp_srh)
+        {
+            move(r, temp_srh);
+        }
     }
 
     void function::greater(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -495,18 +540,19 @@ namespace zen::builder
     {
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
         if (lhs->is(_byte()))
-            gen<zen::gt_i8>(r, resolve(lhs), resolve(rhs));
+            gen<zen::gt_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<zen::gt_i16>(r, resolve(lhs), resolve(rhs));
+            gen<zen::gt_i16>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<zen::gt_i32>(r, resolve(lhs), resolve(rhs));
+            gen<zen::gt_i32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<zen::gt_i64>(r, resolve(lhs), resolve(rhs));
+            gen<zen::gt_i64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<zen::gt_f32>(r, resolve(lhs), resolve(rhs));
+            gen<zen::gt_f32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<zen::gt_f64>(r, resolve(lhs), resolve(rhs));
+            gen<zen::gt_f64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator>", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -521,6 +567,10 @@ namespace zen::builder
         }
         else
             throw exceptions::semantic_error(fmt::format("cannot compare type {}", lhs->type->name), offset);
+        if (temp_srh)
+        {
+            move(r, temp_srh);
+        }
     }
 
     void function::greater_equal(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
@@ -528,18 +578,19 @@ namespace zen::builder
     {
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
         if (lhs->is(_byte()))
-            gen<gte_i8>(r, resolve(lhs), resolve(rhs));
+            gen<gte_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
-            gen<gte_i16>(r, resolve(lhs), resolve(rhs));
+            gen<gte_i16>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_int()))
-            gen<gte_i32>(r, resolve(lhs), resolve(rhs));
+            gen<gte_i32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_long()))
-            gen<gte_i64>(r, resolve(lhs), resolve(rhs));
+            gen<gte_i64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_float()))
-            gen<gte_f32>(r, resolve(lhs), resolve(rhs));
+            gen<gte_f32>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_double()))
-            gen<gte_f64>(r, resolve(lhs), resolve(rhs));
+            gen<gte_f64>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->type->kind == builder::type::heap)
         {
             if (const auto result = call(create("operator>=", {lhs->type, rhs->type}, r->type), {lhs, rhs}); result.
@@ -554,6 +605,10 @@ namespace zen::builder
         }
         else
             throw exceptions::semantic_error(fmt::format("cannot compare type {}", lhs->type->name), offset);
+        if (temp_srh)
+        {
+            move(r, temp_srh);
+        }
     }
 
     void function::move(const std::shared_ptr<value>& lhs, const std::shared_ptr<value>& rhs)
@@ -612,20 +667,35 @@ namespace zen::builder
 
     void function::not_(const std::shared_ptr<value>& r, const std::shared_ptr<value>& val)
     {
-        gen<zen::boolean_not>(r, resolve(val));
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
+        gen<zen::boolean_not>(temp_srh ? temp_srh : r, resolve(val));
+        if (temp_srh)
+        {
+            move(r, temp_srh);
+        }
     }
 
     void function::and_(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
         const std::shared_ptr<value>& rhs)
     {
-        gen<zen::boolean_and>(r, resolve(lhs), resolve(rhs));
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
+        gen<zen::boolean_and>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
+        if (temp_srh)
+        {
+            move(r, temp_srh);
+        }
     }
 
 
     void function::or_(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
         const std::shared_ptr<value>& rhs)
     {
-        gen<zen::boolean_or>(r, resolve(lhs), resolve(rhs));
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
+        gen<zen::boolean_or>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
+        if (temp_srh)
+        {
+            move(r, temp_srh);
+        }
     }
 
     void function::return_value(const std::shared_ptr<value>& r)
@@ -717,6 +787,8 @@ namespace zen::builder
         {
             if (arg->is(_byte()))
                 gen<zen::push_i8>(arg);
+            else if (arg->is(_bool()))
+                gen<zen::push_boolean>(arg);
             else if (arg->is(_short()))
                 gen<zen::push_i16>(arg);
             else if (arg->is(_int()))
@@ -728,7 +800,7 @@ namespace zen::builder
             else if (arg->is(_double()))
                 gen<zen::push_f64>(arg);
             else
-                gen<zen::push_f64>(arg);
+                gen<zen::push_i64>(arg);
             scp->use_stack(arg->type->get_size());
             call_cost += arg->type->get_size();
         }
