@@ -126,7 +126,8 @@ break;
 case T##_to_str:\
     {\
         auto _str = std::to_string(*address<T>(this->code[i + 2], stack));\
-        free((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8));\
+        auto addr = (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8);\
+        if(addr) {free(addr);}\
         *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str()));\
         *(i64*)(*address<i64>(this->code[i + 1], stack)) = _str.length();\
     }\
@@ -271,7 +272,7 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                         }
                         stack_usage -= sti;
                     }
-                    fmt::print("{} ({})\n", i, code[i]);
+                    fmt::println("[{}]: {}", i, code[i]);
                     if (false)
                     {
                         std::string line;
@@ -319,28 +320,36 @@ void zen::vm::run(stack& stack, const i64& entry_point)
             KAIZEN_IO_WRITE_FOR_SCALAR_TYPE(boolean)
             case add_str:
                 {
-                    const i64 new_length = *(i64*)(*address<i64>(this->code[i + 2], stack)) + *(i64*)(*address<i64>(this->code[i + 3], stack));
-                    char * new_str = (char*)malloc(new_length);
-                    free((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8));
-                    strncpy(new_str, (char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), *(i64*)(*address<i64>(this->code[i + 2], stack)));
-                    strncpy(new_str + *(i64*)(*address<i64>(this->code[i + 2], stack)), (char*)*(i64*)(*address<i64>(this->code[i + 3], stack) + 8), *(i64*)(*address<i64>(this->code[i + 3], stack)));
+                    const i64 new_length = *(i64*)(*address<i64>(this->code[i + 2], stack)) + *(i64*)(*address<i64>(
+                        this->code[i + 3], stack));
+                    char* new_str = (char*)malloc(new_length);
+                    const auto addr = (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8);
+                    if (addr) { free(addr); }
+                    strncpy(new_str, (char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8),
+                            *(i64*)(*address<i64>(this->code[i + 2], stack)));
+                    strncpy(new_str + *(i64*)(*address<i64>(this->code[i + 2], stack)),
+                            (char*)*(i64*)(*address<i64>(this->code[i + 3], stack) + 8),
+                            *(i64*)(*address<i64>(this->code[i + 3], stack)));
                     *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = (i64)new_str;
                     *(i64*)(*address<i64>(this->code[i + 1], stack)) = new_length;
                 }
-                i+=3;
+                i += 3;
                 break;
             case eq_str:
                 {
-                    const auto size1 =  *(i64*)*address<i64>(this->code[i + 2], stack);
+                    const auto size1 = *(i64*)*address<i64>(this->code[i + 2], stack);
                     const auto size2 = *(i64*)*address<i64>(this->code[i + 3], stack);
-                    *address<boolean>(this->code[i + 1], stack) = (size1 == size2) and std::strncmp((char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), (char*)*(i64*)(*address<i64>(this->code[i + 3], stack) + 8), size1) == 0;
+                    *address<boolean>(this->code[i + 1], stack) = (size1 == size2) and std::strncmp(
+                        (char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8),
+                        (char*)*(i64*)(*address<i64>(this->code[i + 3], stack) + 8), size1) == 0;
                 }
-               i += 3;
+                i += 3;
                 break;
             case i8_to_str:
                 {
                     auto _str = std::string{*address<i8>(this->code[i + 2], stack)};
-                    free((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8));
+                    const auto addr = (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8);
+                    if (addr) { free(addr); }
                     *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str()));
                     *(i64*)(*address<i64>(this->code[i + 1], stack)) = _str.length();
                 }
@@ -350,7 +359,19 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                     (char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr, 10);
                 i += 2;
                 break;
-            case i16_to_str: { auto _str = std::to_string(*address<i16>(this->code[i + 2], stack)); free((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8)); *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str())); *(i64*)(*address<i64>(this->code[i + 1], stack)) = _str.length(); } i+=2; break; case str_to_i16: *address<i64>(this->code[i + 1], stack) = strtol((char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr, 10);                i += 2;
+            case i16_to_str:
+                {
+                    auto _str = std::to_string(*address<i16>(this->code[i + 2], stack));
+                    const auto addr = (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8);
+                    if (addr) { free(addr); }
+                    *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str()));
+                    *(i64*)(*address<i64>(this->code[i + 1], stack)) = _str.length();
+                }
+                i += 2;
+                break;
+            case str_to_i16: *address<i64>(this->code[i + 1], stack) = strtol(
+                    (char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr, 10);
+                i += 2;
                 break;
             KAIZEN_STRING_CONVERSION_FOR_INTEGER_TYPE(i32, strtol)
             KAIZEN_STRING_CONVERSION_FOR_INTEGER_TYPE(i64, strtoll)
@@ -361,7 +382,8 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                     auto result = std::to_chars((char*)buffer, (char*)(buffer + size),
                                                 *address<f64>(this->code[i + 2], stack), std::chars_format::general);
                     auto _str = std::string(buffer);
-                    free((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8));
+                    const auto addr = (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8);
+                    if (addr) { free(addr); }
                     *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str()));
                     *(i64*)(*address<i64>(this->code[i + 1], stack)) = _str.length();
                 }
@@ -379,7 +401,8 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                     auto result = std::to_chars((char*)buffer, (char*)(buffer + size),
                                                 *address<f32>(this->code[i + 2], stack), std::chars_format::general);
                     auto _str = std::string(buffer);
-                    free((char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8));
+                    const auto addr = (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8);
+                    if (addr) { free(addr); }
                     *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str()));
                     *(i64*)(*address<i64>(this->code[i + 1], stack)) = _str.length();
                 }
@@ -470,7 +493,9 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                     *address<i64>(this->code[i + 2], stack)));
                 if (not*address<i64>(this->code[i + 1], stack))
                 {
-                    throw std::runtime_error(fmt::format("fatal error: out of heap memory (zen vm halted at {}) should allocate {} byte(s)", i, *address<i64>(this->code[i + 2], stack)));
+                    throw std::runtime_error(fmt::format(
+                        "fatal error: out of heap memory (zen vm halted at {}) should allocate {} byte(s)", i,
+                        *address<i64>(this->code[i + 2], stack)));
                 }
                 std::memset((void*)*address<i64>(this->code[i + 1], stack), 0, *address<i64>(this->code[i + 2], stack));
                 i += 2;
