@@ -189,12 +189,33 @@ namespace zen::builder
                 return std::pair{object, target};
             }
         }
-        if (type and not name.starts_with("this."))
+        const auto dotted_class_name = fmt::format("{}.", object->type->name);
+        for (const auto& lib : program->libraries)
         {
-            return get_function("this." + name, params, hint);
+            bool found = false;
+            for (const auto & fn : lib.second->functions)
+            {
+                if (fn.second->name.starts_with(dotted_class_name))
+                {
+                    if (not found)
+                        hint += "\n\t- ";
+                    found = true;
+                    hint += fmt::format("{}, ", fn.second->get_canonical_name());
+                }
+            }
+            if (found and hint.size() > 2)
+            {
+                hint = fmt::format("{} [library: {}]", hint.substr(0, hint.size()-2), lib.second->name);
+            }
         }
-        return std::unexpected(fmt::format("no such method {}",
+        if (not hint.empty())
+        {
+            hint = fmt::format("available overloads: {}", hint);
+            return std::unexpected(fmt::format("no such overload {}",
                                            target->get_canonical_name()));
+        }
+        return std::unexpected(fmt::format("no such method {} found in class {}",
+                                           target->get_canonical_name(), object->type->name));
     }
 
     std::expected<std::shared_ptr<struct type>, std::string> table::get_type(const std::string& name)
