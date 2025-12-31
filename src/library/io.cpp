@@ -2,7 +2,7 @@
 // Created by dte on 12/16/2025.
 //
 
-#include "string.hpp"
+#include "io.hpp"
 
 #include "builder/table.hpp"
 
@@ -32,13 +32,24 @@ namespace zen::library::io
         return fn;
     }
 
+    inline std::shared_ptr<builder::function> create_println(utils::constant_pool & pool, std::shared_ptr<zen::builder::function> print_str)
+    {
+        const auto fn = zen::builder::function::create(pool, 0,false, "println");
+        if (auto r = fn->call(print_str, {fn->constant<std::string>("\n")}); not r.has_value())
+            throw zen::exceptions::semantic_error(r.error(), 0);
+        fn->build();
+        return fn;
+    }
+
     std::shared_ptr<zen::builder::library> create(utils::constant_pool & pool)
     {
         std::shared_ptr<zen::builder::library> library = zen::builder::library::create("io");
         const auto print_str = create_print_string(pool);
         const auto println_str = create_println_string(pool, print_str);
+        const auto println = create_println(pool, println_str);
         library->add(print_str);
         library->add(println_str);
+        library->add(println);
         return library;
     }
 }
