@@ -28,8 +28,9 @@ BEGIN_ILC_CODEGEN(builder_parser)
     zen::utils::constant_pool pool;
     std::stack<std::shared_ptr<zen::builder::value>> values;
     std::shared_ptr<zen::builder::label> temp_pel, temp_pen;
-    bool at_logging = false;
+    bool at_debug = false;
     bool at_extern = false;
+    bool at_test = false;
     bool pragma_dangling_return_value = false;
 
     std::string id, type, value;
@@ -301,7 +302,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
         std::vector<std::shared_ptr<zen::builder::value>> args;
         if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
         {
-            fun = zen::builder::function::create(pool, offset, at_logging, decorator);
+            fun = zen::builder::function::create(pool, offset, at_debug, decorator);
             tab = zen::builder::table::create(fun, class_);
             do
             {
@@ -318,12 +319,17 @@ BEGIN_ILC_CODEGEN(builder_parser)
         if (decorator == "@debug" and args.empty() or (args.size() == 1 and args.at(0)->type ==
             zen::builder::function::_bool()))
         {
-            at_logging = args.empty() or *(bool*)args[0]->address(0);
+            at_debug = args.empty() or *(bool*)args[0]->address(0);
         }
         else if (decorator == "@extern" and args.empty() or (args.size() == 1 and args.at(0)->type ==
             zen::builder::function::_bool()))
         {
             at_extern = args.empty() or *(bool*)args[0]->address(0);
+        }
+        else if (decorator == "@test" and args.empty() or (args.size() == 1 and args.at(0)->type ==
+                   zen::builder::function::_bool()))
+        {
+            at_test = args.empty() or *(bool*)args[0]->address(0);
         }
         else
         {
@@ -331,7 +337,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
                 fmt::format("no such decorator {}{}", decorator, zen::builder::signature::describe_args(args)), offset);
         }
 
-        if (at_logging and at_extern)
+        if (at_debug and at_extern)
         {
             throw zen::exceptions::semantic_error("cannot mix @debug with @extern", offset);
         }
@@ -389,9 +395,9 @@ BEGIN_ILC_CODEGEN(builder_parser)
                 function_name = fmt::format("{}.{}", class_->name, function_name);
             }
         }
-        fun = zen::builder::function::create(pool, offset, at_logging, function_name);
+        fun = zen::builder::function::create(pool, offset, at_debug, function_name);
         tab = zen::builder::table::create(fun, class_, prog);
-        if (at_logging)
+        if (at_debug)
         {
             fmt::println("{}", fun->name);
         }
@@ -407,6 +413,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
             {
                 if (TRY_REQUIRE_NON_TERMINAL(NID))
                 {
+                    if (at_test) throw zen::exceptions::semantic_error("@test function cannot have parameters", offset);
                     const std::string name = id;
                     REQUIRE_TERMINAL_CALLBACK(TCOLON, EXPECTED(":"))
                     type.clear();
@@ -443,8 +450,13 @@ BEGIN_ILC_CODEGEN(builder_parser)
                 throw zen::exceptions::semantic_error(result.error(), offset);
             }
         }
+        if (at_test and fun->signature->type != zen::builder::function::_bool())
+        {
+            throw zen::exceptions::semantic_error("@test function must return bool", offset);
+        }
         if (class_)
         {
+            if (at_test) throw zen::exceptions::semantic_error("method cannot be marked as @test", offset);
             if (is_constructor)
             {
                 fun->set_alias(fun->set_return(class_), "this");
@@ -461,6 +473,11 @@ BEGIN_ILC_CODEGEN(builder_parser)
         }
         lib->add(fun);
         fun->is_extern = at_extern;
+        if (at_test)
+        {
+            lib->add_test(fun);
+        }
+        at_test = false;
         at_extern = false;
     END_PRODUCTION
 
@@ -485,7 +502,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
             }
             fun->build();
         }
-        at_logging = false;
+        at_debug = false;
     END_PRODUCTION
 
     BEGIN_PRODUCTION(META_PRODUCTION_NFOR)
@@ -497,20 +514,29 @@ BEGIN_ILC_CODEGEN(builder_parser)
             REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
         }*/
         REQUIRE_TERMINAL(TCOLON)
-        REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
         std::vector<std::shared_ptr<zen::builder::value>> for_params;
-        if (auto result = tab->get_type(type); result.has_value())
+        // REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
+        if (TRY_REQUIRE_NON_TERMINAL(NTYPE))
         {
-            for_params.push_back(fun->set_local(result.value(), iterator));
-        }
-        else
+            if (auto result = tab->get_type(type); result.has_value())
+            {
+                for_params.push_back(fun->set_local(result.value(), iterator));
+            }
+            else
+            {
+                throw zen::exceptions::semantic_error(result.error(), offset);
+            }
+            REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
+            REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
+            for_params.push_back(pop());
+        } else
         {
-            throw zen::exceptions::semantic_error(result.error(), offset);
+            REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
+            REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
+            const auto begin = pop();
+            for_params.push_back(fun->set_local(begin->type, iterator));
+            for_params.push_back(begin);
         }
-        REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
-        // composer->begin_block();
-        REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
-        for_params.push_back(pop());
         REQUIRE_TERMINAL_CALLBACK(TCOMMA, EXPECTED(","))
         REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
         for_params.push_back(pop());
@@ -739,7 +765,13 @@ BEGIN_ILC_CODEGEN(builder_parser)
     BEGIN_PRODUCTION(PRODUCTION_NVAL_NEGATE_VAL)
         REQUIRE_TERMINAL(TMINUS)
         REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
-        const auto it = pop();
+        auto it = pop();
+        if (it->kind == zen::builder::value::constant)
+        {
+            auto _it = fun->set_local(it->type, "temp::negate_constant");
+            fun->move(_it, it);
+            it = _it;
+        }
         fun->mul(it, it, fun->constant(-1, it->type));
         it->is_negated = true;
         push(it);
@@ -800,21 +832,32 @@ BEGIN_ILC_CODEGEN(builder_parser)
         const auto name = id;
         REQUIRE_TERMINAL(TCOLON)
         type.clear();
-        REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
-        std::shared_ptr<zen::builder::value> local;
-        if (auto result = tab->get_type(id); result.has_value())
+        // REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
+        if (TRY_REQUIRE_NON_TERMINAL(NTYPE))
         {
-            local = fun->set_local(result.value(), name);
+            std::shared_ptr<zen::builder::value> local;
+            if (auto result = tab->get_type(id); result.has_value())
+            {
+                local = fun->set_local(result.value(), name);
+            }
+            else
+            {
+                throw zen::exceptions::semantic_error(result.error(), offset);
+            }
+            if (TRY_REQUIRE_TERMINAL(TEQU))
+            {
+                push(local);
+                offset--;
+                REQUIRE_NON_TERMINAL_CALLBACK(NSUFFIX_ASGN, EXPECTED("ASSIGNMENT"))
+            }
         }
         else
         {
-            throw zen::exceptions::semantic_error(result.error(), offset);
-        }
-        if (TRY_REQUIRE_TERMINAL(TEQU))
-        {
-            push(local);
-            offset--;
-            REQUIRE_NON_TERMINAL_CALLBACK(NSUFFIX_ASGN, EXPECTED("ASSIGNMENT"))
+            REQUIRE_TERMINAL(TEQU);
+            REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("value"))
+            auto rhs = pop();
+            auto local = fun->set_local(rhs->type, name);
+            fun->move(local, rhs);
         }
     END_PRODUCTION
 
@@ -870,6 +913,9 @@ BEGIN_ILC_CODEGEN(builder_parser)
             else if (offset < chain_size)
             {
                 offset++; // ignore anything else
+            } else
+            {
+                break;
             }
         }
     END_PRODUCTION
@@ -925,10 +971,50 @@ BEGIN_ILC_CODEGEN(builder_parser)
         return fun;
     }
 
+inline std::shared_ptr<zen::builder::function> create_equals(const std::shared_ptr<zen::builder::type>& type)
+        {
+            const auto fun = zen::builder::function::create(pool, 0, false, fmt::format("operator==", type->name));
+            fun->set_return(zen::builder::function::_bool());
+            const auto lhs = fun->set_parameter(type, "lhs");
+            const auto rhs = fun->set_parameter(type, "rhs");
+            fun->move(fun->ret, fun->constant<zen::boolean>(true));
+            const auto tab = zen::builder::table::create(fun);
+            const auto temp = fun->set_local(zen::builder::function::_bool(), "temp");
+            for (const auto& field_pair : type->fields)
+            {
+                const auto lhs_field = tab->get_field_or_throw(lhs, field_pair.first);
+                const auto rhs_field = tab->get_field_or_throw(rhs, field_pair.first);
+                fun->equal(temp, lhs_field, rhs_field);
+                fun->and_(fun->ret, fun->ret, temp);
+            }
+            fun->return_implicitly();
+            fun->build();
+            return fun;
+        }
+
+inline std::shared_ptr<zen::builder::function> create_not_equals(const std::shared_ptr<zen::builder::type>& type)
+        {
+            const auto fun = zen::builder::function::create(pool, 0, false, fmt::format("operator!=", type->name));
+            fun->set_return(zen::builder::function::_bool());
+            const auto lhs = fun->set_parameter(type, "lhs");
+            const auto rhs = fun->set_parameter(type, "rhs");
+            if (const auto result = fun->call(fun->create("operator==", std::vector<std::shared_ptr<zen::builder::type>>{lhs->type, rhs->type}, fun->ret->type), {lhs, rhs});not result.has_value())
+            {
+                throw zen::exceptions::semantic_error(result.error(), offset);
+            } else
+            {
+                const auto negation = fun->set_local(zen::builder::function::_bool(), "negation");
+                fun->not_(negation,result.value());
+                fun->return_value(negation);
+            }
+            fun->build();
+            return fun;
+        }
+
     BEGIN_PRODUCTION(META_PRODUCTION_GLOBAL_DISCOVERY)
         while (offset < chain_size)
         {
-            if (at_logging) at_logging = false;
+            if (at_debug) at_debug = false;
             if (TRY_REQUIRE_NON_TERMINAL(NFUNCTION_DEFINITION_PREFIX))
             {
                 REQUIRE_NON_TERMINAL(META_NANY_BODY)
@@ -950,6 +1036,8 @@ BEGIN_ILC_CODEGEN(builder_parser)
                 lib->add(create_allocator(class_));
                 lib->add(create_deallocator(class_));
                 lib->add(create_mover(class_));
+                lib->add(create_equals(class_));
+                lib->add(create_not_equals(class_));
                 class_ = nullptr;
                 REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
             }
@@ -1388,7 +1476,12 @@ END_SYMBOL_BINDING
         compilation_id++;
         offset = 0;
         META_PRODUCTION_GLOBAL_STAT();
-        return offset == chain_size;
+            bool success = offset == chain_size;
+            if (not success)
+            {
+                EXPECTED("class, function or decorator")();
+            }
+        return success;
     }
 
 END_ILC_CODEGEN(builder_parser)
