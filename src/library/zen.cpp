@@ -10,7 +10,7 @@
 #define KAIZEN_VERSION "unspecified"
 #endif
 
-namespace zen::library::zen
+namespace zen::library::_zen
 {
     inline std::shared_ptr<builder::function> create_get_zen_version(utils::constant_pool & pool)
     {
