@@ -1,6 +1,6 @@
 add_rules("mode.debug", "mode.release", "plugin.compile_commands.autoupdate")
 --add_requires("fmt", "asmjit", "libffi")
-add_requires("fmt", "gtest")
+add_requires("fmt 12.0.0", "gtest")
 
 version = "0.4.0"
 
@@ -43,7 +43,7 @@ add_files(
     "src/vm/*.cpp",
     --"src/parser/*.cpp",
     "src/exceptions/*.cpp",
-    "src/composer/vm/*.cpp",
+    --"src/composer/vm/*.cpp",
     "src/builder/*.cpp",
         "src/library/*.cpp"
 )
