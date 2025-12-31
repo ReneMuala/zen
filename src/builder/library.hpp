@@ -12,6 +12,8 @@ namespace zen::builder
     struct library
     {
         std::string name;
+        std::list<std::shared_ptr<builder::function>> tests;
+        void add_test(const std::shared_ptr<builder::function>&);
         i64 hash() const;
         std::unordered_map<i64,std::shared_ptr<builder::function>> functions;
         std::unordered_map<i64,std::shared_ptr<builder::type>> types;

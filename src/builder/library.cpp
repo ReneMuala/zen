@@ -6,6 +6,16 @@
 
 namespace zen::builder
 {
+    void library::add_test(const std::shared_ptr<builder::function>& item)
+    {
+        for (auto const & test : tests)
+        {
+            if (test->hash() == item->hash())
+                return;
+        }
+        tests.push_back(item);
+    }
+
     i64 library::hash() const
     {
         static constexpr std::hash<std::string> hasher;
