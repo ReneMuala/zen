@@ -8,7 +8,10 @@
 #include <optional>
 #include <exceptions/expected_token.hpp>
 
-zen::lexer::lexer(std::istream & stream): stream(stream)
+#include "exceptions/invalid_token.hpp"
+#include "exceptions/syntax_error.hpp"
+
+zen::lexer::lexer(std::istream& stream) : stream(stream)
 {
     lit = it = 0;
     line = col = 1;
@@ -20,9 +23,10 @@ zen::token zen::lexer::next_decorator()
     const auto type = enums::TDECORATOR;
     do
     {
-        value+=it;
+        value += it;
         getchar();
-    } while (isalnum(it) or it == '_');
+    }
+    while (isalnum(it) or it == '_');
     return token(type, std::move(value), line, col);
 }
 
@@ -31,7 +35,7 @@ zen::token zen::lexer::next_number()
     std::string value;
     auto type = enums::TINT_NUM;
     bool e_mode = false;
-    restart:
+restart:
     do
     {
         if (it == '_')
@@ -61,7 +65,8 @@ zen::token zen::lexer::next_number()
             }
         }
         getchar();
-    } while (isdigit(it) or it == '_' or it == 'e');
+    }
+    while (isdigit(it) or it == '_' or it == 'e');
     if (it == '.' and type == enums::TINT_NUM)
     {
         type = enums::TDOUBLE_NUM;
@@ -71,7 +76,8 @@ zen::token zen::lexer::next_number()
     {
         type = enums::TFLOAT_NUM;
         getchar();
-    } else if (it == 'd')
+    }
+    else if (it == 'd')
     {
         type = enums::TDOUBLE_NUM;
         getchar();
@@ -104,7 +110,7 @@ zen::token zen::lexer::next_string()
     std::string value;
     do
     {
-        getchar();
+        getchar(read_all);
         if (stream.eof())
             throw exceptions::expected_token("\"", line, col);
         if (lit == '\\')
@@ -123,9 +129,11 @@ zen::token zen::lexer::next_string()
             }
             else if (it == '"')
                 value += '"';
-        } else
+        }
+        else
             value += it;
-    } while (it != '"' or  lit == '\\');
+    }
+    while (it != '"' or lit == '\\');
     getchar();
     value.pop_back();
     return token(enums::TCHAR_ARRAY, std::move(value), line, col);
@@ -136,10 +144,10 @@ zen::token zen::lexer::next_and()
     std::string value = {it};
     auto type = enums::TERROR;
     getchar();
-    if(it == '&')
+    if (it == '&')
     {
         type = enums::TAND;
-        value+=it;
+        value += it;
         getchar();
     }
     return token(type, std::move(value), line, col);
@@ -150,10 +158,10 @@ zen::token zen::lexer::next_or()
     std::string value = {it};
     auto type = enums::TERROR;
     getchar();
-    if(it == '|')
+    if (it == '|')
     {
         type = enums::TOR;
-        value+=it;
+        value += it;
         getchar();
     }
     return token(type, std::move(value), line, col);
@@ -164,10 +172,10 @@ zen::token zen::lexer::next_equ_or_equal()
     std::string value = {it};
     auto type = enums::TEQU;
     getchar();
-    if(it == '=')
+    if (it == '=')
     {
         type = enums::TEQUAL;
-        value+=it;
+        value += it;
         getchar();
     }
     return token(type, std::move(value), line, col);
@@ -185,10 +193,10 @@ zen::token zen::lexer::next_not_or_not_equal()
     std::string value = {it};
     auto type = enums::TNOT;
     getchar();
-    if(it == '=')
+    if (it == '=')
     {
         type = enums::TNOT_EQUAL;
-        value+=it;
+        value += it;
         getchar();
     }
     return token(type, std::move(value), line, col);
@@ -199,13 +207,13 @@ zen::token zen::lexer::next_greater_or_greater_equal()
     std::string value = {it};
     auto type = enums::TGREATER;
     getchar();
-    if(it == '=')
+    if (it == '=')
     {
         type = enums::TGREATER_OR_EQUAL;
-        value+=it;
+        value += it;
         getchar();
     }
-    return token(type,std::move(value),line, col);
+    return token(type, std::move(value), line, col);
 }
 
 zen::token zen::lexer::next_lower_or_lower_equal()
@@ -213,10 +221,10 @@ zen::token zen::lexer::next_lower_or_lower_equal()
     std::string value = {it};
     auto type = enums::TLOWER;
     getchar();
-    if(it == '=')
+    if (it == '=')
     {
         type = enums::TLOWER_OR_EQUAL;
-        value+=it;
+        value += it;
         getchar();
     }
     return token(type, std::move(value), line, col);
@@ -227,18 +235,19 @@ zen::token zen::lexer::next_plus_or_plus_plus_or_plus_equal()
     std::string value = {it};
     auto type = enums::TPLUS;
     getchar();
-    if(it == '=')
+    if (it == '=')
     {
         type = enums::TPLUS_EQU;
-        value+=it;
-        getchar();
-    } else if(it == '+')
-    {
-        type = enums::TPLUS_PLUS;
-        value+=it;
+        value += it;
         getchar();
     }
-    return token(type,std::move(value), line, col);
+    else if (it == '+')
+    {
+        type = enums::TPLUS_PLUS;
+        value += it;
+        getchar();
+    }
+    return token(type, std::move(value), line, col);
 }
 
 zen::token zen::lexer::next_minus_or_minus_minus_or_minus_equal()
@@ -246,15 +255,16 @@ zen::token zen::lexer::next_minus_or_minus_minus_or_minus_equal()
     std::string value = {it};
     auto type = enums::TMINUS;
     getchar();
-    if(it == '=')
+    if (it == '=')
     {
         type = enums::TMINUS_EQU;
-        value+=it;
+        value += it;
         getchar();
-    } else if(it == '-')
+    }
+    else if (it == '-')
     {
         type = enums::TMINUS_MINUS;
-        value+=it;
+        value += it;
         getchar();
     }
 
@@ -266,10 +276,10 @@ zen::token zen::lexer::next_times_or_times_equal()
     std::string value = {it};
     auto type = enums::TTIMES;
     getchar();
-    if(it == '=')
+    if (it == '=')
     {
         type = enums::TTIMES_EQU;
-        value+=it;
+        value += it;
         getchar();
     }
     return token(type, std::move(value), line, col);
@@ -280,10 +290,10 @@ zen::token zen::lexer::next_modulo_or_modulo_equal()
     std::string value = {it};
     auto type = enums::TMODULO;
     getchar();
-    if(it == '=')
+    if (it == '=')
     {
         type = enums::TMODULO_EQU;
-        value+=it;
+        value += it;
         getchar();
     }
     return token(type, std::move(value), line, col);
@@ -294,12 +304,13 @@ zen::token zen::lexer::next_slash_or_slash_equal_or_comment()
     std::string value = {it};
     auto type = enums::TSLASH;
     getchar();
-    if(it == '=')
+    if (it == '=')
     {
         type = enums::TSLASH_EQU;
-        value+=it;
+        value += it;
         getchar();
-    } else if (it == '/')
+    }
+    else if (it == '/')
     {
         type = enums::TCOMMENT;
         do
@@ -307,13 +318,16 @@ zen::token zen::lexer::next_slash_or_slash_equal_or_comment()
             if (value.size() == 10)
             {
                 value += "...";
-            } else if (value.size() < 10)
+            }
+            else if (value.size() < 10)
             {
                 value += it;
             }
-            getchar();
-        } while(it != '\n' and not stream.eof());
-    } else if (it == '*')
+            getchar(ignore_specials);
+        }
+        while (it != '\n' and not stream.eof());
+    }
+    else if (it == '*')
     {
         int depth = 1;
         type = enums::TCOMMENT;
@@ -322,7 +336,8 @@ zen::token zen::lexer::next_slash_or_slash_equal_or_comment()
             if (value.size() == 10)
             {
                 value += "...";
-            } else if (value.size() < 10)
+            }
+            else if (value.size() < 10)
             {
                 value += it;
             }
@@ -331,7 +346,8 @@ zen::token zen::lexer::next_slash_or_slash_equal_or_comment()
                 throw exceptions::expected_token("*/", line, col);
             if (lit == '/' and it == '*') depth++;
             else if (lit == '*' and it == '/') depth--;
-        } while(depth);
+        }
+        while (depth);
         getchar();
     }
     return token(type, std::move(value), line, col);
@@ -343,9 +359,10 @@ zen::token zen::lexer::next_id_or_keyword()
     auto type = enums::TID;
     do
     {
-        value+=it;
+        value += it;
         getchar();
-    } while (isalnum(it) or it == '_');
+    }
+    while (isalnum(it) or it == '_');
 
     // for, while, if, else, fun, type, mut, yield, when, init, this, object
     if (value.length() >= 2 and value.length() <= 9)
@@ -364,15 +381,15 @@ zen::token zen::lexer::next_id_or_keyword()
             type = enums::TKEYWORD_TRUE;
         else if (value == "false")
             type = enums::TKEYWORD_FALSE;
-        // else if (value == "break")
-        //     type = enums::TKEYWORD_BREAK;
-        // else if (value == "continue")
-        //     type = enums::TKEYWORD_CONTINUE;
+            // else if (value == "break")
+            //     type = enums::TKEYWORD_BREAK;
+            // else if (value == "continue")
+            //     type = enums::TKEYWORD_CONTINUE;
         else if (value == "class")
             type = enums::TKEYWORD_CLASS;
         else if (value == "static")
             type = enums::TKEYWORD_STATIC;
-        }
+    }
     return token(type, std::move(value), line, col);
 }
 
@@ -381,24 +398,37 @@ zen::token zen::lexer::next_error()
     std::string value;
     do
     {
-        value+=it;
+        value += it;
         getchar();
-    } while (not isspace(it) and not stream.eof());
+    }
+    while (not isspace(it) and not stream.eof());
     return token(enums::TERROR, std::move(value), line, col);
 }
 
-void zen::lexer::getchar()
+void zen::lexer::getchar(const getchar_mode mode)
 {
     lit = it;
     if (it == '\n' or it == '\r')
     {
         line++;
         col = 1;
-    } else
+    }
+    else
     {
         col++;
     }
     it = static_cast<char>(stream.get());
+    if (it < -1)
+    {
+        if (mode == ignore_specials)
+        {
+            it = 0;
+        }
+        else if (mode == normal)
+        {
+            throw zen::exceptions::invalid_token(std::to_string(it), line, col);
+        }
+    }
 }
 
 std::optional<zen::token> zen::lexer::next()
@@ -406,7 +436,9 @@ std::optional<zen::token> zen::lexer::next()
     while (true)
     {
         while (std::isspace(it) or it == 0)
+        {
             getchar();
+        }
         if (stream.eof())
             return std::nullopt;
         if (isdigit(it))
@@ -420,7 +452,7 @@ std::optional<zen::token> zen::lexer::next()
         if (it == '}')
             return next_single(enums::TBRACES_CLOSE);
         if (it == '[')
-            return  next_single(enums::TBRACKETS_OPEN);
+            return next_single(enums::TBRACKETS_OPEN);
         if (it == ']')
             return next_single(enums::TBRACKETS_CLOSE);
         if (it == '(')
@@ -461,7 +493,7 @@ std::optional<zen::token> zen::lexer::next()
             return next_modulo_or_modulo_equal();
         if (it == '/')
         {
-            auto && token = next_slash_or_slash_equal_or_comment();
+            auto&& token = next_slash_or_slash_equal_or_comment();
             if (token.type == enums::TCOMMENT)
                 continue;
             return token;

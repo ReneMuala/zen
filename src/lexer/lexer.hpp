@@ -15,7 +15,13 @@ namespace zen {
         std::istream & stream;
         char lit, it;
         long line, col;
-        inline void getchar();
+        enum getchar_mode
+        {
+            normal,
+            ignore_specials,
+            read_all,
+        };
+        inline void getchar(getchar_mode mode = normal);
         public:
         explicit lexer(std::istream& stream);
 
