@@ -979,7 +979,13 @@ namespace zen::builder
                 bind(begin);
                 add(iterator, iterator, step);
                 bind(condition);
-                lower_equal(cond, iterator, last);
+                if (step->is_negated)
+                {
+                    greater_equal(cond, iterator, last);
+                } else
+                {
+                    lower_equal(cond, iterator, last);
+                }
                 go_if_not(cond, end);
                 {
                     get_scope(true)->__dncd__push(block::create(scope::in_for_body));

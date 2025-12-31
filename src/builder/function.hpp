@@ -44,7 +44,7 @@ namespace zen::builder
 
         std::unordered_map<i64, std::shared_ptr<global_label>> dependencies;
         bool is_extern = false;
-        inline std::shared_ptr<block> get_scope(const bool root  = false) const;
+        std::shared_ptr<block> get_scope(const bool root  = false) const;
         static std::shared_ptr<function> create(utils::constant_pool & pool, const i64 & offset,const bool& logging = false, const std::string & name = "");
         std::shared_ptr<function> create(const std::string & name, const std::vector<std::shared_ptr<builder::type>>& params, const std::shared_ptr<builder::type> &type) const;
         std::shared_ptr<value> set_parameter(const std::shared_ptr<zen::builder::type>& t, const std::string& name);
@@ -379,7 +379,7 @@ namespace zen::builder
         void peek();
         void build();
     private:
-        inline i64 get_stack_usage() const;
+        i64 get_stack_usage() const;
         void pop(bool final = false);
         std::shared_ptr<value> resolve(const std::shared_ptr<value> & variable_or_ref)
         {
