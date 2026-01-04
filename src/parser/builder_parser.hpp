@@ -2,6 +2,7 @@
 // Created by dte on 2/24/2025.
 //
 #pragma once
+#include "builder/type.hpp"
 #include "enums/token_type.hpp"
 #include <vector>
 
@@ -922,7 +923,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
 
     inline std::shared_ptr<zen::builder::function> create_allocator(const std::shared_ptr<zen::builder::type>& type)
     {
-        const auto fun = zen::builder::function::create(pool, 0, false, fmt::format("{}::allocate", type->name));
+        const auto fun = zen::builder::function::create(pool, offset, false, fmt::format("{}::allocate", type->name));
         fun->set_return(type);
         fun->gen<zen::allocate>(fun->ret, fun->constant<zen::i64>(type->get_full_size()));
         fun->return_implicitly();
@@ -930,9 +931,10 @@ BEGIN_ILC_CODEGEN(builder_parser)
         return fun;
     }
 
-    inline std::shared_ptr<zen::builder::function> create_deallocator(const std::shared_ptr<zen::builder::type>& type)
+
+    inline std::shared_ptr<zen::builder::function> create_virtual_deallocator(const std::shared_ptr<zen::builder::type>& type)
     {
-        const auto fun = zen::builder::function::create(pool, 0, false, fmt::format("{}::deallocate", type->name));
+        const auto fun = zen::builder::function::create(pool, offset, false, fmt::format("{}::virtually_deallocate", type->name));
         const auto it = fun->set_parameter(type, "it");
         const auto tab = zen::builder::table::create(fun);
         const auto has_data = fun->set_local(zen::builder::function::_bool(), "has_data");
@@ -948,8 +950,26 @@ BEGIN_ILC_CODEGEN(builder_parser)
                 {
                     fun->gen<zen::deallocate>(field_data);
                 });
+            } else if(field_pair.second->kind == zen::builder::type::kind::heap){
+                const auto field = tab->get_field_or_throw(it, field_pair.first);
+                if(const auto r = fun->call(fun->create(fmt::format("{}::virtually_deallocate", field_pair.second->name), std::vector<std::shared_ptr<zen::builder::type>>{field_pair.second}, nullptr), {field}); not r.has_value()){
+                    throw zen::exceptions::semantic_error(r.error(), offset);
+                }
             }
         }
+        fun->build();
+        return fun;
+    }
+
+    inline std::shared_ptr<zen::builder::function> create_deallocator(const std::shared_ptr<zen::builder::type>& type)
+    {
+        const auto fun = zen::builder::function::create(pool, offset, false, fmt::format("{}::deallocate", type->name));
+        const auto it = fun->set_parameter(type, "it");
+        const auto tab = zen::builder::table::create(fun);
+        const auto has_data = fun->set_local(zen::builder::function::_bool(), "has_data");
+                if(const auto r = fun->call(fun->create(fmt::format("{}::virtually_deallocate", type->name), std::vector<std::shared_ptr<zen::builder::type>>{type}, nullptr), {it}); not r.has_value()){
+                    throw zen::exceptions::semantic_error(r.error(), offset);
+                }
         fun->gen<zen::deallocate>(it);
         fun->build();
         return fun;
@@ -957,7 +977,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
 
     inline std::shared_ptr<zen::builder::function> create_mover(const std::shared_ptr<zen::builder::type>& type)
     {
-        const auto fun = zen::builder::function::create(pool, 0, false, fmt::format("operator=", type->name));
+        const auto fun = zen::builder::function::create(pool, offset, false, fmt::format("operator=", type->name));
         const auto lhs = fun->set_parameter(type, "lhs");
         const auto rhs = fun->set_parameter(type, "rhs");
         const auto tab = zen::builder::table::create(fun);
@@ -973,7 +993,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
 
 inline std::shared_ptr<zen::builder::function> create_equals(const std::shared_ptr<zen::builder::type>& type)
         {
-            const auto fun = zen::builder::function::create(pool, 0, false, fmt::format("operator==", type->name));
+            const auto fun = zen::builder::function::create(pool, offset, false, fmt::format("operator==", type->name));
             fun->set_return(zen::builder::function::_bool());
             const auto lhs = fun->set_parameter(type, "lhs");
             const auto rhs = fun->set_parameter(type, "rhs");
@@ -994,7 +1014,7 @@ inline std::shared_ptr<zen::builder::function> create_equals(const std::shared_p
 
 inline std::shared_ptr<zen::builder::function> create_not_equals(const std::shared_ptr<zen::builder::type>& type)
         {
-            const auto fun = zen::builder::function::create(pool, 0, false, fmt::format("operator!=", type->name));
+            const auto fun = zen::builder::function::create(pool, offset, false, fmt::format("operator!=", type->name));
             fun->set_return(zen::builder::function::_bool());
             const auto lhs = fun->set_parameter(type, "lhs");
             const auto rhs = fun->set_parameter(type, "rhs");
@@ -1034,6 +1054,7 @@ inline std::shared_ptr<zen::builder::function> create_not_equals(const std::shar
                     REQUIRE_NON_TERMINAL(META_NANY_BODY)
                 }
                 lib->add(create_allocator(class_));
+                lib->add(create_virtual_deallocator(class_));
                 lib->add(create_deallocator(class_));
                 lib->add(create_mover(class_));
                 lib->add(create_equals(class_));
