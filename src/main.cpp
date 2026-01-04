@@ -330,6 +330,16 @@ rect(lines: int, cols: int) = {
 	sum2 = bool {
 		1 == 2
 	}
+
+	@test 
+	person_equality = bool {
+		person("Zendaya",20) == person("Zendaya",20) 
+	}
+
+	@test 
+	person_inequality = bool {
+		person("Zenya",20) != person("Zendaya",20) 
+	}
 	bool(p: person) = {}
 
 	main = {
@@ -345,7 +355,7 @@ rect(lines: int, cols: int) = {
 		println(string("rene" == "rene"))
 		println(string("rene" != "muala"))
 		// é ação
-		println(string("rene" != "rene")
+		println(string("rene" != "rene"))
 		s: string
 			s = "Hello World!"
 			println(s)

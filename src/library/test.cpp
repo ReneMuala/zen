@@ -111,7 +111,7 @@ namespace zen::library::test
     inline std::shared_ptr<builder::function> create_test_this(utils::constant_pool& pool,
                                                                std::shared_ptr<zen::builder::library> lib)
     {
-        const auto fn = zen::builder::function::create(pool, 0, false, "testThis");
+        const auto fn = zen::builder::function::create(pool, 0, false, "runLocalTests");
         const auto tab = zen::builder::table::create(fn);
         auto print_function = fn->create("print", {zen::builder::function::_string()}, nullptr);
         auto println_function = fn->create("println", {zen::builder::function::_string()}, nullptr);
