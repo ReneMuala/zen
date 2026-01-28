@@ -3,7 +3,6 @@
 #include <memory>
 #include <optional>
 #include "lexer/lexer.hpp"
-#include "parser/parser.hpp"
 #include "parser/builder_parser.hpp"
 #include "builder/function.hpp"
 #include <sstream>
@@ -25,23 +24,24 @@
 #include <chrono>
 std::vector<zen::token> tokens;
 
-extern "C" {
-void EMSCRIPTEN_KEEPALIVE zen_sum(int a, int b)
-{
-	fmt::print("{} + {} = {}\n", a, b, a + b);
-}
-
-inline void setup_parser(const std::shared_ptr<builder_parser>& parser, const std::string& code)
+inline std::vector<SYMBOL> setup_parser(const std::string& code)
 {
 	tokens.clear();
+	std::vector<SYMBOL> chain;
 	std::stringstream stream(code);
 	zen::lexer lexer(stream);
 	while (auto token = lexer.next())
 	{
-		parser->chain.push_back(token->type);
+		chain.push_back(token->type);
 		tokens.emplace_back(token.value());
 	}
-	parser->chain_size = parser->chain.size();
+	return chain;
+}
+
+extern "C" {
+void EMSCRIPTEN_KEEPALIVE zen_sum(int a, int b)
+{
+	fmt::print("{} + {} = {}\n", a, b, a + b);
 }
 
 bool EMSCRIPTEN_KEEPALIVE zen_run(const char* code)
@@ -53,16 +53,18 @@ try
 		return false;
 	}
 	const auto program = zen::builder::program::create();
-	const auto parser = builder_parser::make();
+	std::vector<SYMBOL> chain = setup_parser(std::string(code));
+	const auto parser = builder_parser::make(chain, chain.size());
 	parser->prog = program;
 	program->add(parser->lib);
-	program->add(zen::library::_zen::create(parser->pool));
-	program->add(zen::library::casting::create(parser->pool));
-	program->add(zen::library::string::create(parser->pool));
-	program->add(zen::library::io::create(parser->pool));
-	setup_parser(parser, std::string(code));
+	program->add(zen::library::_zen::create(*parser->pool));
+	program->add(zen::library::casting::create(*parser->pool));
+	program->add(zen::library::string::create(*parser->pool));
+	program->add(zen::library::io::create(*parser->pool));
+	parser->offset = 0;
 	parser->discover();
-	program->add(zen::library::test::create(parser->pool, parser->lib, parser->prog));
+	program->add(zen::library::test::create(*parser->pool, parser->lib, parser->prog));
+	parser->offset = 0;
 	parser->parse();
 	auto params = std::vector<std::shared_ptr<zen::builder::type>>{};
 	std::string hint;
@@ -156,10 +158,10 @@ class point {
 		const auto parser = builder_parser::make();
 		parser->prog = program;
 		program->add(parser->lib);
-		program->add(zen::library::_zen::create(parser->pool));
-		program->add(zen::library::casting::create(parser->pool));
-		program->add(zen::library::string::create(parser->pool));
-		program->add(zen::library::io::create(parser->pool));
+		program->add(zen::library::_zen::create(*parser->pool));
+		program->add(zen::library::casting::create(*parser->pool));
+		program->add(zen::library::string::create(*parser->pool));
+		program->add(zen::library::io::create(*parser->pool));
 		std::string filename = argv[i];
 
 		if (filename.empty())
@@ -173,7 +175,7 @@ class point {
 		parser->id = filename;
 		parser->lib->name = filename;
 		parser->discover();
-		program->add(zen::library::test::create(parser->pool, parser->lib, parser->prog));
+		program->add(zen::library::test::create(*parser->pool, parser->lib, parser->prog));
 		parsers.push_back(parser);
 	}
 	for (auto & parser : parsers)
@@ -244,13 +246,14 @@ sum(x: int, y: int) = int {
 	x + y
 }
 
-person(name: string, age: int) = person {
+person2(name: string, age: int) = person {
 	p: person
 	p.name = name
 	p.age = age
 	p
 }
 
+@test
 test_value_equality = bool {
 	1b == 1b &&
 	1s == 1s &&
@@ -327,24 +330,71 @@ rect(lines: int, cols: int) = {
 		1 + 1 == 2
 	}
 	@test
-	sum2 = bool {
-		1 == 2
+	impossible_sum = bool {
+		1+2 == 2
 	}
 
-	@test 
+	@test
 	person_equality = bool {
-		person("Zendaya",20) == person("Zendaya",20) 
+		person("Zendaya",20) == person("Zendaya",20)
 	}
 
-	@test 
+	@test
 	person_inequality = bool {
-		person("Zenya",20) != person("Zendaya",20) 
+		person("Zenya",20) != person("Zendaya",20)
 	}
 	bool(p: person) = {}
+	@test
+	io_test = bool {
+		print(true)
+		println()
+		println(true)
+		print(65b)
+		println()
+		println(65b)
+		print(1s)
+		println()
+		println(1s)
+		print(1i)
+		println()
+		println(1i)
+		print(1l)
+		println()
+		println(1l)
+		print(1.5f)
+		println()
+		println(1.5f)
+		print(1.5d)
+		println()
+		println(1.5d)
+		true
+	}
+	/*
+	gen1<T> = T {
+		ignored code?
+	}
+	subg<T>(a: T, b: T) = T<B<int>>{
+		a+b
+	}
+	abs<T>(a: T) = T{
+		if(a < T(0)){
+			-a
+		} else {
+			a
+		}
+	}
+	sumg<T>(a: T, b: T) = T(abs<T>(a)+abs<T>(b))
+		println(sumg<long>(-1l,-2l))
+		println(sumg<int>(-1,-2))
+		println(sumg<double>(1.5,-2.5))
+		println(abs<long>(-1l))
+*/
 
-	main = {
+	main2 = {
 		println(string("hello".len()))
-		println(string("".empty()))
+		println("".empty())
+		print("".empty())
+		println()
 		println(string("abc".at(1l)))
 		println("abc".slice(1l,11l))
 		println("[sub]")
@@ -369,6 +419,7 @@ rect(lines: int, cols: int) = {
 		x: int
 		println(string(x))
 	}
+
 	example(x: int) = string("hello")
 
 	test = {
@@ -385,7 +436,91 @@ rect(lines: int, cols: int) = {
 	by2(x: int) = int(x*2)
 	sum(x: int, y: int) = int(x+y)
 	sub(x: int, y: int) = int(x-y)
-	)");
+
+	addTwoThings<T>(x: T, y: T) = T(x+y)
+	getName<N>(n: N) = string(n.name)
+
+	@test
+	str_casting = bool {
+		bool("true") == true && "true" == string(true)
+		bool("false") == false && "false" == string(false)
+		byte("1") == 1b && "1" == string(1b)
+		short("1") == 1s && "1" == string(1s)
+		int("1") == 1i && "1" == string(1i)
+		long("1") == 1l && "1" == string(1l)
+		float("1.5") == 1.5f && "1.5" == string(1.5f)
+		double("2.5") == 2.5d && "2.5" == string(2.5d)
+	}
+
+	sum<T>(x: T, y: T) = T(x+y)
+
+	abs<T>(n: T) = T {
+		if(n < T(0b) /* cast 0b to T */) {
+			-n
+		} else {
+			n
+		}
+	}
+	sum_abs<F,S,R>(first: F, second: S) = R(R(abs<F>(first)) + R(abs<S>(second)))
+
+	class ClassWithGenericsMethods {
+		data: double
+		data_as<T> = T(T(data))
+		sum<T>(x: T, y: T) = T(x+y)
+		abs<T>(n: T) = T {
+			if(n < T(0b) /* cast 0b to T */) {
+				-n
+			} else {
+				n
+			}
+		}
+		sum_abs<F,S,R>(first: F, second: S) = R(R(abs<F>(first)) + R(abs<S>(second)))
+	}
+
+	class ClassWithGenericsMethods2 {
+		c: ClassWithGenericsMethods
+	}
+
+	@test
+	generic_functions = bool {
+		x: ClassWithGenericsMethods
+		x.data = 1.5
+		y: ClassWithGenericsMethods2
+		y.c.data = 5.5
+		sum<int>(1,2) == 3 && sum<double>(1.5, 2.5) == 4d && abs<int>(-1) == 1 && sum_abs<byte, float, double>(1b,1.5f) == 2.5d &&
+		x.sum<int>(1,2) == 3 && x.sum<double>(1.5, 2.5) == 4d && x.abs<int>(-1) == 1 && x.sum_abs<byte, float, double>(1b,1.5f) == 2.5d &&
+		x.data_as<int>() == 1 && x.data_as<string>() == "1.5" &&
+		y.c.sum<int>(1,2) == 3 && y.c.sum<double>(1.5, 2.5) == 4d && y.c.abs<int>(-1) == 1 && y.c.sum_abs<byte, float, double>(1b,1.5f) == 2.5d &&
+		y.c.data_as<int>() == 5 && y.c.data_as<string>() == "5.5"
+	}
+
+	class Pair<A, B> {
+		a: A
+		b: B
+	}
+
+	class PairSet<A, B> {
+		p1: Pair<A,B>
+		p2: Pair<A,B>
+	}
+
+	string<A, B>(pair: Pair<A, B>) = string(string(pair.a) + " " + string(pair.b))
+
+	main() = {
+		pairSet : PairSet<int, short>
+		pair : Pair<int, short>
+		pair.a = 19i
+		pair.b = 19s
+		println(string<int, short>(pair))
+		println(string<int, short>(pairSet.p1))
+		println(string<int, short>(pairSet.p2))
+		runGlobalTests()
+		p := person("Rene", 20)
+		println("got name: " + getName<person>(p))
+		println(addTwoThings<double>(3.4,5.3))
+		println(addTwoThings<string>("hello"," world"))
+	}
+)");
 	// implement symbol manager
 	// implement deference wrappers
 #endif

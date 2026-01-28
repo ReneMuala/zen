@@ -2,7 +2,7 @@ add_rules("mode.debug", "mode.release", "plugin.compile_commands.autoupdate")
 --add_requires("fmt", "asmjit", "libffi")
 add_requires("fmt 12.0.0", "gtest")
 
-version = "0.4.0"
+version = "0.4.1"
 
 add_cxflags([[-DKAIZEN_VERSION=]] .. "\"" .. version .. "\"")
 
@@ -45,7 +45,7 @@ add_files(
     "src/exceptions/*.cpp",
     --"src/composer/vm/*.cpp",
     "src/builder/*.cpp",
-        "src/library/*.cpp"
+    "src/library/*.cpp"
 )
 --
 -- If you want to known more usage about xmake, please see https://xmake.io

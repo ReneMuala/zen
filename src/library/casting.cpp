@@ -521,6 +521,159 @@ namespace zen::library::casting
         return fn;
     }
 
+    // ========== FROM STRING CONVERSIONS ==========
+
+    inline std::shared_ptr<builder::function> create_convert_str_to_int(utils::constant_pool& pool)
+    {
+        const auto fn = zen::builder::function::create(pool, 0, false, "int");
+        fn->set_return(zen::builder::function::_int());
+        fn->gen<zen::str_to_i32>(fn->ret, fn->set_parameter(zen::builder::function::_string(), "it"));
+        fn->return_implicitly();
+        fn->build();
+        return fn;
+    }
+
+    inline std::shared_ptr<builder::function> create_convert_str_to_byte(utils::constant_pool& pool)
+    {
+        const auto fn = zen::builder::function::create(pool, 0, false, "byte");
+        fn->set_return(zen::builder::function::_byte());
+        fn->gen<zen::str_to_i8>(fn->ret, fn->set_parameter(zen::builder::function::_string(), "it"));
+        fn->return_implicitly();
+        fn->build();
+        return fn;
+    }
+
+    inline std::shared_ptr<builder::function> create_convert_str_to_bool(utils::constant_pool& pool)
+    {
+        const auto fn = zen::builder::function::create(pool, 0, false, "bool");
+        fn->set_return(zen::builder::function::_bool());
+        const auto it = fn->set_parameter(zen::builder::function::_string(), "it");
+        const auto it_is_true = fn->set_local(zen::builder::function::_bool(), "it_is_true");
+        fn->equal(it_is_true, it, fn->constant<std::string>("true"));
+        fn->branch(zen::builder::scope::in_if, it_is_true, [&](auto &, auto & pel,auto& pen)
+        {
+            fn->return_value(fn->constant<bool>(true));
+            fn->branch(zen::builder::scope::in_else, nullptr, [&](auto &, auto &, auto&)
+            {
+                fn->return_value(fn->constant<bool>(false));
+            }, pel,pen);
+        });
+        fn->build();
+        return fn;
+    }
+
+    inline std::shared_ptr<builder::function> create_convert_str_to_long(utils::constant_pool& pool)
+    {
+        const auto fn = zen::builder::function::create(pool, 0, false, "long");
+        fn->set_return(zen::builder::function::_long());
+        fn->gen<zen::str_to_i64>(fn->ret, fn->set_parameter(zen::builder::function::_string(), "it"));
+        fn->return_implicitly();
+        fn->build();
+        return fn;
+    }
+
+    inline std::shared_ptr<builder::function> create_convert_str_to_short(utils::constant_pool& pool)
+    {
+        const auto fn = zen::builder::function::create(pool, 0, false, "short");
+        fn->set_return(zen::builder::function::_short());
+        fn->gen<zen::str_to_i16>(fn->ret, fn->set_parameter(zen::builder::function::_string(), "it"));
+        fn->return_implicitly();
+        fn->build();
+        return fn;
+    }
+
+    inline std::shared_ptr<builder::function> create_convert_str_to_float(utils::constant_pool& pool)
+    {
+        const auto fn = zen::builder::function::create(pool, 0, false, "float");
+        fn->set_return(zen::builder::function::_float());
+        fn->gen<zen::str_to_f32>(fn->ret, fn->set_parameter(zen::builder::function::_string(), "it"));
+        fn->return_implicitly();
+        fn->build();
+        return fn;
+    }
+
+    inline std::shared_ptr<builder::function> create_convert_str_to_double(utils::constant_pool& pool)
+    {
+        const auto fn = zen::builder::function::create(pool, 0, false, "double");
+        fn->set_return(zen::builder::function::_double());
+        fn->gen<zen::str_to_f64>(fn->ret, fn->set_parameter(zen::builder::function::_string(), "it"));
+        fn->return_implicitly();
+        fn->build();
+        return fn;
+    }
+
+     // ========== COPY CONVERSIONS (TO HELP WITH GENERICS) ==========
+
+    inline std::shared_ptr<builder::function> create_convert_int_to_int(utils::constant_pool& pool)
+    {
+        const auto fn = zen::builder::function::create(pool, 0, false, "int");
+        fn->set_return(zen::builder::function::_int());
+        fn->gen<zen::i32_to_i32>(fn->ret, fn->set_parameter(zen::builder::function::_int(), "it"));
+        fn->return_implicitly();
+        fn->build();
+        return fn;
+    }
+
+    inline std::shared_ptr<builder::function> create_convert_byte_to_byte(utils::constant_pool& pool)
+    {
+        const auto fn = zen::builder::function::create(pool, 0, false, "byte");
+        fn->set_return(zen::builder::function::_byte());
+        fn->gen<zen::i8_to_i8>(fn->ret, fn->set_parameter(zen::builder::function::_byte(), "it"));
+        fn->return_implicitly();
+        fn->build();
+        return fn;
+    }
+
+    inline std::shared_ptr<builder::function> create_convert_bool_to_bool(utils::constant_pool& pool)
+    {
+        const auto fn = zen::builder::function::create(pool, 0, false, "byte");
+        fn->set_return(zen::builder::function::_byte());
+        fn->gen<zen::i8_to_i8>(fn->ret, fn->set_parameter(zen::builder::function::_byte(), "it"));
+        fn->return_implicitly();
+        fn->build();
+        return fn;
+    }
+
+    inline std::shared_ptr<builder::function> create_convert_long_to_long(utils::constant_pool& pool)
+    {
+        const auto fn = zen::builder::function::create(pool, 0, false, "long");
+        fn->set_return(zen::builder::function::_long());
+        fn->gen<zen::i64_to_str>(fn->ret, fn->set_parameter(zen::builder::function::_long(), "it"));
+        fn->return_implicitly();
+        fn->build();
+        return fn;
+    }
+
+    inline std::shared_ptr<builder::function> create_convert_short_to_short(utils::constant_pool& pool)
+    {
+        const auto fn = zen::builder::function::create(pool, 0, false, "short");
+        fn->set_return(zen::builder::function::_short());
+        fn->gen<zen::i16_to_str>(fn->ret, fn->set_parameter(zen::builder::function::_short(), "it"));
+        fn->return_implicitly();
+        fn->build();
+        return fn;
+    }
+
+    inline std::shared_ptr<builder::function> create_convert_float_to_float(utils::constant_pool& pool)
+    {
+        const auto fn = zen::builder::function::create(pool, 0, false, "float");
+        fn->set_return(zen::builder::function::_float());
+        fn->gen<zen::f32_to_str>(fn->ret, fn->set_parameter(zen::builder::function::_float(), "it"));
+        fn->return_implicitly();
+        fn->build();
+        return fn;
+    }
+
+    inline std::shared_ptr<builder::function> create_convert_double_to_double(utils::constant_pool& pool)
+    {
+        const auto fn = zen::builder::function::create(pool, 0, false, "double");
+        fn->set_return(zen::builder::function::_double());
+        fn->gen<zen::f64_to_str>(fn->ret, fn->set_parameter(zen::builder::function::_double(), "it"));
+        fn->return_implicitly();
+        fn->build();
+        return fn;
+    }
+
     std::shared_ptr<zen::builder::library> create(utils::constant_pool& pool)
     {
         std::shared_ptr<zen::builder::library> library = zen::builder::library::create("casting");
@@ -589,6 +742,24 @@ namespace zen::library::casting
         library->add(create_convert_short_to_str(pool));
         library->add(create_convert_float_to_str(pool));
         library->add(create_convert_double_to_str(pool));
+
+        // STRING conversions (from string)
+        library->add(create_convert_str_to_int(pool));
+        library->add(create_convert_str_to_byte(pool));
+        library->add(create_convert_str_to_bool(pool));
+        library->add(create_convert_str_to_long(pool));
+        library->add(create_convert_str_to_short(pool));
+        library->add(create_convert_str_to_float(pool));
+        library->add(create_convert_str_to_double(pool));
+
+        // Copy operations
+        library->add(create_convert_int_to_int(pool));
+        library->add(create_convert_byte_to_byte(pool));
+        library->add(create_convert_bool_to_bool(pool));
+        library->add(create_convert_long_to_long(pool));
+        library->add(create_convert_short_to_short(pool));
+        library->add(create_convert_float_to_float(pool));
+        library->add(create_convert_double_to_double(pool));
 
         return library;
     }

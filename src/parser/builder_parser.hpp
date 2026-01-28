@@ -6,6 +6,7 @@
 #include "enums/token_type.hpp"
 #include <vector>
 
+#include "builder/generic_context.hpp"
 #include "builder/library.hpp"
 #include "builder/table.hpp"
 #include "exceptions/semantic_error.hpp"
@@ -22,20 +23,45 @@ typedef enums::token_type SYMBOL;
 
 BEGIN_ILC_CODEGEN(builder_parser)
 #define EXPECTED(ITEM) [this]() { throw zen::exceptions::syntax_error(ITEM, offset); }
+    /**
+     * Our current library, should have the name of the file bein parsed without the extension.
+     * NotNullable
+     */
     std::shared_ptr<zen::builder::library> lib = zen::builder::library::create("main");
+    /**
+     * Our current function
+     * Nullable
+     */
     std::shared_ptr<zen::builder::function> fun;
+    /**
+     * Table of symbols, types and functions, use it as less as possible and prefer its static methods.
+     * Nullable (should be initialized with an opaque function when used in global scope, i.e. class fields, etc)
+     */
     std::shared_ptr<zen::builder::table> tab;
+    /**
+     * The whole program bein parsed.
+     * NotNullable, make sure to initialize it when creating the parser.
+     */
     std::shared_ptr<zen::builder::program> prog;
-    zen::utils::constant_pool pool;
+    /**
+     * Constant pool, make sure to use only one in the whole program.
+     * NotNull.
+     * TODO: Move to programs scope.
+     */
+    std::shared_ptr<zen::utils::constant_pool> pool = std::make_shared<zen::utils::constant_pool>();
     std::stack<std::shared_ptr<zen::builder::value>> values;
     std::shared_ptr<zen::builder::label> temp_pel, temp_pen;
     bool at_debug = false;
     bool at_extern = false;
     bool at_test = false;
+    bool at_generic_implementation = false;
+    bool at_generic_specification = false;
     bool pragma_dangling_return_value = false;
 
-    std::string id, type, value;
+    std::string id, type, value, generic_id;
+    std::vector<std::string> generic_params;
     std::shared_ptr<zen::builder::type> class_;
+    std::unordered_map<std::string, std::shared_ptr<zen::builder::type>> gcm;
 
     inline void reset()
     {
@@ -67,13 +93,24 @@ BEGIN_ILC_CODEGEN(builder_parser)
 
     BEGIN_PRODUCTION(PRODUCTION_NCLASS)
         REQUIRE_TERMINAL(TKEYWORD_CLASS)
+        const auto class_token_offset = offset - 1;
         REQUIRE_NON_TERMINAL_CALLBACK(NID, EXPECTED("ID"))
-        class_ = zen::builder::type::create(id, 0);
-        class_->kind = zen::builder::type::kind::heap;
+        const std::string class_name = at_generic_implementation ? generic_id : id;
+        type.clear();
         if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
         {
-            type.clear();
+            if (not at_generic_implementation)
+            {
+                REQUIRE_NON_TERMINAL(META_NANY_BODY)
+                lib->add_generic_type(
+                    zen::builder::generic_context::create(class_name, class_token_offset, offset, generic_params));
+                return true;
+            }
         }
+        if (at_generic_implementation) at_generic_implementation = false;
+
+        class_ = zen::builder::type::create(class_name, 0);
+        class_->kind = zen::builder::type::kind::heap;
         REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
         while (TRY_REQUIRE_NON_TERMINAL(NCLASS_FIELD) or TRY_REQUIRE_NON_TERMINAL(NFUNCTION_DEFINITION) or
             TRY_REQUIRE_NON_TERMINAL(NDECORATOR))
@@ -93,7 +130,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
         {
             throw zen::exceptions::semantic_error("cannot create class field outside of class", offset);
         }
-        if (auto result = zen::builder::table::get_type(type, prog); result.has_value())
+        if (auto result = zen::builder::table::get_type(type, prog, gcm); result.has_value())
         {
             class_->add_field(field_name, result.value(), offset);
         }
@@ -199,11 +236,65 @@ BEGIN_ILC_CODEGEN(builder_parser)
                     });
     END_PRODUCTION
 
+    void generic_context_implementer(const std::unordered_map<
+                                         std::string, std::shared_ptr<
+                                             zen::builder::type>>& mapping,
+                                     const long long generic_offset,
+                                     const size_t generic_chain_size,
+                                     const std::shared_ptr<zen::builder::type>& class_,
+                                     const std::string generic_id)
+    {
+        const auto implementation_parser = make(
+            chain, generic_chain_size,
+            generic_offset);
+        implementation_parser->prog = prog;
+        implementation_parser->lib = lib;
+        implementation_parser->class_ = class_;
+        implementation_parser->pool = pool;
+        implementation_parser->gcm.insert(mapping.begin(), mapping.end());
+        implementation_parser->gcm.insert(this->tab->generic_context_mapping.begin(),
+                                          this->tab->generic_context_mapping.end());
+        try
+        {
+            implementation_parser->offset = generic_offset;
+            implementation_parser->
+                at_generic_implementation = true;
+            implementation_parser->generic_id = generic_id;
+            implementation_parser->discover();
+            implementation_parser->offset = generic_offset;
+            implementation_parser->
+                at_generic_implementation = true;
+            implementation_parser->generic_id = generic_id;
+            implementation_parser->parse();
+        }
+        catch (const zen::exceptions::semantic_error
+            & e)
+        {
+            throw zen::exceptions::semantic_error(
+                fmt::format("generic instantiation of {} failed", generic_id),
+                offset, fmt::format("reason: {}", e.what()));
+        }
+        catch (const std::exception& e)
+        {
+            throw zen::exceptions::semantic_error(
+                e.what(), offset);
+        }
+    }
+
     BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_FUNCTION_CALL)
-        const std::string name = id;
+        std::string name = id;
+        std::optional<std::vector<std::shared_ptr<zen::builder::type>>> generic_args;
         if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
         {
-            type.clear();
+            name = zen::builder::generic_context::get_name(name, generic_params);
+            if (auto result = zen::builder::table::get_types(generic_params, prog, gcm); result.has_value())
+            {
+                generic_args = result.value();
+            }
+            else
+            {
+                throw zen::exceptions::semantic_error(result.error(), offset);
+            }
         }
         id = name;
         REQUIRE_TERMINAL(TPARENTHESIS_OPEN)
@@ -223,6 +314,28 @@ BEGIN_ILC_CODEGEN(builder_parser)
             params.push_back(arg->type);
         }
         std::string hint;
+
+        if (generic_args)
+        {
+            auto params_copy = params;
+            if (auto callee = tab->get_function(name, params_copy, hint); not callee.has_value())
+            //not defined generic function
+            {
+                if (auto gen_ctx = tab->get_generic_function(name, generic_args->size()); not gen_ctx.has_value())
+                {
+                    throw zen::exceptions::semantic_error(gen_ctx.error(), offset);
+                }
+                else if (const auto result = gen_ctx.value()->implement(
+                    generic_args.value(),
+                    std::bind(&builder_parser::generic_context_implementer, this, std::placeholders::_1,
+                              std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
+                              tab->simple_name(name))); not result.has_value())
+                {
+                    throw zen::exceptions::semantic_error(result.error(), offset);
+                }
+            }
+            hint.clear();
+        }
         if (auto callee = tab->get_function(name, params, hint); not callee.has_value())
         {
             throw zen::exceptions::semantic_error(callee.error(), offset, hint);
@@ -250,9 +363,18 @@ BEGIN_ILC_CODEGEN(builder_parser)
 
     BEGIN_PRODUCTION(PRODUCTION_NSUFFIX_METHOD_CALL)
         std::string name = id;
+        std::optional<std::vector<std::shared_ptr<zen::builder::type>>> generic_args;
         if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
         {
-            type.clear();
+            name = zen::builder::generic_context::get_name(name, generic_params);
+            if (auto result = zen::builder::table::get_types(generic_params, prog, gcm); result.has_value())
+            {
+                generic_args = result.value();
+            }
+            else
+            {
+                throw zen::exceptions::semantic_error(result.error(), offset);
+            }
         }
         id = name;
         REQUIRE_TERMINAL(TPARENTHESIS_OPEN)
@@ -272,7 +394,29 @@ BEGIN_ILC_CODEGEN(builder_parser)
             params.push_back(arg->type);
         }
         std::string hint;
-        if (auto callee = tab->get_function(pop(), name, params, hint); not callee.has_value())
+        auto obj = pop();
+        if (generic_args)
+        {
+            auto params_copy = params;
+            if (auto callee = tab->get_function(obj, name, params_copy, hint); not callee.has_value())
+            //not defined generic function
+            {
+                if (auto gen_ctx = tab->get_generic_function(name, generic_args->size()); not gen_ctx.has_value())
+                {
+                    throw zen::exceptions::semantic_error(gen_ctx.error(), offset);
+                }
+                else if (const auto result = gen_ctx.value()->implement(
+                    generic_args.value(),
+                    std::bind(&builder_parser::generic_context_implementer, this, std::placeholders::_1,
+                              std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
+                              tab->simple_name(name))); not result.has_value())
+                {
+                    throw zen::exceptions::semantic_error(result.error(), offset);
+                }
+            }
+            hint.clear();
+        }
+        if (auto callee = tab->get_function(obj, name, params, hint); not callee.has_value())
         {
             throw zen::exceptions::semantic_error(callee.error(), offset, hint);
         }
@@ -303,8 +447,8 @@ BEGIN_ILC_CODEGEN(builder_parser)
         std::vector<std::shared_ptr<zen::builder::value>> args;
         if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
         {
-            fun = zen::builder::function::create(pool, offset, at_debug, decorator);
-            tab = zen::builder::table::create(fun, class_);
+            fun = zen::builder::function::create(*pool, offset, at_debug, decorator);
+            tab = zen::builder::table::create(fun, gcm, class_);
             do
             {
                 if (not(PRODUCTION_NVAL_BOOLEAN() or PRODUCTION_NVAL_AS_NUM() or
@@ -328,7 +472,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
             at_extern = args.empty() or *(bool*)args[0]->address(0);
         }
         else if (decorator == "@test" and args.empty() or (args.size() == 1 and args.at(0)->type ==
-                   zen::builder::function::_bool()))
+            zen::builder::function::_bool()))
         {
             at_test = args.empty() or *(bool*)args[0]->address(0);
         }
@@ -346,7 +490,8 @@ BEGIN_ILC_CODEGEN(builder_parser)
 
     BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_DEFINITION_PREFIX)
         REQUIRE_NON_TERMINAL(NID)
-        std::string function_name = id;
+        const auto function_name_token_offset = offset - 1;
+        std::string function_name = at_generic_implementation ? generic_id : id;
         if (function_name == "operator")
         {
             if (class_)
@@ -396,8 +541,8 @@ BEGIN_ILC_CODEGEN(builder_parser)
                 function_name = fmt::format("{}.{}", class_->name, function_name);
             }
         }
-        fun = zen::builder::function::create(pool, offset, at_debug, function_name);
-        tab = zen::builder::table::create(fun, class_, prog);
+        fun = zen::builder::function::create(*pool, offset, at_debug, function_name);
+        tab = zen::builder::table::create(fun, gcm, class_, prog);
         if (at_debug)
         {
             fmt::println("{}", fun->name);
@@ -405,8 +550,25 @@ BEGIN_ILC_CODEGEN(builder_parser)
         std::list<std::tuple<std::string, std::shared_ptr<zen::builder::type>>> parameters;
         if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
         {
-            type.clear();
+            if (not at_generic_implementation)
+            {
+                type.clear();
+                REQUIRE_NON_TERMINAL(META_NANY_BODY)
+                REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
+                if (TRY_REQUIRE_NON_TERMINAL(NTYPE))
+                {
+                }
+                REQUIRE_NON_TERMINAL(META_NANY_BODY)
+                lib->add_generic_function(
+                    zen::builder::generic_context::create(function_name, function_name_token_offset, offset,
+                                                          generic_params, class_));
+                fun->is_extern = true; // assume genric as extern to ignore definition
+                // fmt::println("{} generic", fun->name);
+                return true;
+            }
         }
+        if (at_generic_implementation)
+            at_generic_implementation = false;
         if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
         {
             bool first_it = true;
@@ -419,7 +581,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
                     REQUIRE_TERMINAL_CALLBACK(TCOLON, EXPECTED(":"))
                     type.clear();
                     REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
-                    if (auto result = tab->get_type(type); result.has_value())
+                    if (auto result = zen::builder::table::get_type(type, prog, gcm); result.has_value())
                     {
                         parameters.emplace_back(name, result.value());
                     }
@@ -442,7 +604,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
         type.clear();
         if (not is_constructor and TRY_REQUIRE_NON_TERMINAL(NTYPE))
         {
-            if (auto result = tab->get_type(type); result.has_value())
+            if (auto result = zen::builder::table::get_type(type, prog, gcm); result.has_value())
             {
                 fun->set_return(result.value());
             }
@@ -519,7 +681,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
         // REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
         if (TRY_REQUIRE_NON_TERMINAL(NTYPE))
         {
-            if (auto result = tab->get_type(type); result.has_value())
+            if (auto result = zen::builder::table::get_type(type, prog, gcm); result.has_value())
             {
                 for_params.push_back(fun->set_local(result.value(), iterator));
             }
@@ -530,7 +692,8 @@ BEGIN_ILC_CODEGEN(builder_parser)
             REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
             REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
             for_params.push_back(pop());
-        } else
+        }
+        else
         {
             REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
             REQUIRE_NON_TERMINAL_CALLBACK(NVAL, EXPECTED("VALUE"))
@@ -808,12 +971,29 @@ BEGIN_ILC_CODEGEN(builder_parser)
 
     BEGIN_PRODUCTION(PRODUCTION_NGENERIC)
         REQUIRE_TERMINAL(TLOWER)
+        std::vector<std::string> generic_fields;
+        const bool backup = at_generic_specification;
+        at_generic_specification = true;
         do
         {
-            REQUIRE_NON_TERMINAL(NTYPE)
+            type.clear();
+            if (TRY_REQUIRE_NON_TERMINAL(NTYPE))
+            {
+                generic_fields.push_back(type);
+            }
+            else
+                break;
         }
         while (TRY_REQUIRE_TERMINAL(TCOMMA));
-        REQUIRE_TERMINAL(TGREATER)
+        at_generic_specification = backup;
+        if (TRY_REQUIRE_TERMINAL(TGREATER))
+        {
+            this->generic_params = generic_fields;
+        }
+        else
+        {
+            ROLLBACK_PRODUCTION()
+        }
     END_PRODUCTION
 
     BEGIN_PRODUCTION(PRODUCTION_NTYPE)
@@ -821,10 +1001,45 @@ BEGIN_ILC_CODEGEN(builder_parser)
         {
             ROLLBACK_PRODUCTION()
         }
-        type += tokens[offset - 1].value;
+        std::string name = zen::builder::table::resolve_type_name(tokens[offset - 1].value, gcm);
+        type += name;
         if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
         {
             type.clear();
+            name = zen::builder::generic_context::get_name(name, generic_params);
+            type = name;
+            if (not at_generic_specification)
+            {
+                std::vector<std::shared_ptr<zen::builder::type>> generic_args;
+                if (auto result = zen::builder::table::get_types(generic_params, prog, gcm); result.has_value())
+                {
+                    generic_args = result.value();
+                }
+                else
+                {
+                    throw zen::exceptions::semantic_error(result.error(), offset);
+                }
+
+                if (const auto real_type = zen::builder::table::get_type(type, prog, gcm); not real_type.has_value())
+                {
+                    // create tab when dealing with class fields
+                    if (not tab) tab = zen::builder::table::create(zen::builder::function::create(*pool, offset), gcm,
+                                                                   class_, prog);
+                    if (const auto gen_ctx = tab->get_generic_type(name, generic_params.size()); not gen_ctx.
+                        has_value())
+                    {
+                        throw zen::exceptions::semantic_error(gen_ctx.error(), offset);
+                    }
+                    else if (const auto result = gen_ctx.value()->implement(
+                        generic_args, std::bind(&builder_parser::generic_context_implementer, this,
+                                                std::placeholders::_1,
+                                                std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
+                                                tab->simple_name(name))); not result.has_value())
+                    {
+                        throw zen::exceptions::semantic_error(result.error(), offset);
+                    }
+                }
+            }
         }
     END_PRODUCTION
 
@@ -837,7 +1052,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
         if (TRY_REQUIRE_NON_TERMINAL(NTYPE))
         {
             std::shared_ptr<zen::builder::value> local;
-            if (auto result = tab->get_type(id); result.has_value())
+            if (auto result = zen::builder::table::get_type(type, prog, gcm); result.has_value())
             {
                 local = fun->set_local(result.value(), name);
             }
@@ -914,7 +1129,8 @@ BEGIN_ILC_CODEGEN(builder_parser)
             else if (offset < chain_size)
             {
                 offset++; // ignore anything else
-            } else
+            }
+            else
             {
                 break;
             }
@@ -923,7 +1139,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
 
     inline std::shared_ptr<zen::builder::function> create_allocator(const std::shared_ptr<zen::builder::type>& type)
     {
-        const auto fun = zen::builder::function::create(pool, offset, false, fmt::format("{}::allocate", type->name));
+        const auto fun = zen::builder::function::create(*pool, offset, false, fmt::format("{}::allocate", type->name));
         fun->set_return(type);
         fun->gen<zen::allocate>(fun->ret, fun->constant<zen::i64>(type->get_full_size()));
         fun->return_implicitly();
@@ -932,9 +1148,11 @@ BEGIN_ILC_CODEGEN(builder_parser)
     }
 
 
-    inline std::shared_ptr<zen::builder::function> create_virtual_deallocator(const std::shared_ptr<zen::builder::type>& type)
+    inline std::shared_ptr<zen::builder::function> create_virtual_deallocator(
+        const std::shared_ptr<zen::builder::type>& type)
     {
-        const auto fun = zen::builder::function::create(pool, offset, false, fmt::format("{}::virtually_deallocate", type->name));
+        const auto fun = zen::builder::function::create(*pool, offset, false,
+                                                        fmt::format("{}::virtually_deallocate", type->name));
         const auto it = fun->set_parameter(type, "it");
         const auto tab = zen::builder::table::create(fun);
         const auto has_data = fun->set_local(zen::builder::function::_bool(), "has_data");
@@ -950,9 +1168,15 @@ BEGIN_ILC_CODEGEN(builder_parser)
                 {
                     fun->gen<zen::deallocate>(field_data);
                 });
-            } else if(field_pair.second->kind == zen::builder::type::kind::heap){
+            }
+            else if (field_pair.second->kind == zen::builder::type::kind::heap)
+            {
                 const auto field = tab->get_field_or_throw(it, field_pair.first);
-                if(const auto r = fun->call(fun->create(fmt::format("{}::virtually_deallocate", field_pair.second->name), std::vector<std::shared_ptr<zen::builder::type>>{field_pair.second}, nullptr), {field}); not r.has_value()){
+                if (const auto r = fun->call(
+                    fun->create(fmt::format("{}::virtually_deallocate", field_pair.second->name),
+                                std::vector<std::shared_ptr<zen::builder::type>>{field_pair.second}, nullptr),
+                    {field}); not r.has_value())
+                {
                     throw zen::exceptions::semantic_error(r.error(), offset);
                 }
             }
@@ -963,13 +1187,17 @@ BEGIN_ILC_CODEGEN(builder_parser)
 
     inline std::shared_ptr<zen::builder::function> create_deallocator(const std::shared_ptr<zen::builder::type>& type)
     {
-        const auto fun = zen::builder::function::create(pool, offset, false, fmt::format("{}::deallocate", type->name));
+        const auto fun =
+            zen::builder::function::create(*pool, offset, false, fmt::format("{}::deallocate", type->name));
         const auto it = fun->set_parameter(type, "it");
         const auto tab = zen::builder::table::create(fun);
         const auto has_data = fun->set_local(zen::builder::function::_bool(), "has_data");
-                if(const auto r = fun->call(fun->create(fmt::format("{}::virtually_deallocate", type->name), std::vector<std::shared_ptr<zen::builder::type>>{type}, nullptr), {it}); not r.has_value()){
-                    throw zen::exceptions::semantic_error(r.error(), offset);
-                }
+        if (const auto r = fun->call(fun->create(fmt::format("{}::virtually_deallocate", type->name),
+                                                 std::vector<std::shared_ptr<zen::builder::type>>{type}, nullptr),
+                                     {it}); not r.has_value())
+        {
+            throw zen::exceptions::semantic_error(r.error(), offset);
+        }
         fun->gen<zen::deallocate>(it);
         fun->build();
         return fun;
@@ -977,7 +1205,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
 
     inline std::shared_ptr<zen::builder::function> create_mover(const std::shared_ptr<zen::builder::type>& type)
     {
-        const auto fun = zen::builder::function::create(pool, offset, false, fmt::format("operator=", type->name));
+        const auto fun = zen::builder::function::create(*pool, offset, false, fmt::format("operator=", type->name));
         const auto lhs = fun->set_parameter(type, "lhs");
         const auto rhs = fun->set_parameter(type, "rhs");
         const auto tab = zen::builder::table::create(fun);
@@ -991,45 +1219,49 @@ BEGIN_ILC_CODEGEN(builder_parser)
         return fun;
     }
 
-inline std::shared_ptr<zen::builder::function> create_equals(const std::shared_ptr<zen::builder::type>& type)
+    inline std::shared_ptr<zen::builder::function> create_equals(const std::shared_ptr<zen::builder::type>& type)
+    {
+        const auto fun = zen::builder::function::create(*pool, offset, false, fmt::format("operator==", type->name));
+        fun->set_return(zen::builder::function::_bool());
+        const auto lhs = fun->set_parameter(type, "lhs");
+        const auto rhs = fun->set_parameter(type, "rhs");
+        fun->move(fun->ret, fun->constant<zen::boolean>(true));
+        const auto tab = zen::builder::table::create(fun);
+        const auto temp = fun->set_local(zen::builder::function::_bool(), "temp");
+        for (const auto& field_pair : type->fields)
         {
-            const auto fun = zen::builder::function::create(pool, offset, false, fmt::format("operator==", type->name));
-            fun->set_return(zen::builder::function::_bool());
-            const auto lhs = fun->set_parameter(type, "lhs");
-            const auto rhs = fun->set_parameter(type, "rhs");
-            fun->move(fun->ret, fun->constant<zen::boolean>(true));
-            const auto tab = zen::builder::table::create(fun);
-            const auto temp = fun->set_local(zen::builder::function::_bool(), "temp");
-            for (const auto& field_pair : type->fields)
-            {
-                const auto lhs_field = tab->get_field_or_throw(lhs, field_pair.first);
-                const auto rhs_field = tab->get_field_or_throw(rhs, field_pair.first);
-                fun->equal(temp, lhs_field, rhs_field);
-                fun->and_(fun->ret, fun->ret, temp);
-            }
-            fun->return_implicitly();
-            fun->build();
-            return fun;
+            const auto lhs_field = tab->get_field_or_throw(lhs, field_pair.first);
+            const auto rhs_field = tab->get_field_or_throw(rhs, field_pair.first);
+            fun->equal(temp, lhs_field, rhs_field);
+            fun->and_(fun->ret, fun->ret, temp);
         }
+        fun->return_implicitly();
+        fun->build();
+        return fun;
+    }
 
-inline std::shared_ptr<zen::builder::function> create_not_equals(const std::shared_ptr<zen::builder::type>& type)
+    inline std::shared_ptr<zen::builder::function> create_not_equals(const std::shared_ptr<zen::builder::type>& type)
+    {
+        const auto fun = zen::builder::function::create(*pool, offset, false, fmt::format("operator!=", type->name));
+        fun->set_return(zen::builder::function::_bool());
+        const auto lhs = fun->set_parameter(type, "lhs");
+        const auto rhs = fun->set_parameter(type, "rhs");
+        if (const auto result = fun->call(fun->create("operator==",
+                                                      std::vector<std::shared_ptr<zen::builder::type>>{
+                                                          lhs->type, rhs->type
+                                                      }, fun->ret->type), {lhs, rhs}); not result.has_value())
         {
-            const auto fun = zen::builder::function::create(pool, offset, false, fmt::format("operator!=", type->name));
-            fun->set_return(zen::builder::function::_bool());
-            const auto lhs = fun->set_parameter(type, "lhs");
-            const auto rhs = fun->set_parameter(type, "rhs");
-            if (const auto result = fun->call(fun->create("operator==", std::vector<std::shared_ptr<zen::builder::type>>{lhs->type, rhs->type}, fun->ret->type), {lhs, rhs});not result.has_value())
-            {
-                throw zen::exceptions::semantic_error(result.error(), offset);
-            } else
-            {
-                const auto negation = fun->set_local(zen::builder::function::_bool(), "negation");
-                fun->not_(negation,result.value());
-                fun->return_value(negation);
-            }
-            fun->build();
-            return fun;
+            throw zen::exceptions::semantic_error(result.error(), offset);
         }
+        else
+        {
+            const auto negation = fun->set_local(zen::builder::function::_bool(), "negation");
+            fun->not_(negation, result.value());
+            fun->return_value(negation);
+        }
+        fun->build();
+        return fun;
+    }
 
     BEGIN_PRODUCTION(META_PRODUCTION_GLOBAL_DISCOVERY)
         while (offset < chain_size)
@@ -1042,12 +1274,19 @@ inline std::shared_ptr<zen::builder::function> create_not_equals(const std::shar
             else if (TRY_REQUIRE_TERMINAL(TKEYWORD_CLASS))
             {
                 REQUIRE_TERMINAL(TID)
-                class_ = zen::builder::type::create(tokens[offset - 1].value);
+                class_ = zen::builder::type::create(at_generic_implementation ? generic_id : tokens[offset - 1].value);
                 class_->kind = zen::builder::type::kind::heap;
-                lib->add(class_);
                 if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
                 {
+                    if (not at_generic_implementation)
+                    {
+                        REQUIRE_NON_TERMINAL(META_NANY_BODY)
+                        continue;
+                    }
                 }
+                lib->add(class_);
+                if (at_generic_implementation)
+                    at_generic_implementation = false;
                 REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
                 while (TRY_REQUIRE_NON_TERMINAL(NCLASS_FIELD) or TRY_REQUIRE_NON_TERMINAL(NGLOBAL_DISCOVERY_STAT))
                 {
@@ -1487,7 +1726,6 @@ END_SYMBOL_BINDING
     inline bool discover()
     {
         compilation_id++;
-        offset = 0;
         META_PRODUCTION_GLOBAL_DISCOVERY();
         return offset == chain_size;
     }
@@ -1495,13 +1733,12 @@ END_SYMBOL_BINDING
     inline bool parse()
     {
         compilation_id++;
-        offset = 0;
         META_PRODUCTION_GLOBAL_STAT();
-            bool success = offset == chain_size;
-            if (not success)
-            {
-                EXPECTED("class, function or decorator")();
-            }
+        bool success = offset == chain_size;
+        if (not success)
+        {
+            EXPECTED("class, function or decorator")();
+        }
         return success;
     }
 

@@ -7,18 +7,18 @@
 
 #define BEGIN_ILC_CODEGEN(NAME)                                                      \
   struct NAME {                                                              \
+  /** @brief The chain to be parsed */ std::vector<SYMBOL> &chain;     \
   /** @brief Compilation time, indicates the ILC compilation time, should be   \
    * incremented when the chain content changes  */                            \
   static unsigned long long compilation_id;                                     \
-  /** @brief The chain to be parsed */ std::vector<SYMBOL> chain{};     \
   /** @brief The size of the chain, should be updated with chain.size() when   \
    * @a chain content's change*/                                               \
    size_t chain_size{0};                                                 \
   /** @brief Indicates the offset of the compilation @warning When getting the \
    * value of an index after REQUIRE_X(...) always do chain[offset-1], because \
    * offset gets incremented after REQUIRE*/                                   \
-  int offset{0}; \
-  static std::shared_ptr<NAME> make(){ return std::make_shared<NAME>();  }
+  long long offset{0}; \
+  static std::shared_ptr<NAME> make(std::vector<SYMBOL> & vec, size_t chain_size = 0, long long offset = 0){  auto p = std::make_shared<NAME>(vec); p->chain_size = chain_size; p->offset = offset; return p;  }
 
 #if defined(BEGIN_ILC_CODEGEN)
 
@@ -27,7 +27,7 @@ struct derivation_history_t
   /// indicates the last compilation time in wich this producion was used
   unsigned long long compilation_id{0};
   /// indicates the offset starting from the beginning the token chain
-  int offset{-1};
+  long long offset{-1};
 };
 
 inline bool CHECK_DERIVATION_HISTORY(derivation_history_t& history);

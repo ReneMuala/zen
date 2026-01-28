@@ -14,6 +14,7 @@ namespace zen::builder
 {
     struct table
     {
+        const std::unordered_map<std::string, std::shared_ptr<builder::type>> & generic_context_mapping;
         const std::shared_ptr<builder::function> & function;
         std::shared_ptr<builder::type> type;
         std::shared_ptr<builder::program> program;
@@ -26,11 +27,18 @@ namespace zen::builder
         std::expected<std::shared_ptr<value>, std::string> get_value(const std::string& name, const std::function<void(std::shared_ptr<value>&, const std
                                                                          ::shared_ptr<value>&)>& pointer_handler);
         std::expected<std::shared_ptr<value>, std::string> get_value(const std::string& name);
+        std::string simple_name(const std::string& name);
+        static std::string resolve_type_name(const std::string& name,  const std::unordered_map<std::string, std::shared_ptr<builder::type>> & gcm = {});
         std::expected<std::pair<std::shared_ptr<builder::value>,std::shared_ptr<builder::function>>, std::string> get_function(const std::string& name, std::vector<std::shared_ptr<zen::builder::type>>& params, std::string& hint);
+        std::expected<std::shared_ptr<generic_context>, std::string> get_generic_function(
+            std::string name, size_t param_count);
+        std::expected<std::shared_ptr<generic_context>, std::string> get_generic_type(
+            std::string name, size_t param_count);
         std::expected<std::pair<std::shared_ptr<builder::value>,std::shared_ptr<builder::function>>, std::string> get_function(const std::shared_ptr<zen::builder::value>& object, const std::string& name, std::vector<std::shared_ptr<zen::builder::
-            type>>& params, std::string& hint);
-        std::expected<std::shared_ptr<builder::type>, std::string> get_type(const std::string& name);
-        static std::expected<std::shared_ptr<builder::type>, std::string> get_type(const std::string& name, const std::shared_ptr<builder::program>& program);
-        static std::shared_ptr<table> create(const std::shared_ptr<builder::function>& function, const std::shared_ptr<builder::type>& type = nullptr, const std::shared_ptr<builder::program>& program = nullptr);
+                                                                                                                                   type>>& params, std::string& hint);
+        // std::expected<std::shared_ptr<builder::type>, std::string> get_type(const std::string& name);
+        static std::expected<std::vector<std::shared_ptr<builder::type>>, std::string> get_types(const std::vector<std::string> & types, const std::shared_ptr<builder::program>& program,  const std::unordered_map<std::string, std::shared_ptr<builder::type>> & gcm);
+        static std::expected<std::shared_ptr<builder::type>, std::string> get_type(const std::string& name, const std::shared_ptr<builder::program>& program,  const std::unordered_map<std::string, std::shared_ptr<builder::type>> & gcm = {});
+        static std::shared_ptr<table> create(const std::shared_ptr<builder::function>& function, const std::unordered_map<std::string, std::shared_ptr<builder::type>> & gcm = {}, const std::shared_ptr<builder::type>& type = nullptr, const std::shared_ptr<builder::program>& program = nullptr);
     };
 }

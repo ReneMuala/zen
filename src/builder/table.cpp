@@ -116,8 +116,28 @@ namespace zen::builder
         return result;
     }
 
+    std::string table::simple_name(const std::string& name)
+    {
+        if (name.contains('.'))
+        {
+            const auto final = name.find_last_of('.');
+            return name.substr(final+1);
+        }
+        return name;
+    }
+
+    std::string table::resolve_type_name(const std::string& name,
+        const std::unordered_map<std::string, std::shared_ptr<builder::type>>& gcm)
+    {
+        if (const auto r = gcm.find(name); r != gcm.end())
+        {
+            return r->second->name;
+        }
+        return name;
+    }
+
     std::expected<std::pair<std::shared_ptr<builder::value>,std::shared_ptr<builder::function>>, std::string> table::get_function(const std::string& name,
-         std::vector<std::shared_ptr<zen::builder::type>>& params, std::string & hint)
+                                                                                                                                  std::vector<std::shared_ptr<zen::builder::type>>& params, std::string & hint)
     {
         std::shared_ptr<builder::function> target;
         std::shared_ptr<builder::value> object;
@@ -161,10 +181,11 @@ namespace zen::builder
                 hint = fmt::format("{} [library: {}]", hint.substr(0, hint.size()-2), lib.second->name);
             }
         }
+
+        if (const auto g = generic_context_mapping.find(name); g != generic_context_mapping.end())
+            return get_function(g->second->name, params, hint);
         if (type and not name.starts_with("this."))
-        {
             return get_function("this." + name, params, hint);
-        }
         if (not hint.empty())
         {
             hint = fmt::format("available overloads: {}", hint);
@@ -173,6 +194,65 @@ namespace zen::builder
         }
         return std::unexpected(fmt::format("no such function {}",
                                            target->get_canonical_name()));
+    }
+
+    std::expected<std::shared_ptr<generic_context>, std::string>  table::get_generic_function(std::string name, const size_t param_count)
+    {
+        i64 hash;
+        if (name.contains('.'))
+        {
+            const auto final = name.find_last_of('.');
+            if (auto result = get_value(name.substr(0, final)); result.has_value())
+            {
+                const std::shared_ptr<builder::value>& object = result.value();
+                name = object->type->name + name.substr(final);
+                hash = zen::builder::generic_context::get_hash(name,param_count);
+            } else
+            {
+                return std::unexpected(result.error());
+            }
+        } else
+        {
+            hash = zen::builder::generic_context::get_hash(name,param_count);
+        }
+        for (const auto& lib : program->libraries)
+        {
+            if (const auto& r = lib.second->get_generic_function(hash))
+            {
+                return r;
+            }
+        }
+        return std::unexpected(fmt::format("no such generic function {}", name));
+    }
+
+    std::expected<std::shared_ptr<generic_context>, std::string> table::get_generic_type(std::string name,
+        size_t param_count)
+    {
+        i64 hash;
+        if (name.contains('.'))
+        {
+            const auto final = name.find_last_of('.');
+            if (auto result = get_value(name.substr(0, final)); result.has_value())
+            {
+                const std::shared_ptr<builder::value>& object = result.value();
+                name = object->type->name + name.substr(final);
+                hash = zen::builder::generic_context::get_hash(name,param_count);
+            } else
+            {
+                return std::unexpected(result.error());
+            }
+        } else
+        {
+            hash = zen::builder::generic_context::get_hash(name,param_count);
+        }
+        for (const auto& lib : program->libraries)
+        {
+            if (const auto& r = lib.second->get_generic_type(hash))
+            {
+                return r;
+            }
+        }
+        return std::unexpected(fmt::format("no such generic class {}", name));
     }
 
     std::expected<std::pair<std::shared_ptr<builder::value>, std::shared_ptr<builder::function>>, std::string> table::
@@ -218,14 +298,33 @@ namespace zen::builder
                                            target->get_canonical_name(), object->type->name));
     }
 
-    std::expected<std::shared_ptr<struct type>, std::string> table::get_type(const std::string& name)
+    // std::expected<std::shared_ptr<struct type>, std::string> table::get_type(const std::string& name)
+    // {
+    //     return get_type(name, program, generic_context_mapping);
+    // }
+
+    std::expected<std::vector<std::shared_ptr<builder::type>>, std::string> table::get_types(
+        const std::vector<std::string>& names, const std::shared_ptr<builder::program>& program,  const std::unordered_map<std::string, std::shared_ptr<builder::type>> & gcm)
     {
-        return get_type(name, program);
+        std::vector<std::shared_ptr<builder::type>> types;
+        for (const auto& name : names)
+        {
+            if (auto result = get_type(name, program, gcm); result.has_value())
+            {
+                types.push_back(result.value());
+            } else
+            {
+                return std::unexpected(result.error());
+            }
+        }
+        return types;
     }
 
     std::expected<std::shared_ptr<builder::type>, std::string> table::get_type(const std::string& name,
-        const std::shared_ptr<builder::program>& program)
+                                                                               const std::shared_ptr<builder::program>& program, const std::unordered_map<std::string, std::shared_ptr<builder::type>> & gcm)
     {
+        if (const auto t_index = gcm.find(name);t_index != gcm.end())
+            return t_index->second;
         for (const auto& lib : program->libraries)
         {
             for (const auto& type : lib.second->types)
@@ -249,9 +348,10 @@ namespace zen::builder
     }
 
     std::shared_ptr<table> table::create(const std::shared_ptr<builder::function>& function,
+                                            const std::unordered_map<std::string, std::shared_ptr<builder::type>> & gcm,
                                          const std::shared_ptr<builder::type>& type,
                                          const std::shared_ptr<builder::program>& program)
     {
-        return std::make_shared<table>(function, type, program);
+        return std::make_shared<table>(gcm, function, type, program);
     }
 }

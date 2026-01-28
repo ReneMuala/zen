@@ -28,6 +28,18 @@ namespace zen::builder
         return target != functions.end() ? target->second : nullptr;
     }
 
+    std::shared_ptr<generic_context> library::get_generic_function(i64 id)
+    {
+        const auto target = generic_functions.find(id);
+        return target != generic_functions.end() ? target->second : nullptr;
+    }
+
+    std::shared_ptr<generic_context> library::get_generic_type(i64 id)
+    {
+        const auto target = generic_types.find(id);
+        return target != generic_types.end() ? target->second : nullptr;
+    }
+
     std::shared_ptr<type> library::get_type(i64 id)
     {
         const auto target = types.find(id);
@@ -37,6 +49,16 @@ namespace zen::builder
     void library::add(std::shared_ptr<builder::function> fn)
     {
         functions[fn->hash()] = fn;
+    }
+
+    void library::add_generic_type(const std::shared_ptr<builder::generic_context> & gc)
+    {
+        generic_types[gc->hash()] = gc;
+    }
+
+    void library::add_generic_function(const std::shared_ptr<builder::generic_context> & gc)
+    {
+        generic_functions[gc->hash()] = gc;
     }
 
     void library::add(std::shared_ptr<builder::type> ty)
