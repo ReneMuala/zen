@@ -228,7 +228,6 @@ namespace zen::builder
     std::expected<std::shared_ptr<generic_context>, std::string> table::get_generic_type(std::string name,
         size_t param_count)
     {
-        i64 hash;
         if (name.contains('.'))
         {
             const auto final = name.find_last_of('.');
@@ -236,15 +235,18 @@ namespace zen::builder
             {
                 const std::shared_ptr<builder::value>& object = result.value();
                 name = object->type->name + name.substr(final);
-                hash = zen::builder::generic_context::get_hash(name,param_count);
             } else
             {
                 return std::unexpected(result.error());
             }
-        } else
-        {
-            hash = zen::builder::generic_context::get_hash(name,param_count);
         }
+        return get_generic_type(name, param_count, program);
+    }
+
+    std::expected<std::shared_ptr<generic_context>, std::string> table::get_generic_type(std::string name,
+        size_t param_count, const std::shared_ptr<builder::program>& program)
+    {
+        i64 hash = zen::builder::generic_context::get_hash(name,param_count);
         for (const auto& lib : program->libraries)
         {
             if (const auto& r = lib.second->get_generic_type(hash))

@@ -252,8 +252,11 @@ BEGIN_ILC_CODEGEN(builder_parser)
         implementation_parser->class_ = class_;
         implementation_parser->pool = pool;
         implementation_parser->gcm.insert(mapping.begin(), mapping.end());
-        implementation_parser->gcm.insert(this->tab->generic_context_mapping.begin(),
-                                          this->tab->generic_context_mapping.end());
+        if (tab)
+        {
+            implementation_parser->gcm.insert(this->tab->generic_context_mapping.begin(),
+                                              this->tab->generic_context_mapping.end());
+        }
         try
         {
             implementation_parser->offset = generic_offset;
@@ -329,7 +332,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
                     generic_args.value(),
                     std::bind(&builder_parser::generic_context_implementer, this, std::placeholders::_1,
                               std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
-                              tab->simple_name(name))); not result.has_value())
+                              zen::builder::table::simple_name(name))); not result.has_value())
                 {
                     throw zen::exceptions::semantic_error(result.error(), offset);
                 }
@@ -1023,9 +1026,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
                 if (const auto real_type = zen::builder::table::get_type(type, prog, gcm); not real_type.has_value())
                 {
                     // create tab when dealing with class fields
-                    if (not tab) tab = zen::builder::table::create(zen::builder::function::create(*pool, offset), gcm,
-                                                                   class_, prog);
-                    if (const auto gen_ctx = tab->get_generic_type(name, generic_params.size()); not gen_ctx.
+                    if (const auto gen_ctx = tab ? tab->get_generic_type(name, generic_params.size()) : zen::builder::table::get_generic_type(name, generic_params.size(), prog); not gen_ctx.
                         has_value())
                     {
                         throw zen::exceptions::semantic_error(gen_ctx.error(), offset);
@@ -1034,7 +1035,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
                         generic_args, std::bind(&builder_parser::generic_context_implementer, this,
                                                 std::placeholders::_1,
                                                 std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
-                                                tab->simple_name(name))); not result.has_value())
+                                                zen::builder::table::simple_name(name))); not result.has_value())
                     {
                         throw zen::exceptions::semantic_error(result.error(), offset);
                     }
