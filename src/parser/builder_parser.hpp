@@ -89,6 +89,92 @@ BEGIN_ILC_CODEGEN(builder_parser)
     BEGIN_PRODUCTION(PRODUCTION_NUSING_STAT)
         REQUIRE_TERMINAL(TKEYWORD_USING)
         REQUIRE_NON_TERMINAL_CALLBACK(NID, EXPECTED("ID"))
+        const std::string name = id;
+        if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
+        {
+            std::vector<std::shared_ptr<zen::builder::type>> params;
+            do
+            {
+                if (TRY_REQUIRE_TERMINAL(TID))
+                {
+                    REQUIRE_TERMINAL_CALLBACK(TCOLON, EXPECTED(":"))
+                    type.clear();
+                    REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
+                    if (auto result = zen::builder::table::get_type(type, prog, gcm); result.has_value())
+                    {
+                        params.push_back(result.value());
+                    }
+                    else
+                    {
+                        throw zen::exceptions::semantic_error(result.error(), offset);
+                    }
+                } else break;
+            } while (TRY_REQUIRE_TERMINAL(TCOMMA));
+            REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
+            REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
+            REQUIRE_NON_TERMINAL_CALLBACK(NID, EXPECTED("ID"))
+            std::string function_name = id;
+            std::optional<std::vector<std::shared_ptr<zen::builder::type>>> generic_args;
+            if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
+            {
+                function_name = zen::builder::generic_context::get_name(function_name, generic_params);
+                if (auto result = zen::builder::table::get_types(generic_params, prog, gcm); result.has_value())
+                {
+                    generic_args = result.value();
+                }
+                else
+                {
+                    throw zen::exceptions::semantic_error(result.error(), offset);
+                }
+            }
+
+            std::string hint;
+            if (generic_args)
+            {
+                auto params_copy = params;
+                if (auto callee = tab->get_function(function_name, params_copy, hint); not callee.has_value())
+                    //not defined generic function
+                {
+                    if (auto gen_ctx = tab->get_generic_function_or_type(function_name, generic_args->size()); not gen_ctx.
+                        has_value())
+                    {
+                        throw zen::exceptions::semantic_error(gen_ctx.error(), offset);
+                    }
+                    else if (const auto result = gen_ctx.value()->implement(
+                        generic_args.value(),
+                        std::bind(&builder_parser::generic_context_implementer, this, std::placeholders::_1,
+                                  std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
+                                  zen::builder::table::simple_name(function_name))); not result.has_value())
+                    {
+                        throw zen::exceptions::semantic_error(result.error(), offset);
+                    }
+                }
+                hint.clear();
+            }
+            if (auto callee = tab->get_function(function_name, params, hint); not callee.has_value())
+            {
+                throw zen::exceptions::semantic_error(callee.error(), offset, hint);
+            } else
+            {
+                callee.value().second->name = name;
+                lib->add(callee.value().second);
+                callee.value().second->name = function_name;
+            }
+        }
+        else
+        {
+            REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
+            type.clear();
+            REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("NTYPE"))
+            if (const auto result = zen::builder::table::get_type(type, prog); not result.has_value())
+            {
+                throw zen::exceptions::semantic_error(result.error(), offset);
+            }
+            else
+            {
+                gcm[name] = result.value();
+            }
+        }
     END_PRODUCTION
 
     BEGIN_PRODUCTION(PRODUCTION_NCLASS)
@@ -324,7 +410,8 @@ BEGIN_ILC_CODEGEN(builder_parser)
             if (auto callee = tab->get_function(name, params_copy, hint); not callee.has_value())
             //not defined generic function
             {
-                if (auto gen_ctx = tab->get_generic_function(name, generic_args->size()); not gen_ctx.has_value())
+                if (auto gen_ctx = tab->get_generic_function_or_type(name, generic_args->size()); not gen_ctx.
+                    has_value())
                 {
                     throw zen::exceptions::semantic_error(gen_ctx.error(), offset);
                 }
@@ -404,7 +491,8 @@ BEGIN_ILC_CODEGEN(builder_parser)
             if (auto callee = tab->get_function(obj, name, params_copy, hint); not callee.has_value())
             //not defined generic function
             {
-                if (auto gen_ctx = tab->get_generic_function(name, generic_args->size()); not gen_ctx.has_value())
+                if (auto gen_ctx = tab->get_generic_function_or_type(name, generic_args->size()); not gen_ctx.
+                    has_value())
                 {
                     throw zen::exceptions::semantic_error(gen_ctx.error(), offset);
                 }
@@ -649,7 +737,14 @@ BEGIN_ILC_CODEGEN(builder_parser)
 
     BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_DEFINITION)
         REQUIRE_NON_TERMINAL(NFUNCTION_DEFINITION_PREFIX)
-        if (not fun->is_extern)
+        if (fun->is_extern)
+        {
+            if (TRY_REQUIRE_TERMINAL(TBRACES_OPEN))
+            {
+                throw zen::exceptions::semantic_error("@extern function should not have body", offset);
+            }
+        }
+        else
         {
             if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
             {
@@ -1026,7 +1121,10 @@ BEGIN_ILC_CODEGEN(builder_parser)
                 if (const auto real_type = zen::builder::table::get_type(type, prog, gcm); not real_type.has_value())
                 {
                     // create tab when dealing with class fields
-                    if (const auto gen_ctx = tab ? tab->get_generic_type(name, generic_params.size()) : zen::builder::table::get_generic_type(name, generic_params.size(), prog); not gen_ctx.
+                    if (const auto gen_ctx = tab
+                                                 ? tab->get_generic_type(name, generic_params.size())
+                                                 : zen::builder::table::get_generic_type(
+                                                     name, generic_params.size(), prog); not gen_ctx.
                         has_value())
                     {
                         throw zen::exceptions::semantic_error(gen_ctx.error(), offset);

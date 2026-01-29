@@ -30,7 +30,7 @@ namespace zen::builder
         static std::string simple_name(const std::string& name);
         static std::string resolve_type_name(const std::string& name,  const std::unordered_map<std::string, std::shared_ptr<builder::type>> & gcm = {});
         std::expected<std::pair<std::shared_ptr<builder::value>,std::shared_ptr<builder::function>>, std::string> get_function(const std::string& name, std::vector<std::shared_ptr<zen::builder::type>>& params, std::string& hint);
-        std::expected<std::shared_ptr<generic_context>, std::string> get_generic_function(
+        std::expected<std::shared_ptr<generic_context>, std::string> get_generic_function_or_type(
             std::string name, size_t param_count);
         std::expected<std::shared_ptr<generic_context>, std::string> get_generic_type(
             std::string name, size_t param_count);

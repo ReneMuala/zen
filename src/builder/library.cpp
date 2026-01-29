@@ -46,7 +46,7 @@ namespace zen::builder
         return target != types.end() ? target->second : nullptr;
     }
 
-    void library::add(std::shared_ptr<builder::function> fn)
+    void library::add(const std::shared_ptr<function>& fn)
     {
         functions[fn->hash()] = fn;
     }
@@ -61,7 +61,7 @@ namespace zen::builder
         generic_functions[gc->hash()] = gc;
     }
 
-    void library::add(std::shared_ptr<builder::type> ty)
+    void library::add(const std::shared_ptr<type>& ty)
     {
         types[ty->hash()] = ty;
     }

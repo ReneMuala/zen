@@ -196,7 +196,7 @@ namespace zen::builder
                                            target->get_canonical_name()));
     }
 
-    std::expected<std::shared_ptr<generic_context>, std::string>  table::get_generic_function(std::string name, const size_t param_count)
+    std::expected<std::shared_ptr<generic_context>, std::string>  table::get_generic_function_or_type(std::string name, const size_t param_count)
     {
         i64 hash;
         if (name.contains('.'))
@@ -218,9 +218,9 @@ namespace zen::builder
         for (const auto& lib : program->libraries)
         {
             if (const auto& r = lib.second->get_generic_function(hash))
-            {
                 return r;
-            }
+            if (const auto& r = lib.second->get_generic_type(hash))
+                return r;
         }
         return std::unexpected(fmt::format("no such generic function {}", name));
     }

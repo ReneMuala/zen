@@ -638,7 +638,7 @@ namespace zen::library::casting
     {
         const auto fn = zen::builder::function::create(pool, 0, false, "long");
         fn->set_return(zen::builder::function::_long());
-        fn->gen<zen::i64_to_str>(fn->ret, fn->set_parameter(zen::builder::function::_long(), "it"));
+        fn->gen<zen::i64_to_i64>(fn->ret, fn->set_parameter(zen::builder::function::_long(), "it"));
         fn->return_implicitly();
         fn->build();
         return fn;
@@ -648,7 +648,7 @@ namespace zen::library::casting
     {
         const auto fn = zen::builder::function::create(pool, 0, false, "short");
         fn->set_return(zen::builder::function::_short());
-        fn->gen<zen::i16_to_str>(fn->ret, fn->set_parameter(zen::builder::function::_short(), "it"));
+        fn->gen<zen::i16_to_i16>(fn->ret, fn->set_parameter(zen::builder::function::_short(), "it"));
         fn->return_implicitly();
         fn->build();
         return fn;
@@ -658,7 +658,7 @@ namespace zen::library::casting
     {
         const auto fn = zen::builder::function::create(pool, 0, false, "float");
         fn->set_return(zen::builder::function::_float());
-        fn->gen<zen::f32_to_str>(fn->ret, fn->set_parameter(zen::builder::function::_float(), "it"));
+        fn->gen<zen::f32_to_f32>(fn->ret, fn->set_parameter(zen::builder::function::_float(), "it"));
         fn->return_implicitly();
         fn->build();
         return fn;
@@ -668,7 +668,7 @@ namespace zen::library::casting
     {
         const auto fn = zen::builder::function::create(pool, 0, false, "double");
         fn->set_return(zen::builder::function::_double());
-        fn->gen<zen::f64_to_str>(fn->ret, fn->set_parameter(zen::builder::function::_double(), "it"));
+        fn->gen<zen::f64_to_f64>(fn->ret, fn->set_parameter(zen::builder::function::_double(), "it"));
         fn->return_implicitly();
         fn->build();
         return fn;

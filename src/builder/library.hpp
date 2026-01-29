@@ -23,10 +23,10 @@ namespace zen::builder
         std::shared_ptr<generic_context> get_generic_function(i64 id);
         std::shared_ptr<generic_context> get_generic_type(i64 id);
         std::shared_ptr<type> get_type(i64);
-        void add(std::shared_ptr<builder::function>);
+        void add(const std::shared_ptr<function>&);
         void add_generic_type(const std::shared_ptr<generic_context>& gc);
         void add_generic_function(const std::shared_ptr<generic_context>& gc);
-        void add(std::shared_ptr<builder::type>);
+        void add(const std::shared_ptr<type>&);
         static std::shared_ptr<library> create(const std::string& name);
     };
 

@@ -497,23 +497,49 @@ rect(lines: int, cols: int) = {
 	class Pair<A, B> {
 		a: A
 		b: B
+		new(a: A, b: B) = {
+			this.a = a
+			this.b = b
+		}
 	}
 
+	using FloatPair = Pair<float, float>
+
+	using i32 = int
+	using IntInt = Pair<i32, i32>
+	using money = double
 	class PairSet<A, B> {
 		p1: Pair<A,B>
 		p2: Pair<A,B>
+		new(a1: A, b1: B, a2: A, b2: B) = {
+			this.p1 = Pair<A,B>(a1, b1)
+			this.p2 = Pair<A,B>(a2, b2)
+		}
 	}
-
+	class maybe<T> {
+		valid = bool(true)
+	}
 	string<A, B>(pair: Pair<A, B>) = string(string(pair.a) + " " + string(pair.b))
-
+	add<T>(x: T, y: T) = T(x+y)
+	using add(x: float, y: float) = add<float>
+	using abs(x: double) = abs<double>
+	using abs(x: float) = abs<float>
 	main() = {
-		pairSet : PairSet<int, short>
-		pair : Pair<int, short>
-		pair.a = 19i
-		pair.b = 19s
+		println(add<float>(2f,3f))
+		println(add(2f, 3f))
+		x := 4.3
+		x := 2
+		ii := IntInt(20,20)
+		value := money(50.25)
+		println(value)
+		pairSet := PairSet<int, short>(10i, 10s, 11i, 11s)
+		pair := Pair<int, short>(19i, 19s)
 		println(string<int, short>(pair))
 		println(string<int, short>(pairSet.p1))
 		println(string<int, short>(pairSet.p2))
+		pair := Pair<string, money>("fifty hundred", 50e100)
+		fp := FloatPair(2f,3f)
+		println(string<float, float>(fp))
 		runGlobalTests()
 		p := person("Rene", 20)
 		println("got name: " + getName<person>(p))
