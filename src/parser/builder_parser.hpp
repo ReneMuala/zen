@@ -1387,16 +1387,10 @@ BEGIN_ILC_CODEGEN(builder_parser)
                 if (at_generic_implementation)
                     at_generic_implementation = false;
                 REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
-                while (TRY_REQUIRE_NON_TERMINAL(NCLASS_FIELD) or TRY_REQUIRE_NON_TERMINAL(NGLOBAL_DISCOVERY_STAT))
+                while (TRY_REQUIRE_NON_TERMINAL(NDISCOVERY_CLASS_FIELD) or TRY_REQUIRE_NON_TERMINAL(NGLOBAL_DISCOVERY_STAT))
                 {
                     REQUIRE_NON_TERMINAL(META_NANY_BODY)
                 }
-                lib->add(create_allocator(class_));
-                lib->add(create_virtual_deallocator(class_));
-                lib->add(create_deallocator(class_));
-                lib->add(create_mover(class_));
-                lib->add(create_equals(class_));
-                lib->add(create_not_equals(class_));
                 class_ = nullptr;
                 REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
             }
