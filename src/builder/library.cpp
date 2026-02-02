@@ -22,6 +22,18 @@ namespace zen::builder
         return hasher(name);
     }
 
+    std::expected<std::shared_ptr<type>, std::string> library::find_type_or_throw(const std::string& string)
+    {
+        for (auto& item : types)
+        {
+            if (item.second->name == string)
+            {
+                return item.second;
+            }
+        }
+        return std::unexpected<std::string>(fmt::format("class {} was not found during passing", string, "this os more likely a bug or a result of memory corruption"));
+    }
+
     std::shared_ptr<function> library::get_function(i64 id)
     {
         const auto target = functions.find(id);
@@ -61,9 +73,15 @@ namespace zen::builder
         generic_functions[gc->hash()] = gc;
     }
 
-    void library::add(const std::shared_ptr<type>& ty)
+    std::expected<bool, std::string> library::add(const std::shared_ptr<type>& ty)
     {
+        const auto hash = ty->hash();
+        if (types.contains(hash))
+        {
+            return std::unexpected(fmt::format("type {} is already defined", ty->name));
+        }
         types[ty->hash()] = ty;
+        return true;
     }
 
     std::shared_ptr<library> library::create(const std::string& name)

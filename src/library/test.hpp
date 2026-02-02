@@ -7,7 +7,7 @@
 #include "builder/library.hpp"
 #include "builder/program.hpp"
 
-namespace zen::library::test
+namespace zen::libraries::test
 {
     std::shared_ptr<zen::builder::library> create(utils::constant_pool & pool, std::shared_ptr<zen::builder::library> lib, std::shared_ptr<zen::builder::program> program);
 }

@@ -6,7 +6,7 @@
 
 #include "builder/table.hpp"
 
-namespace zen::library::test
+namespace zen::libraries::test
 {
     inline std::shared_ptr<builder::function> create_test_all(utils::constant_pool& pool,
                                                               std::shared_ptr<builder::program> program)

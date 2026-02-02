@@ -6,7 +6,7 @@
 #include <memory>
 #include "builder/library.hpp"
 
-namespace zen::library::casting
+namespace zen::libraries::casting
 {
     std::shared_ptr<zen::builder::library> create(utils::constant_pool & pool);
 }

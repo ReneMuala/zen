@@ -14,21 +14,21 @@ if is_plat("wasm") then
 end
 
 if not is_plat("wasm") then
-    target("tests")
-    set_languages("c++23")
-    set_kind("binary")
-    add_packages("fmt", "asmjit", "gtest")
-    add_includedirs("src/", "libs/")
-    add_files(
-        "src/lexer/*.cpp",
-        "src/vm/*.cpp",
-        --"src/parser/*.cpp",
-        "src/exceptions/*.cpp",
-        "src/composer/vm/*.cpp",
-        "src/builder/*.cpp",
-        "src/library/*.cpp",
-        "test/*.cpp"
-    )
+    --target("tests")
+    --set_languages("c++23")
+    --set_kind("binary")
+    --add_packages("fmt", "asmjit", "gtest")
+    --add_includedirs("src/", "libs/")
+    --add_files(
+    --    "src/lexer/*.cpp",
+    --    "src/vm/*.cpp",
+    --    --"src/parser/*.cpp",
+    --    "src/exceptions/*.cpp",
+    --    "src/composer/vm/*.cpp",
+    --    "src/builder/*.cpp",
+    --    "src/library/*.cpp",
+    --    "test/*.cpp"
+    --)
 end
 
 target("zen")

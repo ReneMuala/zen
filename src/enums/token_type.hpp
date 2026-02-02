@@ -22,11 +22,13 @@ namespace enums
     TPARENTHESIS_OPEN,
     /// )
     TPARENTHESIS_CLOSE,
+    NDISCOVERY_CLASS_FIELD,
     NCLASS_FIELD,
     NFUNCTION_BODY,
     /// statement
     NSTAT,
     NGLOBAL_STAT,
+    NUSING_STAT,
     NGLOBAL_DISCOVERY_STAT,
     META_NANY_BODY,
     /// ,
@@ -99,6 +101,7 @@ namespace enums
     NFUNCTION_DEFINITION,
     // (...) = TYPE
     NFUNCTION_DEFINITION_PREFIX,
+    NIGNORE_FUNCTION_DEFINITION_PREFIX,
     /// short number
     TBYTE_NUM,
     /// short number

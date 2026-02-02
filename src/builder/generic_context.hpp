@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <any>
 #include <expected>
 #include <functional>
 #include <memory>
@@ -19,19 +20,17 @@
 
 namespace zen::builder
 {
-    struct generic_context
+    struct generic_context: public  std::enable_shared_from_this<generic_context>
     {
-        enum kind
-        {
-            type,
-            function,
-        };
         std::string name;
         long long offset;
         size_t chain_size;
         std::shared_ptr<zen::builder::type> class_;
         std::vector<std::string> params;
-
+        virtual std::shared_ptr<generic_context> with_hints(std::vector<std::shared_ptr<builder::type>>& hints)
+        {
+            return shared_from_this();
+        }
         void add_parameter(const std::string& parameter)
         {
             params.push_back(parameter);
@@ -39,10 +38,13 @@ namespace zen::builder
 
         types::stack::i64 hash() const;
 
-        static std::shared_ptr<generic_context> create(const std::string& name, const long long offset, size_t chain_size, std::vector<std::string>& params, const std::shared_ptr<zen::builder::type>& class_ = nullptr)
+        static std::shared_ptr<generic_context> create(const std::string& name, const long long offset, size_t chain_size, const std::vector<std::string>& params, const std::shared_ptr<zen::builder::type>& class_ = nullptr)
         {
-            auto t = std::make_shared<generic_context>(name, offset, chain_size);
-            t->params = std::move(params);
+            auto t = std::make_shared<generic_context>();
+            t->name = name;
+            t->offset = offset;
+            t->chain_size = chain_size;
+            t->params = params;
             t->class_ = class_;
             return t;
         }
@@ -53,6 +55,19 @@ namespace zen::builder
             for (auto& argument : arguments)
             {
                 args_string += fmt::format("{},", argument);
+            }
+            if (not arguments.empty())
+                args_string.pop_back();
+            args_string += ">";
+            return args_string;
+        }
+
+        static std::string get_name(const std::string& name, const std::vector<std::shared_ptr<zen::builder::type>> & arguments)
+        {
+            std::string args_string = name+"<";
+            for (auto& argument : arguments)
+            {
+                args_string += fmt::format("{},", argument->name);
             }
             if (not arguments.empty())
                 args_string.pop_back();
@@ -78,7 +93,7 @@ namespace zen::builder
             return mapping;
         }
 
-        std::expected<bool, std::string> implement(const std::vector<std::shared_ptr<builder::type>>& arguments, const std::function<void(const std::unordered_map<std::string, std::shared_ptr<builder::type>>& mapping, long long offset, size_t chain_size, const std::shared_ptr<zen::builder::type>& class_)>& implementer) const
+        virtual std::expected<bool, std::string> implement(std::any program,const std::vector<std::shared_ptr<builder::type>>& arguments, const std::function<void(const std::unordered_map<std::string, std::shared_ptr<builder::type>>& mapping, long long offset, size_t chain_size, const std::shared_ptr<zen::builder::type>& class_)>& implementer) const
         {
             std::unordered_map<std::string, std::shared_ptr<builder::type>> mapping;
             if (const auto result = get_mapping(arguments); result.has_value())

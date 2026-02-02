@@ -6,7 +6,7 @@
 
 #include "builder/table.hpp"
 
-namespace zen::library::string
+namespace zen::libraries::string
 {
     inline std::shared_ptr<builder::function> create_allocator(utils::constant_pool& pool)
     {

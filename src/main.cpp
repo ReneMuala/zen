@@ -15,6 +15,7 @@
 #include "library/zen.hpp"
 #include "fmt/core.h"
 #include "library/test.hpp"
+#include "library/typing.hpp"
 
 #ifdef KAIZEN_WASM
 #include <emscripten.h>
@@ -57,13 +58,14 @@ try
 	const auto parser = builder_parser::make(chain, chain.size());
 	parser->prog = program;
 	program->add(parser->lib);
-	program->add(zen::library::_zen::create(*parser->pool));
-	program->add(zen::library::casting::create(*parser->pool));
-	program->add(zen::library::string::create(*parser->pool));
-	program->add(zen::library::io::create(*parser->pool));
+	program->add(zen::libraries::_zen::create(*parser->pool));
+	program->add(zen::libraries::casting::create(*parser->pool));
+	program->add(zen::libraries::string::create(*parser->pool));
+	program->add(zen::libraries::io::create(*parser->pool));
+	program->add(zen::libraries::typing::create(*parser->pool));
 	parser->offset = 0;
 	parser->discover();
-	program->add(zen::library::test::create(*parser->pool, parser->lib, parser->prog));
+	program->add(zen::libraries::test::create(*parser->pool, parser->lib, parser->prog));
 	parser->offset = 0;
 	parser->parse();
 	auto params = std::vector<std::shared_ptr<zen::builder::type>>{};
@@ -158,10 +160,10 @@ class point {
 		const auto parser = builder_parser::make();
 		parser->prog = program;
 		program->add(parser->lib);
-		program->add(zen::library::_zen::create(*parser->pool));
-		program->add(zen::library::casting::create(*parser->pool));
-		program->add(zen::library::string::create(*parser->pool));
-		program->add(zen::library::io::create(*parser->pool));
+		program->add(zen::libraries::_zen::create(*parser->pool));
+		program->add(zen::libraries::casting::create(*parser->pool));
+		program->add(zen::libraries::string::create(*parser->pool));
+		program->add(zen::libraries::io::create(*parser->pool));
 		std::string filename = argv[i];
 
 		if (filename.empty())
@@ -175,7 +177,7 @@ class point {
 		parser->id = filename;
 		parser->lib->name = filename;
 		parser->discover();
-		program->add(zen::library::test::create(*parser->pool, parser->lib, parser->prog));
+		program->add(zen::libraries::test::create(*parser->pool, parser->lib, parser->prog));
 		parsers.push_back(parser);
 	}
 	for (auto & parser : parsers)
@@ -197,6 +199,30 @@ class point {
 	}
 #else
 	zen_run(R"(
+	class Pair<A, B> {
+		a: A
+		b: B
+		new(a: A, b: B) = {
+			this.a = a
+			this.b = b
+		}
+	}
+class E {
+	e: int
+}
+
+printE(e: E, i: int) = {
+	println(e.e)
+}
+
+class E2 {
+	f: long
+}
+
+printE(e: E) = {
+	println(e.e)
+}
+
 class point {
     x: double
     y: double
@@ -231,20 +257,11 @@ main3 = {
 	y: bool = a.getB().getC().mul(3,2) > a.getB().getC().mul(2,4) == a.getB().getC().mul(3,2) < a.getB().getC().mul(2,4)
 	y: bool = a.getB().getC().mul(3,2) > a.getB().getC().mul(2,4) == a.getB().getC().mul(3,2) < a.getB().getC().mul(2,4)
 }
-class person {
-	name: string
-	surname: string
-	age: int
-	registered: bool
-}
 
-test = {
+test_person_name_equality = {
 	x: bool = person("Zendaya", 20).name == person("Zendaya", 20).name
 }
 
-sum(x: int, y: int) = int {
-	x + y
-}
 
 person2(name: string, age: int) = person {
 	p: person
@@ -390,7 +407,7 @@ rect(lines: int, cols: int) = {
 		println(abs<long>(-1l))
 */
 
-	main2 = {
+	main4 = {
 		println(string("hello".len()))
 		println("".empty())
 		print("".empty())
@@ -494,17 +511,17 @@ rect(lines: int, cols: int) = {
 		y.c.data_as<int>() == 5 && y.c.data_as<string>() == "5.5"
 	}
 
-	class Pair<A, B> {
-		a: A
-		b: B
-		new(a: A, b: B) = {
-			this.a = a
-			this.b = b
-		}
+	class X {
+		y: Y
 	}
 
-	using FloatPair = Pair<float, float>
+	class Y {
+		k: i32
+	}
 
+
+
+	using FloatPair = Pair<float, float>
 	using i32 = int
 	using IntInt = Pair<i32, i32>
 	using money = double
@@ -520,11 +537,20 @@ rect(lines: int, cols: int) = {
 		valid = bool(true)
 	}
 	string<A, B>(pair: Pair<A, B>) = string(string(pair.a) + " " + string(pair.b))
-	add<T>(x: T, y: T) = T(x+y)
 	using add(x: float, y: float) = add<float>
+	add<T>(x: T, y: T) = T(x+y)
 	using abs(x: double) = abs<double>
 	using abs(x: float) = abs<float>
+	using rand() = getRandomNumber
+	getRandomNumber = int(21)
 	main() = {
+		x := 1
+		if(is<int>(x)){
+			println("x is int")
+		} else {
+			println("x is not int")
+		}
+		println(rand())
 		println(add<float>(2f,3f))
 		println(add(2f, 3f))
 		x := 4.3

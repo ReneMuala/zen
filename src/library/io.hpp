@@ -6,7 +6,7 @@
 #include <memory>
 #include "builder/library.hpp"
 
-namespace zen::library::io
+namespace zen::libraries::io
 {
     std::shared_ptr<zen::builder::library> create(utils::constant_pool & pool);
 }

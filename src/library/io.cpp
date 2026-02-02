@@ -6,7 +6,7 @@
 
 #include "builder/table.hpp"
 
-namespace zen::library::io
+namespace zen::libraries::io
 {
     inline std::shared_ptr<builder::function> create_print_string(utils::constant_pool & pool)
     {

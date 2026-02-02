@@ -2,6 +2,8 @@
 // Created by dte on 2/24/2025.
 //
 #pragma once
+#include <unordered_set>
+
 #include "builder/type.hpp"
 #include "enums/token_type.hpp"
 #include <vector>
@@ -21,8 +23,70 @@ extern std::vector<zen::token> tokens;
 typedef enums::token_type SYMBOL;
 #include "ilc/include/ilc.hpp"
 
+struct signature_deferment
+{
+    std::shared_ptr<zen::builder::function> fun;
+    std::list<std::tuple<std::string, std::string, long long>> params;
+    std::tuple<std::string, long long> ret;
+    std::shared_ptr<zen::builder::type> class_;
+    bool at_test, is_construtor;
+};
+
+struct class_field_deferment
+{
+    std::shared_ptr<zen::builder::type> class_;
+    std::tuple<std::string, std::string, long long> field;
+};
+
+struct function_alias_deferment
+{
+    bool generic;
+    std::string alias, function_name;
+    std::list<std::tuple<std::string, long long>> params;
+    std::vector<std::string> generic_params;
+    long long offset;
+};
+
+struct type_alias_deferment
+{
+    [[nodiscard]] bool is_generic() const
+    {
+        return type_name.contains('<');
+    }
+
+    std::string alias, type_name;
+};
+
+struct generic_deferment
+{
+    std::string name;
+    std::vector<std::string> params;
+    long long offset;
+
+    bool operator==(const generic_deferment& other) const
+    {
+        return this->name == other.name and this->params == other.params;
+    }
+};
+
+template <>
+struct std::hash<generic_deferment>
+{
+    std::size_t operator()(const generic_deferment& p) const noexcept
+    {
+        return std::hash<std::string>{}(p.name);
+    }
+};
+
 BEGIN_ILC_CODEGEN(builder_parser)
 #define EXPECTED(ITEM) [this]() { throw zen::exceptions::syntax_error(ITEM, offset); }
+
+    std::list<signature_deferment> signature_deferments;
+    std::list<function_alias_deferment> function_alias_deferments;
+    std::list<type_alias_deferment> type_alias_deferments;
+    std::list<class_field_deferment> class_field_deferments;
+    std::unordered_set<generic_deferment> generic_deferments;
+
     /**
      * Our current library, should have the name of the file bein parsed without the extension.
      * NotNullable
@@ -54,8 +118,8 @@ BEGIN_ILC_CODEGEN(builder_parser)
     bool at_debug = false;
     bool at_extern = false;
     bool at_test = false;
-    bool at_generic_implementation = false;
-    bool at_generic_specification = false;
+    bool pragma_context_implementation = false;
+    bool pragma_discovery_mode = false;
     bool pragma_dangling_return_value = false;
 
     std::string id, type, value, generic_id;
@@ -86,13 +150,27 @@ BEGIN_ILC_CODEGEN(builder_parser)
         values.push(val);
     }
 
+    BEGIN_PRODUCTION(PRODUCTION_NDISCOVERY_USING_STAT)
+        REQUIRE_TERMINAL(TKEYWORD_USING)
+        REQUIRE_NON_TERMINAL_CALLBACK(NID, EXPECTED("ID"))
+        if (TRY_REQUIRE_NON_TERMINAL(META_NANY_BODY))
+        {
+        }
+        REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
+        REQUIRE_NON_TERMINAL_CALLBACK(NID, EXPECTED("ID"))
+        if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
+        {
+        }
+    END_PRODUCTION
+
     BEGIN_PRODUCTION(PRODUCTION_NUSING_STAT)
         REQUIRE_TERMINAL(TKEYWORD_USING)
         REQUIRE_NON_TERMINAL_CALLBACK(NID, EXPECTED("ID"))
         const std::string name = id;
         if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
         {
-            std::vector<std::shared_ptr<zen::builder::type>> params;
+            function_alias_deferment ufd;
+            ufd.alias = name;
             do
             {
                 if (TRY_REQUIRE_TERMINAL(TID))
@@ -100,102 +178,250 @@ BEGIN_ILC_CODEGEN(builder_parser)
                     REQUIRE_TERMINAL_CALLBACK(TCOLON, EXPECTED(":"))
                     type.clear();
                     REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
-                    if (auto result = zen::builder::table::get_type(type, prog, gcm); result.has_value())
-                    {
-                        params.push_back(result.value());
-                    }
-                    else
-                    {
-                        throw zen::exceptions::semantic_error(result.error(), offset);
-                    }
-                } else break;
-            } while (TRY_REQUIRE_TERMINAL(TCOMMA));
+                    ufd.params.emplace_back(type, offset);
+                }
+                else break;
+            }
+            while (TRY_REQUIRE_TERMINAL(TCOMMA));
             REQUIRE_TERMINAL_CALLBACK(TPARENTHESIS_CLOSE, EXPECTED(")"))
             REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
             REQUIRE_NON_TERMINAL_CALLBACK(NID, EXPECTED("ID"))
-            std::string function_name = id;
-            std::optional<std::vector<std::shared_ptr<zen::builder::type>>> generic_args;
+            ufd.function_name = id;
             if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
             {
-                function_name = zen::builder::generic_context::get_name(function_name, generic_params);
-                if (auto result = zen::builder::table::get_types(generic_params, prog, gcm); result.has_value())
-                {
-                    generic_args = result.value();
-                }
-                else
-                {
-                    throw zen::exceptions::semantic_error(result.error(), offset);
-                }
+                ufd.function_name = zen::builder::generic_context::get_name(ufd.function_name, generic_params);
+                ufd.generic = true;
+                ufd.offset = offset;
+                ufd.generic_params = generic_params;
             }
-
-            std::string hint;
-            if (generic_args)
-            {
-                auto params_copy = params;
-                if (auto callee = tab->get_function(function_name, params_copy, hint); not callee.has_value())
-                    //not defined generic function
-                {
-                    if (auto gen_ctx = tab->get_generic_function_or_type(function_name, generic_args->size()); not gen_ctx.
-                        has_value())
-                    {
-                        throw zen::exceptions::semantic_error(gen_ctx.error(), offset);
-                    }
-                    else if (const auto result = gen_ctx.value()->implement(
-                        generic_args.value(),
-                        std::bind(&builder_parser::generic_context_implementer, this, std::placeholders::_1,
-                                  std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
-                                  zen::builder::table::simple_name(function_name))); not result.has_value())
-                    {
-                        throw zen::exceptions::semantic_error(result.error(), offset);
-                    }
-                }
-                hint.clear();
-            }
-            if (auto callee = tab->get_function(function_name, params, hint); not callee.has_value())
-            {
-                throw zen::exceptions::semantic_error(callee.error(), offset, hint);
-            } else
-            {
-                callee.value().second->name = name;
-                lib->add(callee.value().second);
-                callee.value().second->name = function_name;
-            }
+            function_alias_deferments.push_back(ufd);
         }
         else
         {
+            type_alias_deferment utd;
+            utd.alias = name;
             REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
             type.clear();
             REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("NTYPE"))
-            if (const auto result = zen::builder::table::get_type(type, prog); not result.has_value())
-            {
-                throw zen::exceptions::semantic_error(result.error(), offset);
-            }
-            else
-            {
-                gcm[name] = result.value();
-            }
+            utd.type_name = type;
+            type_alias_deferments.push_back(utd);
         }
     END_PRODUCTION
 
+    void resolve_generic(std::string& name)
+    {
+        std::optional<generic_deferment> target;
+        for (const auto& gd : generic_deferments)
+        {
+            if (gd.name == name)
+            {
+                target = gd;
+                break;
+            }
+        }
+        if (target)
+        {
+            generic_deferments.erase(target.value());
+            resolve_generic(target.value());
+        }
+    }
+
+    void resolve_generic(generic_deferment& gd)
+    {
+        std::vector<std::shared_ptr<zen::builder::type>> generic_args;
+        if (auto result = zen::builder::table::get_types(gd.params, prog, gcm); result.has_value())
+        {
+            generic_args = result.value();
+        }
+        else
+        {
+            throw zen::exceptions::semantic_error(result.error(), gd.offset);
+        }
+
+        if (const auto real_type = zen::builder::table::get_type(gd.name, prog, gcm); not real_type.has_value())
+        {
+            // create tab when dealing with class fields
+            if (const auto gen_ctx = tab
+                                         ? tab->get_generic_type(gd.name, gd.params.size())
+                                         : zen::builder::table::get_generic_type(
+                                             gd.name, gd.params.size(), prog); not gen_ctx.
+                has_value())
+            {
+                throw zen::exceptions::semantic_error(gen_ctx.error(), gd.offset);
+            }
+            else if (const auto result = gen_ctx.value()->implement(prog,
+                generic_args, std::bind(&builder_parser::generic_context_implementer, this,
+                                        std::placeholders::_1,
+                                        std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
+                                        zen::builder::table::simple_name(gd.name))); not result.has_value())
+            {
+                throw zen::exceptions::semantic_error(result.error(), gd.offset);
+            }
+        }
+    }
+
+    void resolve_generics()
+    {
+        while (not generic_deferments.empty())
+        {
+            generic_deferment k = *generic_deferments.begin();
+            generic_deferments.erase(k);
+            resolve_generic(k);
+        }
+    }
+
+void resolve_class_field(class_field_deferment &f)
+        {
+            if (auto result = zen::builder::table::get_type(std::get<1>(f.field), prog, gcm); result.has_value())
+            {
+                f.class_->add_field(std::get<0>(f.field), result.value(), std::get<2>(f.field));
+            }
+            else
+            {
+                throw zen::exceptions::semantic_error(result.error(), std::get<2>(f.field));
+            }
+
+        }
+
+void resolve_class_fields()
+        {
+            while (not class_field_deferments.empty())
+            {
+                class_field_deferment f = class_field_deferments.front();
+                class_field_deferments.pop_front();
+                resolve_class_field(f);
+            }
+        }
+
+    void resolve_function_alias_deferment(function_alias_deferment& ufd)
+    {
+        std::vector<std::shared_ptr<zen::builder::type>> params;
+
+        for (const auto& type : ufd.params)
+        {
+            if (auto result = zen::builder::table::get_type(std::get<0>(type), prog, gcm); result.has_value())
+            {
+                params.push_back(result.value());
+            }
+            else
+            {
+                throw zen::exceptions::semantic_error(result.error(), std::get<1>(type));
+            }
+        }
+        std::string hint;
+
+        if (ufd.generic)
+        {
+            std::vector<std::shared_ptr<zen::builder::type>> generic_args;
+            if (auto result = zen::builder::table::get_types(ufd.generic_params, prog, gcm); result.has_value())
+            {
+                generic_args = result.value();
+            }
+            else
+            {
+                throw zen::exceptions::semantic_error(result.error(), ufd.offset);
+            }
+
+            auto params_copy = params;
+            if (auto callee = tab->get_function(ufd.function_name, params_copy, hint); not callee.has_value())
+            //not defined generic function
+            {
+                if (auto gen_ctx = tab->get_generic_function_or_type(ufd.function_name, generic_args.size()); not
+                    gen_ctx.
+                    has_value())
+                {
+                    throw zen::exceptions::semantic_error(gen_ctx.error(), ufd.offset);
+                }
+                else if (const auto result = gen_ctx.value()->implement(prog,
+                    generic_args,
+                    std::bind(&builder_parser::generic_context_implementer, this, std::placeholders::_1,
+                              std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
+                              zen::builder::table::simple_name(ufd.function_name))); not result.has_value())
+                {
+                    throw zen::exceptions::semantic_error(result.error(), ufd.offset);
+                }
+            }
+            hint.clear();
+        }
+        if (auto callee = tab->get_function(ufd.function_name, params, hint); not callee.has_value())
+        {
+            throw zen::exceptions::semantic_error(callee.error(), offset, hint);
+        }
+        else
+        {
+            auto f = callee.value().second;
+            f->name = ufd.alias;
+            if (lib->functions.contains(f->hash()))
+            {
+                throw zen::exceptions::semantic_error(fmt::format("redefinition of function {}", f->get_canonical_name()), f->offset);
+            }
+            lib->add(f);
+            f->name = ufd.function_name;
+        }
+    }
+
+    void resolve_function_alias_deferments()
+    {
+        while (not function_alias_deferments.empty())
+        {
+            auto ufd = function_alias_deferments.front();
+            function_alias_deferments.pop_front();
+            resolve_function_alias_deferment(ufd);
+        }
+    }
+
+    void resolve_type_alias_deferment(type_alias_deferment& utd)
+    {
+        if (utd.is_generic())
+            resolve_generic(utd.type_name);
+        if (const auto result = zen::builder::table::get_type(utd.type_name, prog); not result.has_value())
+        {
+            throw zen::exceptions::semantic_error(result.error(), offset);
+        }
+        else
+        {
+            gcm[utd.alias] = result.value();
+        }
+    }
+
+    void resolve_type_alias_deferments()
+    {
+        while (not type_alias_deferments.empty())
+        {
+            auto utd = type_alias_deferments.front();
+            type_alias_deferments.pop_front();
+            resolve_type_alias_deferment(utd);
+        }
+    }
+
     BEGIN_PRODUCTION(PRODUCTION_NCLASS)
         REQUIRE_TERMINAL(TKEYWORD_CLASS)
-        const auto class_token_offset = offset - 1;
         REQUIRE_NON_TERMINAL_CALLBACK(NID, EXPECTED("ID"))
-        const std::string class_name = at_generic_implementation ? generic_id : id;
+        const std::string class_name = pragma_context_implementation ? generic_id : id;
         type.clear();
         if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
         {
-            if (not at_generic_implementation)
+            if (not pragma_context_implementation)
             {
                 REQUIRE_NON_TERMINAL(META_NANY_BODY)
-                lib->add_generic_type(
-                    zen::builder::generic_context::create(class_name, class_token_offset, offset, generic_params));
                 return true;
             }
         }
-        if (at_generic_implementation) at_generic_implementation = false;
-
-        class_ = zen::builder::type::create(class_name, 0);
+        if (pragma_context_implementation) pragma_context_implementation = false;
+        if (auto result = lib->find_type_or_throw(class_name); not result.has_value())
+        {
+            throw zen::exceptions::semantic_error(result.error(), offset);
+        }
+        else
+        {
+            class_ = result.value();
+        }
+        lib->add(create_allocator(class_));
+        lib->add(create_virtual_deallocator(class_));
+        lib->add(create_deallocator(class_));
+        lib->add(create_mover(class_));
+        lib->add(create_equals(class_));
+        lib->add(create_not_equals(class_));
         class_->kind = zen::builder::type::kind::heap;
         REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
         while (TRY_REQUIRE_NON_TERMINAL(NCLASS_FIELD) or TRY_REQUIRE_NON_TERMINAL(NFUNCTION_DEFINITION) or
@@ -216,14 +442,28 @@ BEGIN_ILC_CODEGEN(builder_parser)
         {
             throw zen::exceptions::semantic_error("cannot create class field outside of class", offset);
         }
-        if (auto result = zen::builder::table::get_type(type, prog, gcm); result.has_value())
+
+        if (pragma_discovery_mode)
         {
-            class_->add_field(field_name, result.value(), offset);
+            class_field_deferments.emplace_back(class_, std::make_tuple(field_name, type, offset));
         }
-        else
+        /*else if (false)
         {
-            throw zen::exceptions::semantic_error(result.error(), offset);
-        }
+            if (auto result = zen::builder::table::get_type(type, prog, gcm); result.has_value())
+            {
+                class_->add_field(field_name, result.value(), offset);
+            }
+            else
+            {
+                throw zen::exceptions::semantic_error(result.error(), offset);
+            }
+        }*/
+    END_PRODUCTION
+
+    BEGIN_PRODUCTION(PRODUCTION_NDISCOVERY_CLASS_FIELD)
+        REQUIRE_TERMINAL(TID)
+        REQUIRE_TERMINAL(TCOLON)
+        REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
     END_PRODUCTION
 
     BEGIN_PRODUCTION(META_PRODUCTION_NELSE)
@@ -328,7 +568,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
                                      const long long generic_offset,
                                      const size_t generic_chain_size,
                                      const std::shared_ptr<zen::builder::type>& class_,
-                                     const std::string generic_id)
+                                     const std::string generic_id) const
     {
         const auto implementation_parser = make(
             chain, generic_chain_size,
@@ -347,14 +587,14 @@ BEGIN_ILC_CODEGEN(builder_parser)
         {
             implementation_parser->offset = generic_offset;
             implementation_parser->
-                at_generic_implementation = true;
+                pragma_context_implementation = true;
             implementation_parser->generic_id = generic_id;
-            implementation_parser->discover();
+                implementation_parser->discover();
             implementation_parser->offset = generic_offset;
             implementation_parser->
-                at_generic_implementation = true;
+                pragma_context_implementation = true;
             implementation_parser->generic_id = generic_id;
-            implementation_parser->parse();
+                implementation_parser->parse();
         }
         catch (const zen::exceptions::semantic_error
             & e)
@@ -415,7 +655,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
                 {
                     throw zen::exceptions::semantic_error(gen_ctx.error(), offset);
                 }
-                else if (const auto result = gen_ctx.value()->implement(
+                else if (const auto result = gen_ctx.value()->with_hints(params)->implement(prog,
                     generic_args.value(),
                     std::bind(&builder_parser::generic_context_implementer, this, std::placeholders::_1,
                               std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
@@ -496,7 +736,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
                 {
                     throw zen::exceptions::semantic_error(gen_ctx.error(), offset);
                 }
-                else if (const auto result = gen_ctx.value()->implement(
+                else if (const auto result = gen_ctx.value()->with_hints(params)->implement(prog,
                     generic_args.value(),
                     std::bind(&builder_parser::generic_context_implementer, this, std::placeholders::_1,
                               std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
@@ -582,7 +822,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
     BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_DEFINITION_PREFIX)
         REQUIRE_NON_TERMINAL(NID)
         const auto function_name_token_offset = offset - 1;
-        std::string function_name = at_generic_implementation ? generic_id : id;
+        std::string function_name = pragma_context_implementation ? generic_id : id;
         if (function_name == "operator")
         {
             if (class_)
@@ -638,10 +878,9 @@ BEGIN_ILC_CODEGEN(builder_parser)
         {
             fmt::println("{}", fun->name);
         }
-        std::list<std::tuple<std::string, std::shared_ptr<zen::builder::type>>> parameters;
         if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
         {
-            if (not at_generic_implementation)
+            if (not pragma_context_implementation)
             {
                 type.clear();
                 REQUIRE_NON_TERMINAL(META_NANY_BODY)
@@ -658,8 +897,13 @@ BEGIN_ILC_CODEGEN(builder_parser)
                 return true;
             }
         }
-        if (at_generic_implementation)
-            at_generic_implementation = false;
+        if (pragma_context_implementation)
+            pragma_context_implementation = false;
+        signature_deferment def;
+        def.fun = fun;
+        def.is_construtor = is_constructor;
+        def.at_test = at_test;
+        def.class_ = class_;
         if (TRY_REQUIRE_TERMINAL(TPARENTHESIS_OPEN))
         {
             bool first_it = true;
@@ -672,14 +916,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
                     REQUIRE_TERMINAL_CALLBACK(TCOLON, EXPECTED(":"))
                     type.clear();
                     REQUIRE_NON_TERMINAL_CALLBACK(NTYPE, EXPECTED("TYPE"))
-                    if (auto result = zen::builder::table::get_type(type, prog, gcm); result.has_value())
-                    {
-                        parameters.emplace_back(name, result.value());
-                    }
-                    else
-                    {
-                        throw zen::exceptions::semantic_error(result.error(), offset);
-                    }
+                    def.params.emplace_back(name, type, offset);
                 }
                 else if (not first_it)
                 {
@@ -695,19 +932,9 @@ BEGIN_ILC_CODEGEN(builder_parser)
         type.clear();
         if (not is_constructor and TRY_REQUIRE_NON_TERMINAL(NTYPE))
         {
-            if (auto result = zen::builder::table::get_type(type, prog, gcm); result.has_value())
-            {
-                fun->set_return(result.value());
-            }
-            else
-            {
-                throw zen::exceptions::semantic_error(result.error(), offset);
-            }
+            def.ret = std::make_tuple(type, offset);
         }
-        if (at_test and fun->signature->type != zen::builder::function::_bool())
-        {
-            throw zen::exceptions::semantic_error("@test function must return bool", offset);
-        }
+
         if (class_)
         {
             if (at_test) throw zen::exceptions::semantic_error("method cannot be marked as @test", offset);
@@ -716,24 +943,77 @@ BEGIN_ILC_CODEGEN(builder_parser)
                 fun->set_alias(fun->set_return(class_), "this");
                 fun->return_implicitly();
             }
-            else
-            {
-                fun->set_parameter(class_, "this");
-            }
         }
-        for (auto param : parameters)
+        // declare(def);
+        if (pragma_discovery_mode)
         {
-            fun->set_parameter(std::get<1>(param), std::get<0>(param));
+            signature_deferments.push_back(def);
+            if (at_test)
+                lib->add_test(fun);
+        } else
+        {
+            resolve_signature(def);
+            lib->add(fun);
         }
-        lib->add(fun);
         fun->is_extern = at_extern;
-        if (at_test)
-        {
-            lib->add_test(fun);
-        }
         at_test = false;
         at_extern = false;
     END_PRODUCTION
+
+    void resolve_signatures()
+    {
+        while (not signature_deferments.empty())
+        {
+            signature_deferment sig = signature_deferments.front();
+            signature_deferments.pop_front();
+            resolve_signature(sig);
+            if (lib->functions.contains(sig.fun->hash()))
+            {
+                throw zen::exceptions::semantic_error(fmt::format("redefinition of function {}", sig.fun->get_canonical_name()), sig.fun->offset);
+            }
+            lib->add(sig.fun);
+        }
+    }
+
+    void resolve_signature(signature_deferment& def)
+    {
+        auto fun = def.fun;
+        auto ret_type = std::get<0>(def.ret);
+        if (not ret_type.empty())
+        {
+            if (auto result = zen::builder::table::get_type(ret_type, prog, gcm); result.has_value())
+            {
+                fun->set_return(result.value());
+            }
+            else
+            {
+                throw zen::exceptions::semantic_error(result.error(), std::get<1>(def.ret));
+            }
+        }
+        if (def.class_ and not def.is_construtor)
+        {
+            fun->set_parameter(def.class_, "this");
+        }
+        for (const auto& param : def.params)
+        {
+            auto name = std::get<0>(param);
+            auto type = std::get<1>(param);
+            auto offset = std::get<2>(param);
+            if (auto result = zen::builder::table::get_type(type, prog, gcm); result.has_value())
+            {
+                fun->set_parameter(result.value(), name);
+            }
+            else
+            {
+                // HANDLE THAT SWAP MECHANISM
+                throw zen::exceptions::semantic_error(result.error(), offset);
+            }
+        }
+        if (def.at_test and fun->signature->type != zen::builder::function::_bool())
+        {
+            throw zen::exceptions::semantic_error("@test function must return bool", offset);
+        }
+    }
 
     BEGIN_PRODUCTION(PRODUCTION_NFUNCTION_DEFINITION)
         REQUIRE_NON_TERMINAL(NFUNCTION_DEFINITION_PREFIX)
@@ -1070,8 +1350,6 @@ BEGIN_ILC_CODEGEN(builder_parser)
     BEGIN_PRODUCTION(PRODUCTION_NGENERIC)
         REQUIRE_TERMINAL(TLOWER)
         std::vector<std::string> generic_fields;
-        const bool backup = at_generic_specification;
-        at_generic_specification = true;
         do
         {
             type.clear();
@@ -1083,7 +1361,6 @@ BEGIN_ILC_CODEGEN(builder_parser)
                 break;
         }
         while (TRY_REQUIRE_TERMINAL(TCOMMA));
-        at_generic_specification = backup;
         if (TRY_REQUIRE_TERMINAL(TGREATER))
         {
             this->generic_params = generic_fields;
@@ -1105,9 +1382,12 @@ BEGIN_ILC_CODEGEN(builder_parser)
         {
             type.clear();
             name = zen::builder::generic_context::get_name(name, generic_params);
+            generic_deferments.emplace(name, generic_params, offset);
             type = name;
-            if (not at_generic_specification)
+            /// implement generic defs
+            // if (not pragma_ignore_generics)
             {
+                /*
                 std::vector<std::shared_ptr<zen::builder::type>> generic_args;
                 if (auto result = zen::builder::table::get_types(generic_params, prog, gcm); result.has_value())
                 {
@@ -1138,6 +1418,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
                         throw zen::exceptions::semantic_error(result.error(), offset);
                     }
                 }
+                */
             }
         }
     END_PRODUCTION
@@ -1370,28 +1651,42 @@ BEGIN_ILC_CODEGEN(builder_parser)
             {
                 REQUIRE_NON_TERMINAL(META_NANY_BODY)
             }
+            else if (TRY_REQUIRE_NON_TERMINAL(NUSING_STAT))
+            {
+            }
             else if (TRY_REQUIRE_TERMINAL(TKEYWORD_CLASS))
             {
+                const auto class_token_offset = offset - 1;
                 REQUIRE_TERMINAL(TID)
-                class_ = zen::builder::type::create(at_generic_implementation ? generic_id : tokens[offset - 1].value);
+                class_ = zen::builder::type::create(pragma_context_implementation
+                                                        ? generic_id
+                                                        : tokens[offset - 1].value);
                 class_->kind = zen::builder::type::kind::heap;
                 if (TRY_REQUIRE_NON_TERMINAL(NGENERIC))
                 {
-                    if (not at_generic_implementation)
+                    if (not pragma_context_implementation)
                     {
                         REQUIRE_NON_TERMINAL(META_NANY_BODY)
+                        lib->add_generic_type(
+                            zen::builder::generic_context::create(class_->name, class_token_offset, offset,
+                                                                  generic_params));
+                        class_.reset();
                         continue;
                     }
                 }
-                lib->add(class_);
-                if (at_generic_implementation)
-                    at_generic_implementation = false;
+                if (const auto result = lib->add(class_); not result.has_value())
+                {
+                    throw zen::exceptions::semantic_error(result.error(), offset, "try using another name");
+                }
+                if (pragma_context_implementation)
+                    pragma_context_implementation = false;
                 REQUIRE_TERMINAL_CALLBACK(TBRACES_OPEN, EXPECTED("{"))
-                while (TRY_REQUIRE_NON_TERMINAL(NDISCOVERY_CLASS_FIELD) or TRY_REQUIRE_NON_TERMINAL(NGLOBAL_DISCOVERY_STAT))
+                while (TRY_REQUIRE_NON_TERMINAL(NCLASS_FIELD) or TRY_REQUIRE_NON_TERMINAL(
+                    NGLOBAL_DISCOVERY_STAT))
                 {
                     REQUIRE_NON_TERMINAL(META_NANY_BODY)
                 }
-                class_ = nullptr;
+                class_.reset();
                 REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
             }
             else if (not TRY_REQUIRE_NON_TERMINAL(NDECORATOR))
@@ -1636,6 +1931,15 @@ END_SYMBOL_BINDING
     BEGIN_SYMBOL_BINDING(NCLASS_FIELD)
     PRODUCTION_NCLASS_FIELD()
 END_SYMBOL_BINDING
+
+    BEGIN_SYMBOL_BINDING(NUSING_STAT)
+    PRODUCTION_NUSING_STAT()
+    END_SYMBOL_BINDING
+
+    BEGIN_SYMBOL_BINDING(NDISCOVERY_CLASS_FIELD)
+    PRODUCTION_NDISCOVERY_CLASS_FIELD()
+    END_SYMBOL_BINDING
+
     BEGIN_SYMBOL_BINDING(NDECORATOR)
         PRODUCTION_NDECORATOR()
     END_SYMBOL_BINDING
@@ -1647,7 +1951,7 @@ END_SYMBOL_BINDING
     BEGIN_SYMBOL_BINDING(NGLOBAL_STAT)
             PRODUCTION_NDECORATOR() or
             PRODUCTION_NFUNCTION_DEFINITION() or
-            PRODUCTION_NUSING_STAT() or
+            PRODUCTION_NDISCOVERY_USING_STAT() or
             PRODUCTION_NCLASS()
         END_SYMBOL_BINDING
 
@@ -1819,18 +2123,36 @@ END_SYMBOL_BINDING
     inline bool discover()
     {
         compilation_id++;
+        const bool backup = pragma_discovery_mode;
+        pragma_discovery_mode = true;
+
         META_PRODUCTION_GLOBAL_DISCOVERY();
-        return offset == chain_size;
+        const bool success = offset == chain_size;
+        if (not success)
+        {
+            pragma_discovery_mode = backup;
+            EXPECTED("class, function, using or decorator")();
+        }
+        else
+        {
+            resolve_type_alias_deferments();
+            resolve_generics();
+            resolve_class_fields();
+            resolve_signatures();
+            resolve_function_alias_deferments();
+        }
+        pragma_discovery_mode = backup;
+        return success;
     }
 
     inline bool parse()
     {
         compilation_id++;
         META_PRODUCTION_GLOBAL_STAT();
-        bool success = offset == chain_size;
+        const bool success = offset == chain_size;
         if (not success)
         {
-            EXPECTED("class, function or decorator")();
+            EXPECTED("class, function, using or decorator")();
         }
         return success;
     }

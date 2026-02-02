@@ -7,7 +7,7 @@
 #include "builder/table.hpp"
 #include "composer/composer.hpp"
 
-namespace zen::library::casting
+namespace zen::libraries::casting
 {
     inline std::shared_ptr<builder::function> create_convert_int_to_byte(utils::constant_pool& pool)
     {
