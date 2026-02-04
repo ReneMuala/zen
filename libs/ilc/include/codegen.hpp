@@ -61,7 +61,7 @@ constexpr inline bool HANDLE_NON_TERMINAL(int); // definined with BEGIN_BINDINGS
     }                                                                          \
     inline bool CHECK_DERIVATION_HISTORY(derivation_history_t &history) {      \
       static bool found;                                                       \
-      found = history.offset >= offset and                                \
+      found = history.offset == offset and                                \
               history.compilation_id == compilation_id;                   \
       if (not found) {                                                         \
         history.offset = offset;                                          \
