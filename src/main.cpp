@@ -199,6 +199,36 @@ class point {
 	}
 #else
 	zen_run(R"(
+main() = {
+		io::println("Hello world")
+		x := 1
+		if(typing::is<int>(x)){
+			println("x is int")
+		} else {
+			println("x is not int")
+		}
+		println(rand())
+		println(add<float>(2f,3f))
+		println(add(2f, 3f))
+		x := 4.3
+		x := 2
+		ii := IntInt(20,20)
+		value := money(50.25)
+		println(value)
+		pairSet := PairSet<int, short>(10i, 10s, 11i, 11s)
+		pair := Pair<int, short>(19i, 19s)
+		println(string<int, short>(pair))
+		println(string<int, short>(pairSet.p1))
+		println(string<int, short>(pairSet.p2))
+		pair := Pair<string, money>("fifty hundred", 50e100)
+		fp := FloatPair(2f,3f)
+		println(string<float, float>(fp))
+		runGlobalTests()
+		p := person("Rene", 20)
+		println("got name: " + getName<person>(p))
+		println(addTwoThings<double>(3.4,5.3))
+		println(addTwoThings<string>("hello"," world"))
+	}
 	class Pair<A, B> {
 		a: A
 		b: B
@@ -460,13 +490,13 @@ rect(lines: int, cols: int) = {
 	@test
 	str_casting = bool {
 		bool("true") == true && "true" == string(true)
-		bool("false") == false && "false" == string(false)
-		byte("1") == 1b && "1" == string(1b)
-		short("1") == 1s && "1" == string(1s)
-		int("1") == 1i && "1" == string(1i)
-		long("1") == 1l && "1" == string(1l)
-		float("1.5") == 1.5f && "1.5" == string(1.5f)
-		double("2.5") == 2.5d && "2.5" == string(2.5d)
+		&& bool("false") == false && "false" == string(false)
+		&& byte("1") == 1b && "A" == string(65b)
+		&& short("1") == 1s && "1" == string(1s)
+		&& int("1") == 1i && "1" == string(1i)
+		&& long("1") == 1l && "1" == string(1l)
+		&& float("1.5") == 1.5f && "1.5" == string(1.5f)
+		&& double("2.5") == 2.5d && "2.5" == string(2.5d)
 	}
 
 	sum<T>(x: T, y: T) = T(x+y)
@@ -519,6 +549,65 @@ rect(lines: int, cols: int) = {
 		k: i32
 	}
 
+class Person {
+    name: string
+    birth: Date
+    profession: string
+    alias: string
+    coffeeLink: string
+    reader: string
+    new(name: string,birth: Date) = {
+        this.name = name
+        this.birth = birth
+    }
+
+    setProfession(profession: string) = {
+        this.profession = profession
+    }
+
+    setAlias(alias: string) = {
+        this.alias = alias
+    }
+
+    setCoffeeLink(link: string) = {
+        this.coffeeLink = link
+    }
+
+    setReader(reader: string) = {
+        this.reader = reader
+    }
+
+    getReader = string {
+        if(reader == "PUT_YOUR_NAME_HERE") {
+            "world"
+        } else {
+            reader
+        }
+    }
+
+    getYoutubeLink = string("https://youtube.com/@" + alias)
+
+    getLinkedinLink = string("https://linkedin.com/in/" + alias)
+
+    getGithubLink = string("https://github.com/" + alias)
+
+    toString() = string("Hello "+ getReader() +"!, i'm " + name + ".\nA " + profession + " born on " + birth.toString() + ".")
+
+}
+
+class Date {
+    day: int
+    year: int
+    month: string
+
+    new(day: int,month: string, year: int) = {
+        this.day = day
+        this.year = year
+        this.month = month
+    }
+
+    toString = string(month + " " + string(day) + ", " + string(year))
+}
 
 
 	using FloatPair = Pair<float, float>
@@ -543,35 +632,7 @@ rect(lines: int, cols: int) = {
 	using abs(x: float) = abs<float>
 	using rand() = getRandomNumber
 	getRandomNumber = int(21)
-	main() = {
-		x := 1
-		if(is<int>(x)){
-			println("x is int")
-		} else {
-			println("x is not int")
-		}
-		println(rand())
-		println(add<float>(2f,3f))
-		println(add(2f, 3f))
-		x := 4.3
-		x := 2
-		ii := IntInt(20,20)
-		value := money(50.25)
-		println(value)
-		pairSet := PairSet<int, short>(10i, 10s, 11i, 11s)
-		pair := Pair<int, short>(19i, 19s)
-		println(string<int, short>(pair))
-		println(string<int, short>(pairSet.p1))
-		println(string<int, short>(pairSet.p2))
-		pair := Pair<string, money>("fifty hundred", 50e100)
-		fp := FloatPair(2f,3f)
-		println(string<float, float>(fp))
-		runGlobalTests()
-		p := person("Rene", 20)
-		println("got name: " + getName<person>(p))
-		println(addTwoThings<double>(3.4,5.3))
-		println(addTwoThings<string>("hello"," world"))
-	}
+
 )");
 	// implement symbol manager
 	// implement deference wrappers

@@ -241,19 +241,22 @@ BEGIN_ILC_CODEGEN(builder_parser)
         if (const auto real_type = zen::builder::table::get_type(gd.name, prog, gcm); not real_type.has_value())
         {
             // create tab when dealing with class fields
-            if (const auto gen_ctx = tab
-                                         ? tab->get_generic_type(gd.name, gd.params.size())
-                                         : zen::builder::table::get_generic_type(
+            if (const auto gen_ctx = zen::builder::table::get_generic_type(
                                              gd.name, gd.params.size(), prog); not gen_ctx.
                 has_value())
             {
                 throw zen::exceptions::semantic_error(gen_ctx.error(), gd.offset);
             }
             else if (const auto result = gen_ctx.value()->implement(prog,
-                generic_args, std::bind(&builder_parser::generic_context_implementer, this,
-                                        std::placeholders::_1,
-                                        std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
-                                        zen::builder::table::simple_name(gd.name))); not result.has_value())
+                                                                    generic_args,
+                                                                    std::bind(
+                                                                        &builder_parser::generic_context_implementer,
+                                                                        this,
+                                                                        std::placeholders::_1,
+                                                                        std::placeholders::_2, std::placeholders::_3,
+                                                                        std::placeholders::_4,
+                                                                        zen::builder::table::simple_name(gd.name))); not
+                result.has_value())
             {
                 throw zen::exceptions::semantic_error(result.error(), gd.offset);
             }
@@ -270,28 +273,27 @@ BEGIN_ILC_CODEGEN(builder_parser)
         }
     }
 
-void resolve_class_field(class_field_deferment &f)
+    void resolve_class_field(class_field_deferment& f)
+    {
+        if (auto result = zen::builder::table::get_type(std::get<1>(f.field), prog, gcm); result.has_value())
         {
-            if (auto result = zen::builder::table::get_type(std::get<1>(f.field), prog, gcm); result.has_value())
-            {
-                f.class_->add_field(std::get<0>(f.field), result.value(), std::get<2>(f.field));
-            }
-            else
-            {
-                throw zen::exceptions::semantic_error(result.error(), std::get<2>(f.field));
-            }
-
+            f.class_->add_field(std::get<0>(f.field), result.value(), std::get<2>(f.field));
         }
-
-void resolve_class_fields()
+        else
         {
-            while (not class_field_deferments.empty())
-            {
-                class_field_deferment f = class_field_deferments.front();
-                class_field_deferments.pop_front();
-                resolve_class_field(f);
-            }
+            throw zen::exceptions::semantic_error(result.error(), std::get<2>(f.field));
         }
+    }
+
+    void resolve_class_fields()
+    {
+        while (not class_field_deferments.empty())
+        {
+            class_field_deferment f = class_field_deferments.front();
+            class_field_deferments.pop_front();
+            resolve_class_field(f);
+        }
+    }
 
     void resolve_function_alias_deferment(function_alias_deferment& ufd)
     {
@@ -333,10 +335,16 @@ void resolve_class_fields()
                     throw zen::exceptions::semantic_error(gen_ctx.error(), ufd.offset);
                 }
                 else if (const auto result = gen_ctx.value()->implement(prog,
-                    generic_args,
-                    std::bind(&builder_parser::generic_context_implementer, this, std::placeholders::_1,
-                              std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
-                              zen::builder::table::simple_name(ufd.function_name))); not result.has_value())
+                                                                        generic_args,
+                                                                        std::bind(
+                                                                            &builder_parser::generic_context_implementer,
+                                                                            this, std::placeholders::_1,
+                                                                            std::placeholders::_2,
+                                                                            std::placeholders::_3,
+                                                                            std::placeholders::_4,
+                                                                            zen::builder::table::simple_name(
+                                                                                ufd.function_name))); not result.
+                    has_value())
                 {
                     throw zen::exceptions::semantic_error(result.error(), ufd.offset);
                 }
@@ -353,7 +361,8 @@ void resolve_class_fields()
             f->name = ufd.alias;
             if (lib->functions.contains(f->hash()))
             {
-                throw zen::exceptions::semantic_error(fmt::format("redefinition of function {}", f->get_canonical_name()), f->offset);
+                throw zen::exceptions::semantic_error(
+                    fmt::format("redefinition of function {}", f->get_canonical_name()), f->offset);
             }
             lib->add(f);
             f->name = ufd.function_name;
@@ -589,12 +598,12 @@ void resolve_class_fields()
             implementation_parser->
                 pragma_context_implementation = true;
             implementation_parser->generic_id = generic_id;
-                implementation_parser->discover();
+            implementation_parser->discover();
             implementation_parser->offset = generic_offset;
             implementation_parser->
                 pragma_context_implementation = true;
             implementation_parser->generic_id = generic_id;
-                implementation_parser->parse();
+            implementation_parser->parse();
         }
         catch (const zen::exceptions::semantic_error
             & e)
@@ -950,7 +959,8 @@ void resolve_class_fields()
             signature_deferments.push_back(def);
             if (at_test)
                 lib->add_test(fun);
-        } else
+        }
+        else
         {
             resolve_signature(def);
             lib->add(fun);
@@ -969,7 +979,8 @@ void resolve_class_fields()
             resolve_signature(sig);
             if (lib->functions.contains(sig.fun->hash()))
             {
-                throw zen::exceptions::semantic_error(fmt::format("redefinition of function {}", sig.fun->get_canonical_name()), sig.fun->offset);
+                throw zen::exceptions::semantic_error(
+                    fmt::format("redefinition of function {}", sig.fun->get_canonical_name()), sig.fun->offset);
             }
             lib->add(sig.fun);
         }
@@ -1423,8 +1434,7 @@ void resolve_class_fields()
         }
     END_PRODUCTION
 
-    BEGIN_PRODUCTION(PRODUCTION_NVARIABLE_DEFINITION)
-        REQUIRE_NON_TERMINAL(NID)
+    BEGIN_PRODUCTION(PRODUCTION_NVARIABLE_DEFINITION_SUFFIX)
         const auto name = id;
         REQUIRE_TERMINAL(TCOLON)
         type.clear();
@@ -1701,43 +1711,55 @@ void resolve_class_fields()
         bool dangling_value = false;
         while (true)
         {
-            if (TRY_REQUIRE_NON_TERMINAL(NSTAT))
+            if (TRY_REQUIRE_NON_TERMINAL(NBLOCK_STAT))
             {
                 if (dangling_value)
                 {
                     pop();
                     dangling_value = false;
                 }
-                continue;
             }
-            if (TRY_REQUIRE_NON_TERMINAL(NID))
+            else if (TRY_REQUIRE_NON_TERMINAL(NID))
             {
                 if (dangling_value)
+                {
                     pop();
-                if (TRY_REQUIRE_NON_TERMINAL(NSUFFIX_FUNCTION_CALL))
+                    dangling_value = false;
+                }
+                if (TRY_REQUIRE_NON_TERMINAL(NSUFFIX_STAT_FROM_ASGN))
+                {
+                    //
+                }
+                else if (TRY_REQUIRE_NON_TERMINAL(NSUFFIX_VARIABLE_DEFINITION))
+                {
+                    //
+                }
+                else if (TRY_REQUIRE_NON_TERMINAL(NSUFFIX_FUNCTION_CALL))
                 {
                     dangling_value = pragma_dangling_return_value;
                     if (dangling_value)
                         TRY_REQUIRE_NON_TERMINAL(NENDLESS_SUFIXES);
-                    continue;
                 }
-                if (auto result = tab->get_value(id); result.has_value())
+                else if (auto result = tab->get_value(id); result.has_value())
                 {
                     push(result.value());
+                    dangling_value = true;
+                    TRY_REQUIRE_NON_TERMINAL(NENDLESS_SUFIXES);
+                    break;
                 }
                 else
                 {
                     throw zen::exceptions::semantic_error(result.error(), offset);
                 }
-                TRY_REQUIRE_NON_TERMINAL(NENDLESS_SUFIXES);
-                dangling_value = true;
-                break;
             }
-            if (TRY_REQUIRE_NON_TERMINAL(NVAL))
+            else if (TRY_REQUIRE_NON_TERMINAL(NVAL))
             {
                 dangling_value = true;
             }
-            break;
+            else
+            {
+                break;
+            }
         } // improve return handler
         if (dangling_value)
         {
@@ -1752,8 +1774,7 @@ void resolve_class_fields()
         }
     END_PRODUCTION
 
-    BEGIN_PRODUCTION(PRODUCTION_NSTAT_FROM_ASGN)
-        REQUIRE_NON_TERMINAL(NID)
+    BEGIN_PRODUCTION(PRODUCTION_NSTAT_FROM_ASGN_SUFFIX)
         if (TRY_REQUIRE_TERMINAL(TEQU))
         {
             if (auto result = tab->get_value(id); result.has_value())
@@ -1866,15 +1887,27 @@ void resolve_class_fields()
         id.clear();
         REQUIRE_TERMINAL(TID)
         id += tokens[offset - 1].value;
-        while (TRY_REQUIRE_TERMINAL(TDOT))
+        while (true)
         {
-            if (TRY_REQUIRE_TERMINAL(TTIMES))
+            if (TRY_REQUIRE_TERMINAL(TDOT))
             {
+                REQUIRE_TERMINAL_CALLBACK(TID, EXPECTED("identifier"))
                 id += "." + tokens[offset - 1].value;
-                break;
             }
-            REQUIRE_TERMINAL_CALLBACK(TID, EXPECTED("identifier"))
-            id += "." + tokens[offset - 1].value;
+            else if (TRY_REQUIRE_TERMINAL(TCOLON))
+            {
+                if (TRY_REQUIRE_TERMINAL(TCOLON))
+                {
+                    REQUIRE_TERMINAL_CALLBACK(TID, EXPECTED("colon"))
+                    id += "::" + tokens[offset - 1].value;
+                }
+                else
+                {
+                    offset--;
+                    break;
+                }
+            }
+            else break;
         }
     END_PRODUCTION
 
@@ -1954,13 +1987,18 @@ END_SYMBOL_BINDING
             PRODUCTION_NDISCOVERY_USING_STAT() or
             PRODUCTION_NCLASS()
         END_SYMBOL_BINDING
+    BEGIN_SYMBOL_BINDING(NSUFFIX_VARIABLE_DEFINITION)
+PRODUCTION_NVARIABLE_DEFINITION_SUFFIX()
+END_SYMBOL_BINDING
 
-    BEGIN_SYMBOL_BINDING(NSTAT)
-            PRODUCTION_NVARIABLE_DEFINITION() or
+    BEGIN_SYMBOL_BINDING(NSUFFIX_STAT_FROM_ASGN)
+PRODUCTION_NSTAT_FROM_ASGN_SUFFIX()
+END_SYMBOL_BINDING
+
+    BEGIN_SYMBOL_BINDING(NBLOCK_STAT)
             PRODUCTION_NIF() or
             PRODUCTION_NFOR() or
-            PRODUCTION_NWHILE() or
-            PRODUCTION_NSTAT_FROM_ASGN()
+            PRODUCTION_NWHILE()
         END_SYMBOL_BINDING
 
     BEGIN_SYMBOL_BINDING(NFUNCTION_BODY)

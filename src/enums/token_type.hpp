@@ -26,7 +26,7 @@ namespace enums
     NCLASS_FIELD,
     NFUNCTION_BODY,
     /// statement
-    NSTAT,
+    NBLOCK_STAT,
     NGLOBAL_STAT,
     NUSING_STAT,
     NGLOBAL_DISCOVERY_STAT,
@@ -35,6 +35,8 @@ namespace enums
     TCOMMA,
     /// :
     TCOLON,
+    /// ::
+    NSCOPE_RESOLUTION,
     /// .
     TDOT,
     /// ;
@@ -87,6 +89,8 @@ namespace enums
     TID,
     /// id:prop:prop....
     NID,
+    NSUFFIX_STAT_FROM_ASGN,
+    NSUFFIX_VARIABLE_DEFINITION,
     /// id || id<type> | string | number | undefined | null
     NTYPE,
     // <TYPE>

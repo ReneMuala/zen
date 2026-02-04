@@ -136,11 +136,35 @@ namespace zen::builder
         return name;
     }
 
-    std::expected<std::pair<std::shared_ptr<builder::value>,std::shared_ptr<builder::function>>, std::string> table::get_function(const std::string& name,
+    const std::string table::extract_specified_lib(std::string& name, std::shared_ptr<builder::library>& specified_lib, std::shared_ptr<zen::builder::program> program)
+    {
+        const auto final = name.find_last_of(':');
+        const auto lib_name = name.substr(0, final-1);
+        for (const auto& lib : program->libraries)
+        {
+            if (lib.second->name == lib_name)
+            {
+                specified_lib = lib.second;
+                name = name.substr(final+1);
+            }
+        }
+        return lib_name;
+    }
+
+    std::expected<std::pair<std::shared_ptr<builder::value>,std::shared_ptr<builder::function>>, std::string> table::get_function(std::string name,
                                                                                                                                   std::vector<std::shared_ptr<zen::builder::type>>& params, std::string & hint)
     {
         std::shared_ptr<builder::function> target;
         std::shared_ptr<builder::value> object;
+        std::shared_ptr<builder::library> specified_lib;
+        if (name.contains(':'))
+        {
+            const std::string lib_name = extract_specified_lib(name, specified_lib, program);
+            if (not specified_lib)
+            {
+                return std::unexpected(fmt::format("no such library {}", lib_name));
+            }
+        }
         if (name.contains('.'))
         {
             const auto final = name.find_last_of('.');
@@ -158,12 +182,23 @@ namespace zen::builder
         {
             target = function->create(name, params, nullptr);
         }
-        for (const auto& lib : program->libraries)
+        if (specified_lib)
         {
-            if (const auto& r = lib.second->get_function(target->hash()))
+            if (const auto& r = specified_lib->get_function(target->hash()))
             {
                 target = r;
                 return std::pair{object, target};
+            }
+        }
+        for (const auto& lib : program->libraries)
+        {
+            if (not specified_lib)
+            {
+                if (const auto& r = lib.second->get_function(target->hash()))
+                {
+                    target = r;
+                    return std::pair{object, target};
+                }
             }
             bool found = false;
             for (const auto & fn : lib.second->functions)
@@ -188,8 +223,9 @@ namespace zen::builder
             return get_function("this." + name, params, hint);
         if (not hint.empty())
         {
-            hint = fmt::format("available overloads: {}", hint);
-            return std::unexpected(fmt::format("no such overload {}",
+            hint = fmt::format("available alternatives: {}", hint);
+            return std::unexpected(specified_lib ? fmt::format("no such function {}::{}",
+                                           specified_lib->name,target->get_canonical_name()) : fmt::format("no such function {}",
                                            target->get_canonical_name()));
         }
         return std::unexpected(fmt::format("no such function {}",
@@ -199,6 +235,15 @@ namespace zen::builder
     std::expected<std::shared_ptr<generic_context>, std::string>  table::get_generic_function_or_type(std::string name, const size_t param_count)
     {
         i64 hash;
+        std::shared_ptr<builder::library> specified_lib;
+        if (name.contains(':'))
+        {
+            const std::string lib_name = extract_specified_lib(name, specified_lib, program);
+            if (not specified_lib)
+            {
+                return std::unexpected(fmt::format("no such library {}", lib_name));
+            }
+        }
         if (name.contains('.'))
         {
             const auto final = name.find_last_of('.');
@@ -215,43 +260,52 @@ namespace zen::builder
         {
             hash = zen::builder::generic_context::get_hash(name,param_count);
         }
-        for (const auto& lib : program->libraries)
+        if (specified_lib)
         {
-            if (const auto& r = lib.second->get_generic_function(hash))
+            if (const auto& r = specified_lib->get_generic_function(hash))
                 return r;
-            if (const auto& r = lib.second->get_generic_type(hash))
+            if (const auto& r = specified_lib->get_generic_type(hash))
                 return r;
-        }
-        return std::unexpected(fmt::format("no such generic function {}", name));
-    }
-
-    std::expected<std::shared_ptr<generic_context>, std::string> table::get_generic_type(std::string name,
-        size_t param_count)
-    {
-        if (name.contains('.'))
+        } else
         {
-            const auto final = name.find_last_of('.');
-            if (auto result = get_value(name.substr(0, final)); result.has_value())
+            for (const auto& lib : program->libraries)
             {
-                const std::shared_ptr<builder::value>& object = result.value();
-                name = object->type->name + name.substr(final);
-            } else
-            {
-                return std::unexpected(result.error());
+                if (const auto& r = lib.second->get_generic_function(hash))
+                    return r;
+                if (const auto& r = lib.second->get_generic_type(hash))
+                    return r;
             }
         }
-        return get_generic_type(name, param_count, program);
+        return std::unexpected(fmt::format("no such generic function {}", name));
     }
 
     std::expected<std::shared_ptr<generic_context>, std::string> table::get_generic_type(std::string name,
         size_t param_count, const std::shared_ptr<builder::program>& program)
     {
         i64 hash = zen::builder::generic_context::get_hash(name,param_count);
-        for (const auto& lib : program->libraries)
+        std::shared_ptr<builder::library> specified_lib;
+        if (name.contains(':'))
         {
-            if (const auto& r = lib.second->get_generic_type(hash))
+            const std::string lib_name = extract_specified_lib(name, specified_lib, program);
+            if (not specified_lib)
+            {
+                return std::unexpected(fmt::format("no such library {}", lib_name));
+            }
+        }
+        if (specified_lib)
+        {
+            if (const auto& r = specified_lib->get_generic_type(hash))
             {
                 return r;
+            }
+        } else
+        {
+            for (const auto& lib : program->libraries)
+            {
+                if (const auto& r = lib.second->get_generic_type(hash))
+                {
+                    return r;
+                }
             }
         }
         return std::unexpected(fmt::format("no such generic class {}", name));
@@ -355,5 +409,13 @@ namespace zen::builder
                                          const std::shared_ptr<builder::program>& program)
     {
         return std::make_shared<table>(gcm, function, type, program);
+    }
+    table_helpers::scope::scope(table& tab, std::string& name): tab(tab)
+    {
+
+    }
+
+    table_helpers::scope::~scope()
+    {
     }
 }

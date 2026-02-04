@@ -2,7 +2,7 @@ add_rules("mode.debug", "mode.release", "plugin.compile_commands.autoupdate")
 --add_requires("fmt", "asmjit", "libffi")
 add_requires("fmt 12.0.0", "gtest")
 
-version = "0.4.2"
+version = "0.4.3"
 
 add_cxflags([[-DKAIZEN_VERSION=]] .. "\"" .. version .. "\"")
 

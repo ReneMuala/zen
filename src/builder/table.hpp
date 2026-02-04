@@ -29,10 +29,9 @@ namespace zen::builder
         std::expected<std::shared_ptr<value>, std::string> get_value(const std::string& name);
         static std::string simple_name(const std::string& name);
         static std::string resolve_type_name(const std::string& name,  const std::unordered_map<std::string, std::shared_ptr<builder::type>> & gcm = {});
-        std::expected<std::pair<std::shared_ptr<builder::value>,std::shared_ptr<builder::function>>, std::string> get_function(const std::string& name, std::vector<std::shared_ptr<zen::builder::type>>& params, std::string& hint);
+        static const std::string extract_specified_lib(std::string& name, std::shared_ptr<library>& specified_lib, std::shared_ptr<builder::program> program);
+        std::expected<std::pair<std::shared_ptr<builder::value>,std::shared_ptr<builder::function>>, std::string> get_function(std::string name, std::vector<std::shared_ptr<zen::builder::type>>& params, std::string& hint);
         std::expected<std::shared_ptr<generic_context>, std::string> get_generic_function_or_type(
-            std::string name, size_t param_count);
-        std::expected<std::shared_ptr<generic_context>, std::string> get_generic_type(
             std::string name, size_t param_count);
         static std::expected<std::shared_ptr<generic_context>, std::string> get_generic_type(
             std::string name, size_t param_count, const std::shared_ptr<builder::program>& program);
@@ -43,4 +42,13 @@ namespace zen::builder
         static std::expected<std::shared_ptr<builder::type>, std::string> get_type(const std::string& name, const std::shared_ptr<builder::program>& program,  const std::unordered_map<std::string, std::shared_ptr<builder::type>> & gcm = {});
         static std::shared_ptr<table> create(const std::shared_ptr<builder::function>& function, const std::unordered_map<std::string, std::shared_ptr<builder::type>> & gcm = {}, const std::shared_ptr<builder::type>& type = nullptr, const std::shared_ptr<builder::program>& program = nullptr);
     };
+    namespace table_helpers
+    {
+        struct scope
+        {
+            table& tab;
+            scope(table& tab, std::string & name);
+            ~scope();
+        };
+    }
 }

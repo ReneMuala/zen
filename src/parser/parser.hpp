@@ -583,7 +583,7 @@ BEGIN_ILC_CODEGEN(parser)
         bool dangling_value = false;
         while (true)
         {
-            if (TRY_REQUIRE_NON_TERMINAL(NSTAT))
+            if (TRY_REQUIRE_NON_TERMINAL(NBLOCK_STAT))
             {
                 if (dangling_value)
                 {
@@ -739,7 +739,7 @@ END_SYMBOL_BINDING
             PRODUCTION_NCLASS()
         END_SYMBOL_BINDING
 
-    BEGIN_SYMBOL_BINDING(NSTAT)
+    BEGIN_SYMBOL_BINDING(NBLOCK_STAT)
             PRODUCTION_NVARIABLE_DEFINITION() or
             PRODUCTION_NIF() or
             PRODUCTION_NFOR() or
