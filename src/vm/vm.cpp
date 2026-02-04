@@ -10,6 +10,7 @@
 #include <ostream>
 #include <stack>
 #include <fmt/core.h>
+#include <iomanip>
 
 #define KAIZEN_ARITHMETICS_FOR_INTEGER_TYPE(T) \
 case add_ ## T: \
@@ -130,16 +131,25 @@ case T##_to_str:\
         if(addr) {free(addr);}\
         *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str()));\
         *(i64*)(*address<i64>(this->code[i + 1], stack)) = _str.length();\
+        /*fmt::println("{}_to_str from {} to {} #{}", STRINGIZE(T), std::string{(char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8), (size_t)*(i64*)*address<i64>(this->code[i + 1], stack)}, *address<T>(this->code[i + 2], stack), *(i64*)*address<i64>(this->code[i + 1], stack));*/\
     }\
 i+=2;\
 break;
 
-#define KAIZEN_STRING_CONVERSION_FOR_INTEGER_TYPE(T,A) \
-KAIZEN_CONVERSION_FROM_INTEGER_TO_STRING(T)\
+#define STRINGIZE(x) #x
+
+#define KAIZEN_CONVERSION_FROM_STRING_TO_TYPE(T)\
 case str_to_##T:\
-    *address<i64>(this->code[i + 1], stack) = A((char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr, 10);\
-    i+=2;\
+/*std::stol(std::string{(char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), (size_t)*(i64*)*address<i64>(this->code[i + 2], stack)});*/\
+std::from_chars((char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), (char*)(*(i64*)(*address<i64>(this->code[i + 2], stack) + 8)+(size_t)*(i64*)*address<i64>(this->code[i + 2], stack)), *address<T>(this->code[i + 1], stack));\
+/*fmt::println("str_to_{} from {} -> {} #{}", STRINGIZE(T), std::string{(char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), (size_t)*(i64*)*address<i64>(this->code[i + 2], stack)}, *address<T>(this->code[i + 1], stack), (size_t)*(i64*)*address<i64>(this->code[i + 2], stack));*/\
+/**address<i64>(this->code[i + 1], stack) = A((char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr, 10);*/\
+i+=2;\
 break;
+
+#define KAIZEN_STRING_CONVERSION_FOR_INTEGER_TYPE(T) \
+KAIZEN_CONVERSION_FROM_INTEGER_TO_STRING(T)\
+KAIZEN_CONVERSION_FROM_STRING_TO_TYPE(T)
 
 #define KAIZEN_STACK_PUSH_FOR_TYPE(T) \
 case push_ ## T:\
@@ -357,40 +367,36 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 }
                 i += 3;
                 break;
-            case i8_to_str:
+            // case i8_to_str:
+                // {
+                //     auto _str = std::string{*address<i8>(this->code[i + 2], stack)};
+                //     fmt::println("[i8_to_str: {} from {}]", _str, (int)*address<i8>(this->code[i + 2], stack));
+                //     const auto addr = (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8);
+                //     if (addr) { free(addr); }
+                //     *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str()));
+                //     *(i64*)(*address<i64>(this->code[i + 1], stack)) = _str.length();
+                // }
+                // i += 2;
+                // break;
+        case i8_to_str:
+            {
+                auto _str = std::string{*address<i8>(this->code[i + 2], stack), 1};
+                auto addr = (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8);
+                if (addr) { free(addr); }
+                *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str()));
+                *(i64*)(*address<i64>(this->code[i + 1], stack)) = 1;
+            }
+            i += 2;
+            break;
+            KAIZEN_CONVERSION_FROM_STRING_TO_TYPE(i8)
+            KAIZEN_STRING_CONVERSION_FOR_INTEGER_TYPE(i16)
+            KAIZEN_STRING_CONVERSION_FOR_INTEGER_TYPE(i32)
+        KAIZEN_STRING_CONVERSION_FOR_INTEGER_TYPE(i64)
+        case f64_to_str:
                 {
-                    auto _str = std::string{*address<i8>(this->code[i + 2], stack)};
-                    const auto addr = (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8);
-                    if (addr) { free(addr); }
-                    *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str()));
-                    *(i64*)(*address<i64>(this->code[i + 1], stack)) = _str.length();
-                }
-                i += 2;
-                break;
-            case str_to_i8: *address<i64>(this->code[i + 1], stack) = strtol(
-                    (char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr, 10);
-                i += 2;
-                break;
-            case i16_to_str:
-                {
-                    auto _str = std::to_string(*address<i16>(this->code[i + 2], stack));
-                    const auto addr = (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8);
-                    if (addr) { free(addr); }
-                    *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str()));
-                    *(i64*)(*address<i64>(this->code[i + 1], stack)) = _str.length();
-                }
-                i += 2;
-                break;
-            case str_to_i16: *address<i64>(this->code[i + 1], stack) = strtol(
-                    (char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr, 10);
-                i += 2;
-                break;
-            KAIZEN_STRING_CONVERSION_FOR_INTEGER_TYPE(i32, strtol)
-            KAIZEN_STRING_CONVERSION_FOR_INTEGER_TYPE(i64, strtoll)
-            case f64_to_str:
-                {
-                    constexpr size_t size = 3 + DBL_MANT_DIG - DBL_MIN_EXP;
-                    char buffer[size]{};
+                    static constexpr size_t size = 3 + DBL_MANT_DIG - DBL_MIN_EXP;
+                    static char buffer[size]{0};
+                    memset(buffer, 0, size);
                     auto result = std::to_chars((char*)buffer, (char*)(buffer + size),
                                                 *address<f64>(this->code[i + 2], stack), std::chars_format::general);
                     auto _str = std::string(buffer);
@@ -401,18 +407,16 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 }
                 i += 2;
                 break;
-            case str_to_f64:
-                *address<f64>(this->code[i + 1], stack) = std::strtod(
-                    (char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr);
-                i += 2;
-                break;
+                KAIZEN_CONVERSION_FROM_STRING_TO_TYPE(f64)
             case f32_to_str:
                 {
-                    constexpr size_t size = 3 + FLT_MANT_DIG - FLT_MIN_EXP;
-                    char buffer[size]{};
+                    static constexpr size_t size = 3 + FLT_MANT_DIG - FLT_MIN_EXP;
+                    static char buffer[size]{0};
+                        memset(buffer, 0, size);
                     auto result = std::to_chars((char*)buffer, (char*)(buffer + size),
                                                 *address<f32>(this->code[i + 2], stack), std::chars_format::general);
                     auto _str = std::string(buffer);
+                        // fmt::println("f32_to_str from {} to {}", *address<f32>(this->code[i + 2], stack), _str);
                     const auto addr = (char*)*(i64*)(*address<i64>(this->code[i + 1], stack) + 8);
                     if (addr) { free(addr); }
                     *(i64*)(*address<i64>(this->code[i + 1], stack) + 8) = reinterpret_cast<i64>(strdup(_str.c_str()));
@@ -420,12 +424,7 @@ void zen::vm::run(stack& stack, const i64& entry_point)
                 }
                 i += 2;
                 break;
-            case str_to_f32:
-                // std::cout << *address<i64>(this->code[i + 1], stack) << " " << *address<i64>(this->code[i + 2], stack) << std::endl;
-                *address<f32>(this->code[i + 1], stack) = std::strtof(
-                    (char*)*(i64*)(*address<i64>(this->code[i + 2], stack) + 8), nullptr);
-                i += 2;
-                break;
+                KAIZEN_CONVERSION_FROM_STRING_TO_TYPE(f32)
             case write_str:
                 fwrite((char*)(*address<i64>(this->code[i + 1], stack)), 1,
                        // std::min(*address<i64>(this->code[i + 2], stack), *(i64*)(*address<i64>(this->code[i + 1], stack))),
