@@ -164,14 +164,16 @@ namespace zen::builder
                     throw exceptions::semantic_error(result.error(), offset);
                 }
             }
-        } else
+        }
+        else
         {
             sym->no_destructor = true;
         }
         return sym;
     }
 
-    std::shared_ptr<value> function::set_alias(const std::shared_ptr<zen::builder::value>& val, const std::string& name) const
+    std::shared_ptr<value> function::set_alias(const std::shared_ptr<zen::builder::value>& val,
+                                               const std::string& name) const
     {
         const auto& scp = get_scope();
         scp->locals[name].push_back(val);
@@ -183,8 +185,10 @@ namespace zen::builder
     {
         if (not _1->has_same_type_as(*_2))
         {
-            throw exceptions::semantic_error(fmt::format("cannot {} {}[{}] to {}[{}]", verb, _2->type->name, _2->type->get_full_size(), _1->type->name, _1->type->get_full_size()),
-                                             offset);
+            throw exceptions::semantic_error(
+                fmt::format("cannot {} {}[{}] to {}[{}]", verb, _2->type->name, _2->type->get_full_size(),
+                            _1->type->name, _1->type->get_full_size()),
+                offset);
         }
     }
 
@@ -202,7 +206,9 @@ namespace zen::builder
     {
         assert_same_type("add", lhs, rhs, offset);
         assert_same_type("assign", r, lhs, offset);
-        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack)
+                                  ? set_local(r->type, "temp::srh")
+                                  : nullptr;
         if (lhs->is(_byte()))
             gen<zen::add_i8>(temp_srh ? temp_srh : temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
@@ -240,7 +246,9 @@ namespace zen::builder
     {
         assert_same_type("subtract", lhs, rhs, offset);
         assert_same_type("assign", r, lhs, offset);
-        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack)
+                                  ? set_local(r->type, "temp::srh")
+                                  : nullptr;
         if (lhs->is(_byte()))
             gen<zen::sub_i8>(temp_srh ? temp_srh : temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
@@ -278,7 +286,9 @@ namespace zen::builder
     {
         assert_same_type("multiply", lhs, rhs, offset);
         assert_same_type("assign", r, lhs, offset);
-        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack)
+                                  ? set_local(r->type, "temp::srh")
+                                  : nullptr;
         if (lhs->is(_byte()))
             gen<zen::mul_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
@@ -316,7 +326,9 @@ namespace zen::builder
     {
         assert_same_type("divide", lhs, rhs, offset);
         assert_same_type("assign", r, lhs, offset);
-        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack)
+                                  ? set_local(r->type, "temp::srh")
+                                  : nullptr;
         if (lhs->is(_byte()))
             gen<zen::div_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
@@ -354,7 +366,9 @@ namespace zen::builder
     {
         assert_same_type("mod", lhs, rhs, offset);
         assert_same_type("assign", r, lhs, offset);
-        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack)
+                                  ? set_local(r->type, "temp::srh")
+                                  : nullptr;
         if (lhs->is(_byte()))
             gen<zen::mod_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
@@ -388,7 +402,9 @@ namespace zen::builder
     {
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
-        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack)
+                                  ? set_local(r->type, "temp::srh")
+                                  : nullptr;
         if (lhs->is(_byte()) or lhs->is(_bool()))
             gen<eq_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
@@ -426,7 +442,9 @@ namespace zen::builder
     {
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
-        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack)
+                                  ? set_local(r->type, "temp::srh")
+                                  : nullptr;
         if (lhs->is(_byte()) or lhs->is(_bool()))
             gen<neq_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
@@ -464,7 +482,9 @@ namespace zen::builder
     {
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
-        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack)
+                                  ? set_local(r->type, "temp::srh")
+                                  : nullptr;
         if (lhs->is(_byte()))
             gen<zen::lt_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
@@ -502,7 +522,9 @@ namespace zen::builder
     {
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
-        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack)
+                                  ? set_local(r->type, "temp::srh")
+                                  : nullptr;
         if (lhs->is(_byte()))
             gen<lte_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
@@ -540,7 +562,9 @@ namespace zen::builder
     {
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
-        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack)
+                                  ? set_local(r->type, "temp::srh")
+                                  : nullptr;
         if (lhs->is(_byte()))
             gen<zen::gt_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
@@ -578,7 +602,9 @@ namespace zen::builder
     {
         assert_same_type("compare", lhs, rhs, offset);
         assert_type("assign", r, _bool(), offset);
-        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack)
+                                  ? set_local(r->type, "temp::srh")
+                                  : nullptr;
         if (lhs->is(_byte()))
             gen<gte_i8>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         else if (lhs->is(_short()))
@@ -635,7 +661,7 @@ namespace zen::builder
             }
             else if (lhs->is_reference and not rhs->is_reference)
             {
-                const auto ref = set_local(_long(),"temp::rhs_ref");
+                const auto ref = set_local(_long(), "temp::rhs_ref");
                 gen<zen::refer>(ref, rhs);
                 ref->type = rhs->type;
                 ref->is_reference = true;
@@ -644,7 +670,7 @@ namespace zen::builder
             }
             else if (not lhs->is_reference and rhs->is_reference)
             {
-                const auto ref = set_local(_long(),"temp::lhs_ref");
+                const auto ref = set_local(_long(), "temp::lhs_ref");
                 gen<zen::refer>(ref, lhs);
                 ref->type = lhs->type;
                 ref->is_reference = true;
@@ -653,10 +679,12 @@ namespace zen::builder
             }
             else
             {
-                gen<zen::copy>(lhs, rhs, lhs->type->get_full_size(), fmt::format("@size:{}", lhs->type->get_full_size()));
+                gen<zen::copy>(lhs, rhs, lhs->type->get_full_size(),
+                               fmt::format("@size:{}", lhs->type->get_full_size()));
             }
         }
-        else {
+        else
+        {
             if (const auto result = call(create("operator=", {lhs->type, rhs->type}, nullptr), {lhs, rhs}); not result.
                 has_value())
             {
@@ -667,7 +695,9 @@ namespace zen::builder
 
     void function::not_(const std::shared_ptr<value>& r, const std::shared_ptr<value>& val)
     {
-        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack)
+                                  ? set_local(r->type, "temp::srh")
+                                  : nullptr;
         gen<zen::boolean_not>(temp_srh ? temp_srh : r, resolve(val));
         if (temp_srh)
         {
@@ -676,9 +706,11 @@ namespace zen::builder
     }
 
     void function::and_(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
-        const std::shared_ptr<value>& rhs)
+                        const std::shared_ptr<value>& rhs)
     {
-        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack)
+                                  ? set_local(r->type, "temp::srh")
+                                  : nullptr;
         gen<zen::boolean_and>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         if (temp_srh)
         {
@@ -688,9 +720,11 @@ namespace zen::builder
 
 
     void function::or_(const std::shared_ptr<value>& r, const std::shared_ptr<value>& lhs,
-        const std::shared_ptr<value>& rhs)
+                       const std::shared_ptr<value>& rhs)
     {
-        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack) ? set_local(r->type, "temp::srh") : nullptr;
+        const auto temp_srh = (r->is_reference and r->type->kind == type::kind::stack)
+                                  ? set_local(r->type, "temp::srh")
+                                  : nullptr;
         gen<zen::boolean_or>(temp_srh ? temp_srh : r, resolve(lhs), resolve(rhs));
         if (temp_srh)
         {
@@ -764,12 +798,13 @@ namespace zen::builder
                 arg = cha;
             }
             else if (arg->is_reference)
-                // deference fields only if they are stack allocated since nested objects are stored in a contiguous memory block
+            // deference fields only if they are stack allocated since nested objects are stored in a contiguous memory block
             {
                 if (arg->type->kind == type::kind::stack)
                 {
                     arg = dereference(arg);
-                } else
+                }
+                else
                 {
                     arg = advance(arg);
                 }
@@ -945,6 +980,25 @@ namespace zen::builder
         }
     }
 
+    std::shared_ptr<value> function::to_localized(const std::shared_ptr<value>& value)
+    {
+        if (value->is_reference)
+        {
+            auto localized = set_local(value->type, "temp::localized");
+            move(localized, value);
+            return localized;
+        }
+        return value;
+    }
+
+    void function::scoped(const std::function<void(const std::shared_ptr<builder::function>&)>& body)
+    {
+        const auto scp = get_scope(true);
+        scp->__dncd__push(block::create(scope::in_function));
+        body(shared_from_this());
+        pop();
+    }
+
     static std::shared_ptr<value> constant_of_type(const i64 val, const std::shared_ptr<type>& t)
     {
         return std::make_shared<value>(fmt::format("{}", val), t, 0);
@@ -966,10 +1020,10 @@ namespace zen::builder
         else if (params.size() == 4)
         {
             const auto cond = set_local(_bool(), "for::cond");
-            const std::shared_ptr<value> &iterator = params[0],
-                                         &first = params[1],
-                                         &last = params[2],
-                                         &step = params[3];
+             const std::shared_ptr<value> &iterator = params[0],
+                                         first = to_localized(params[1]),
+                                         last = to_localized(params[2]),
+                                         step = to_localized(params[3]);
             const std::shared_ptr<builder::label> begin = label(),
                                                   end = label(),
                                                   condition = label();
@@ -982,7 +1036,8 @@ namespace zen::builder
                 if (step->is_negated)
                 {
                     greater_equal(cond, iterator, last);
-                } else
+                }
+                else
                 {
                     lower_equal(cond, iterator, last);
                 }
@@ -1013,11 +1068,10 @@ namespace zen::builder
         {
             const auto cond = params[0];
             go_if_not(cond, end);
+            scoped([&](auto _)
             {
-                scp->__dncd__push(block::create(scope::in_for_body));
                 body(shared_from_this());
-                pop();
-            }
+            });
             peek();
             go(begin);
             bind(end);
@@ -1038,7 +1092,9 @@ namespace zen::builder
                 {
                     if (local->type->kind == type::heap && !local->no_destructor)
                     {
-                        if (const auto result = call(create(fmt::format("{}::deallocate", local->type->name), {local->type}, nullptr), {local}); not
+                        if (const auto result = call(
+                                create(fmt::format("{}::deallocate", local->type->name), {local->type}, nullptr),
+                                {local}); not
                             result.
                             has_value())
                         {
@@ -1082,7 +1138,9 @@ namespace zen::builder
                 {
                     if (local->type->kind == type::heap && !local->no_destructor)
                     {
-                        if (const auto result = call(create(fmt::format("{}::deallocate", local->type->name), {local->type}, nullptr), {local}); not
+                        if (const auto result = call(
+                                create(fmt::format("{}::deallocate", local->type->name), {local->type}, nullptr),
+                                {local}); not
                             result.
                             has_value())
                         {
@@ -1095,7 +1153,7 @@ namespace zen::builder
             if (final)
             {
                 callee_cost = signature->type ? signature->type->get_size() : 0;
-                for (const auto & param : signature->parameters)
+                for (const auto& param : signature->parameters)
                 {
                     callee_cost += param->get_size();
                 }

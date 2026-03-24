@@ -891,6 +891,14 @@ BEGIN_ILC_CODEGEN(builder_parser)
         {
             if (not pragma_context_implementation)
             {
+                if (at_extern)
+                {
+                    throw zen::exceptions::semantic_error(fmt::format("generic function cannot be marked as @extern", fun->name), offset);
+                }
+                if (at_debug)
+                {
+                    throw zen::exceptions::semantic_error(fmt::format("generic function cannot be marked as @debug", fun->name), offset);
+                }
                 type.clear();
                 REQUIRE_NON_TERMINAL(META_NANY_BODY)
                 REQUIRE_TERMINAL_CALLBACK(TEQU, EXPECTED("="))
@@ -1058,6 +1066,8 @@ BEGIN_ILC_CODEGEN(builder_parser)
     END_PRODUCTION
 
     BEGIN_PRODUCTION(META_PRODUCTION_NFOR)
+const auto scp = fun->get_scope(true);
+scp->__dncd__push(zen::builder::block::create(zen::builder::scope::in_function));
         REQUIRE_TERMINAL_CALLBACK(TID, EXPECTED("ID"))
         const std::string iterator = tokens[offset - 1].value;
         type.clear();
@@ -1115,6 +1125,7 @@ BEGIN_ILC_CODEGEN(builder_parser)
             });
             REQUIRE_TERMINAL_CALLBACK(TBRACES_CLOSE, EXPECTED("}"))
         }
+fun->pop();
     END_PRODUCTION
 
     BEGIN_PRODUCTION(PRODUCTION_NFOR)

@@ -88,6 +88,8 @@ namespace zen::builder
                             function>&, const std::shared_ptr<builder::label>&,
                         const std::shared_ptr<builder::label>&)>&, const std::shared_ptr<builder::label>& pel = nullptr, const std::
                     shared_ptr<builder::label>& pen = nullptr);
+        std::shared_ptr<value> to_localized(const std::shared_ptr<value>& value);
+        void scoped(const std::function<void(const std::shared_ptr<builder::function>&)>& body);
         void loop_for(const std::vector<std::shared_ptr<value>>& params, const std::function<void(const std::shared_ptr<
                           builder::function>&)>& body);
         template<typename T>
@@ -378,9 +380,9 @@ namespace zen::builder
         function& operator=(const function&) = delete;
         void peek();
         void build();
+        void pop(bool final = false);
     private:
         i64 get_stack_usage() const;
-        void pop(bool final = false);
         std::shared_ptr<value> resolve(const std::shared_ptr<value> & variable_or_ref)
         {
             return variable_or_ref->is_reference ? dereference(variable_or_ref) : variable_or_ref;

@@ -199,7 +199,7 @@ class point {
 	}
 #else
 	zen_run(R"(
-main() = {
+main0() = {
 		io::println("Hello world")
 		x := 1
 		if(typing::is<int>(x)){
@@ -436,7 +436,28 @@ rect(lines: int, cols: int) = {
 		println(sumg<double>(1.5,-2.5))
 		println(abs<long>(-1l))
 */
+main = {
+	tab := TableCreator(10,10)
+	tab.print()
+}
 
+class TableCreator {
+    rows: int
+    columns: int
+
+    new(r: int, c: int) = {
+        rows = r
+        columns = c
+    }
+	i: int
+
+    @debug
+    print = {
+        for(i := 1, rows){
+            println(string(i) + ", ")
+        }
+    }
+}
 	main4 = {
 		println(string("hello".len()))
 		println("".empty())
